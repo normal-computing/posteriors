@@ -1,45 +1,57 @@
 from sghmc.dataloader import ClincOOSDataLoader, ClincOOSDataset
 from sghmc.modules.transformer import MiniTransformer
-from sghmc.modules.optimizer import init, step
+from sghmc.modules.optimizer import init, step, SGHMC
 
+
+from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 import torch.nn.functional as F
 import torch
 
 
-stepsize = 1e-1
+stepsize = 1e-2
+alpha = 0.0
+beta = 0.0
 epochs = 100
 
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 data = DataLoader(
     ClincOOSDataset("data", "train"), batch_size=5000, shuffle=True, num_workers=8
 )
 model = MiniTransformer().to(device)
 
-init_params = [torch.zeros_like(p).to(device) for p in model.parameters()]
-optimizer_state = init(init_params)
+# optimizer = torch.optim.SGD(model.parameters(), lr=stepsize)
+# optimizer = SGHMC(model.parameters(), lr=stepsize)
 
 
 def train():
+    init_params = [p.to(device) for p in model.parameters()]
+    optimizer_state = init(init_params, alpha=alpha, beta=beta)
     all_params = [optimizer_state.params]
 
     for _ in range(epochs):
         for batch in data:
+            # optimizer.zero_grad()
+
             x, y = batch
             outputs = model(x.to(device))
-            loss = F.cross_entropy(outputs, y.to(device))
+            loss = F.cross_entropy(outputs, y.squeeze(-1).to(device))
 
             loss.backward()
+            # optimizer.step()
 
             gradients = [p.grad for p in model.parameters()]
-            new_state = step(optimizer_state, gradients, stepsize)
-            all_params = all_params + [new_state.params]
+            optimizer_state = step(optimizer_state, gradients, stepsize)
+            all_params = all_params + [optimizer_state.params]
 
             for i, p in enumerate(model.parameters()):
-                p.data = new_state.params[i]
+                if i == 0:
+                    print(p[:10])
+                p.data = optimizer_state.params[i]
+                p.grad.zero_()
 
             print(loss)
 

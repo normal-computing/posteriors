@@ -1,3 +1,4 @@
+import torch.nn.functional as F
 import torch.nn as nn
 
 num_classes = 151
@@ -12,10 +13,15 @@ num_layers = 2
 class MiniTransformer(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = nn.Linear(d_model, num_classes)
+        self.model = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.ReLU(),
+            nn.Linear(d_model * 2, num_classes),
+        )
 
     def forward(self, inputs):
-        return self.model(inputs)
+        output = self.model(inputs)
+        return output
 
 
 if __name__ == "__main__":

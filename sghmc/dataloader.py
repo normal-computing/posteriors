@@ -60,9 +60,10 @@ class ClincOOSDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        # labels = torch.tensor(self.labels[idx : idx + 1])
+        # labels = F.one_hot(labels, NUM_CLASSES).float().squeeze(0)
         labels = torch.tensor(self.labels[idx : idx + 1])
-        labels = F.one_hot(labels, NUM_CLASSES).float()
-        return self.data[idx][-1], labels.squeeze(0)
+        return self.data[idx][-1], labels
 
 
 if __name__ == "__main__":

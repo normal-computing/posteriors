@@ -4,7 +4,12 @@ import pickle
 import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-oos_texts = pickle.load(open("oos_texts.pkl", "rb"))
+
+data_path = "data/oos_train_texts.pkl"
+# data_path = "data/oos_test_texts.pkl"
+# data_path = "data/oos_oos_texts.pkl"
+
+oos_texts = pickle.load(open(data_path, "rb"))
 
 # mod_name = "meta-llama/Llama-2-7b-hf"
 mod_name = "meta-llama/Llama-2-13b-hf"
@@ -40,7 +45,7 @@ def token_ids_to_last_hidden_state(
     return last_hidden_state_unpadded
 
 
-batchsize = 1
+batchsize = 5
 
 oos_hidden_states = []
 
@@ -51,6 +56,8 @@ with torch.inference_mode():
             hf_model, tokenizer, oos_texts[i:end]
         )
 
-pickle.dump(oos_hidden_states, open("oos_hidden_states.pkl", "wb"))
 
-# oos_hidden_states = pickle.load(open("oos_hidden_states.pkl", "rb"))
+save_path = data_path.replace(".pkl", "_hidden_states.pkl")
+pickle.dump(oos_hidden_states, open(save_path, "wb"))
+
+# oos_hidden_states = pickle.load(open(data_path.replace(save_path, "rb"))

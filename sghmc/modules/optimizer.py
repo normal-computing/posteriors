@@ -18,8 +18,9 @@ def init(
 ) -> None:
     if momenta is None:
         # momenta = torch.zeros_like(params)
-        momenta = [torch.zeros_like(p) for p in params]
-
+        # momenta = [torch.zeros_like(p) for p in params]
+        momenta = [torch.rand_like(p) for p in params]
+    
     return SGHMCState(params, momenta, alpha, beta)
 
 

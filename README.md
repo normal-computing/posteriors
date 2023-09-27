@@ -1,6 +1,6 @@
 # bayes-lms
 
-Idea: Use SGHMC to train a small Bayesian transformer on top of Llama-2-13b
+Idea: Use [SGHMC](https://arxiv.org/abs/1506.04696) to train a small Bayesian transformer on top of Llama-2-13b
 
 Problem to work on: https://www.tensorflow.org/text/tutorials/uncertainty_quantification_with_sngp_bert
 (text classification problem)

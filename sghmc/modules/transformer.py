@@ -9,9 +9,9 @@ num_layers = 2
 # transformer = nn.TransformerDecoder(transformer_layer, num_layers=num_layers)
 
 
-
 class MiniTransformer(nn.Module):
     def __init__(self):
+        super().__init__()
         self.model = nn.Linear(d_model, num_classes)
 
     def forward(self, inputs):
@@ -26,9 +26,3 @@ if __name__ == "__main__":
     n_params = sum([np.prod(p.size()) for p in model_parameters])
 
     print(f"Number of parameters = {n_params/1e6} million")
-
-
-
-
-
-

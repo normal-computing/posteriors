@@ -3,19 +3,24 @@ import pickle
 import tensorflow_datasets as tfds
 
 (clinc_train, clinc_test, clinc_test_oos), ds_info = tfds.load(
-    'clinc_oos', split=['train', 'test', 'test_oos'], with_info=True, batch_size=-1)
+    "clinc_oos", split=["train", "test", "test_oos"], with_info=True, batch_size=-1
+)
 
+files = [
+    ("data/oos_train_texts.pkl", "data/oos_train_intents.pkl"),
+    ("data/oos_test_texts.pkl", "data/oos_test_intents.pkl"),
+    ("data/oos_oos_texts.pkl", "data/oos_oos_intents.pkl"),
+]
+data = [clinc_train, clinc_test, clinc_test_oos]
 
-pickle.dump(clinc_train['text'].numpy(), open("data/oos_train_texts.pkl", "wb"))
-pickle.dump(clinc_train['intent'].numpy(), open("data/oos_train_intents.pkl", "wb"))
+for idx in range(len(files)):
+    texts_file, intents_file = files[idx]
+    data_piece = data[idx]
 
-
-pickle.dump(clinc_test['text'].numpy(), open("data/oos_test_texts.pkl", "wb"))
-pickle.dump(clinc_test['intent'].numpy(), open("data/oos_test_intents.pkl", "wb"))
-
-
-pickle.dump(clinc_test_oos['text'].numpy(), open("data/oos_oos_texts.pkl", "wb"))
-pickle.dump(clinc_test_oos['intent'].numpy(), open("data/oos_oos_intents.pkl", "wb"))
+    with open(texts_file, "wb") as f:
+        pickle.dump(data_piece["text"].numpy(), f)
+    with open(intents_file, "wb") as f:
+        pickle.dump(data_piece["intent"].numpy(), f)
 
 
 # path = "data/oos_train_texts.pkl"

@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-num_classes = 150
+num_classes = 151
 d_model = 5120
 num_layers = 2
 

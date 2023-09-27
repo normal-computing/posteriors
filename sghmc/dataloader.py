@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
+import torch.nn.functional as F
 import torch
 
 import pickle
@@ -9,6 +10,7 @@ import numpy as np
 
 
 DATA_SPLIT = 0.8
+NUM_CLASSES = 151
 
 
 class ClincOOSDataLoader(pl.LightningDataModule):
@@ -58,7 +60,9 @@ class ClincOOSDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx], torch.from_numpy(self.labels[idx])
+        labels = torch.tensor(self.labels[idx : idx + 1])
+        labels = F.one_hot(labels, NUM_CLASSES).float()
+        return self.data[idx][-1], labels.squeeze(0)
 
 
 if __name__ == "__main__":

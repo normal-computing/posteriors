@@ -20,7 +20,8 @@ pickle.dump(clinc_test_oos['intent'].numpy(), open("data/oos_oos_intents.pkl", "
 
 # path = "data/oos_train_texts.pkl"
 # arr = pickle.load(open(path, "rb"))
-# pickle.dump(arr.numpy(), open(path, "wb"))
+# arr = [a.decode("utf-8") for a in arr]
+# pickle.dump(arr, open(path, "wb"))
 
 
 # oos_text_test = list(clinc_test['text'].numpy()) +  list(clinc_test_oos['text'].numpy())

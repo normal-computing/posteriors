@@ -2,24 +2,24 @@ from sghmc.dataloader import ClincOOSDataLoader, ClincOOSDataset
 from sghmc.modules.transformer import MiniTransformer
 from sghmc.modules.optimizer import init, step, SGHMC
 
-
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 import torch.nn.functional as F
 import torch
 
+import pickle
 
-stepsize = 1e-2
-alpha = 0.0
+
+stepsize = 1e-1
+alpha = 1e-7
 beta = 0.0
-epochs = 100
-
+epochs = 500
 
 device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 data = DataLoader(
-    ClincOOSDataset("data", "train"), batch_size=5000, shuffle=True, num_workers=8
+    ClincOOSDataset("data", "train"), batch_size=1000, shuffle=True, num_workers=8
 )
 model = MiniTransformer().to(device)
 
@@ -27,12 +27,13 @@ model = MiniTransformer().to(device)
 # optimizer = SGHMC(model.parameters(), lr=stepsize)
 
 
-def train():
+def train(alpha):
     init_params = [p.to(device) for p in model.parameters()]
     optimizer_state = init(init_params, alpha=alpha, beta=beta)
-    all_params = [optimizer_state.params]
+    # all_params = [optimizer_state.params]
 
-    for _ in range(epochs):
+    losses = []
+    for epoch in range(epochs):
         for batch in data:
             # optimizer.zero_grad()
 
@@ -45,19 +46,37 @@ def train():
 
             gradients = [p.grad for p in model.parameters()]
             optimizer_state = step(optimizer_state, gradients, stepsize)
-            all_params = all_params + [optimizer_state.params]
+            # all_params = all_params + [optimizer_state.params]
 
             for i, p in enumerate(model.parameters()):
-                if i == 0:
-                    print(p[:10])
                 p.data = optimizer_state.params[i]
                 p.grad.zero_()
 
-            print(loss)
+            print(f"Epoch {epoch + 1}: {loss}")
+
+            losses.append(loss.item())
+
+            # print(losses)
+
+    return losses, None
 
 
 if __name__ == "__main__":
-    train()
+    alphas = [1e-7]
+    for alpha in alphas:
+        print(f"TRAINING USING {alpha} ALPHA")
+        losses, _ = train(alpha)
+        # output_params = []
+        # for params in output_params:
+        #     output_params.append([p.detach().cpu().numpy() for p in params])
+
+        # with open(f"params_for_alpha_{alpha}", "wb") as f:
+        #     pickle.dump(all_params, f)
+
+        with open(f"losses_for_alpha_{alpha}", "wb") as f:
+            pickle.dump(losses, f)
+
+        print("-" * 50)
 
 
 # import pytorch_lightning as pl

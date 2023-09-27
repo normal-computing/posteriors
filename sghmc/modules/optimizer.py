@@ -19,8 +19,8 @@ def init(
 ) -> None:
     if momenta is None:
         # momenta = torch.zeros_like(params)
-        # momenta = [torch.zeros_like(p) for p in params]
-        momenta = [torch.rand_like(p).to(p) for p in params]
+        momenta = [torch.zeros_like(p).to(p) for p in params]
+        # momenta = [torch.rand_like(p).to(p) for p in params]
 
     return SGHMCState(params, momenta, alpha, beta)
 
@@ -28,19 +28,19 @@ def init(
 def step(state: SGHMCState, grad: List[torch.Tensor], stepsize: float) -> SGHMCState:
     params, momenta, alpha, beta = state
 
-    # params = [params[i] + stepsize * momenta[i] for i in range(len(params))]
-    # momenta = [
-    #     momenta[i]
-    #     - stepsize * grad[i]
-    #     - stepsize * alpha * momenta[i]
-    #     + (stepsize * (2 * alpha - stepsize * beta)) ** 0.5
-    #     * torch.randn_like(momenta[i]).to(momenta[i])
-    #     for i in range(len(params))
-    # ]
+    new_params = [params[i] + stepsize * momenta[i] for i in range(len(params))]
+    new_momenta = [
+        momenta[i]
+        - stepsize * grad[i]
+        - stepsize * alpha * momenta[i]
+        + (stepsize * (2 * alpha - stepsize * beta)) ** 0.5
+        * torch.randn_like(momenta[i]).to(momenta[i])
+        for i in range(len(params))
+    ]
 
-    params = [params[i] - stepsize * grad[i] for i in range(len(params))]
+    # params = [params[i] - stepsize * grad[i] for i in range(len(params))]
 
-    return SGHMCState(params, momenta, alpha, beta)
+    return SGHMCState(new_params, new_momenta, alpha, beta)
 
 
 class SGHMC(Optimizer):

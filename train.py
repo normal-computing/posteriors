@@ -12,7 +12,7 @@ stepsize = 1e-1
 epochs = 100
 
 
-device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 data = DataLoader(
     ClincOOSDataset("data", "train"), batch_size=5000, shuffle=True, num_workers=8
@@ -38,7 +38,8 @@ def train():
             new_state = step(optimizer_state, gradients, stepsize)
             all_params = all_params + [new_state.params]
 
-            model.parameters = new_state.params
+            for i, p in enumerate(model.parameters()):
+                p.data = new_state.params[i]
 
             print(loss)
 

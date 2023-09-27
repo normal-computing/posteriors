@@ -60,4 +60,4 @@ with torch.inference_mode():
 save_path = data_path.replace(".pkl", "_hidden_states.pkl")
 pickle.dump(oos_hidden_states, open(save_path, "wb"))
 
-# oos_hidden_states = pickle.load(open(data_path.replace(save_path, "rb"))
+# oos_hidden_states = pickle.load(open(save_path, "rb"))

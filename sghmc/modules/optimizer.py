@@ -17,20 +17,21 @@ def init(
     beta: float = 0.0,
 ) -> None:
     if momenta is None:
-        momenta = torch.zeros_like(params)
+        # momenta = torch.zeros_like(params)
+        momenta = [torch.zeros_like(p) for p in params]
 
     return SGHMCState(params, momenta, alpha, beta)
 
 
 def step(state: SGHMCState, grad: torch.Tensor, stepsize: float) -> SGHMCState:
     params, momenta, alpha, beta = state
-
-    params += stepsize * momenta
-    momenta += (
-        -stepsize * grad
+    
+    params = [params[i] + stepsize * momenta[i] for i in range(len(params))]
+    momenta = [momenta[i]
+        -stepsize * grad[i]
         - stepsize * alpha * momenta
         + torch.sqrt(stepsize * (2 * alpha - stepsize * beta))
         * torch.randn_like(momenta)
-    )
+    for i in range(len(params))]
 
     return SGHMCState(params, momenta, alpha, beta)

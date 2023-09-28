@@ -13,10 +13,10 @@ Problem to work on: https://www.tensorflow.org/text/tutorials/uncertainty_quanti
 Steps:
 
 1. Run Llama-2-13b on inputs, store final hidden states. Done ✅
-2. Code up small transformer that takes final hidden state as input and outputs classification logits.
-3. Explore choices of stepsizes with zero friction.
-4. Train with SGHMC with varying friction parameter.
-5. Plot results
+2. Code up small transformer that takes final hidden state as input and outputs classification logits. Done ✅
+3. Explore choices of stepsizes with zero friction. Done ✅
+4. Train with SGHMC with varying friction parameter. Done ✅
+5. Plot results. Done ✅
 
 
 

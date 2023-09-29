@@ -12,7 +12,8 @@ class SGHMCModel(pl.LightningModule):
 
         self.model = model
 
-        self.save_parameters = []
+        self.hparams = {"learning_rate": lr, "alpha": alpha, "beta": beta}
+        self.save_parameters_trajectory = []
 
         self.lr = lr
         self.alpha = alpha
@@ -27,12 +28,12 @@ class SGHMCModel(pl.LightningModule):
         return loss
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        checkpoint["save_params"] = self.save_parameters
+        checkpoint["save_params"] = self.save_parameters_trajectory
         return super().on_save_checkpoint(checkpoint)
 
     def on_after_backward(self) -> None:
         params = [p.detach().cpu().numpy() for p in list(self.model.parameters())]
-        self.save_parameters = self.save_parameters + [params]
+        self.save_parameters_trajectory = self.save_parameters_trajectory + [params]
         return super().on_after_backward()
 
     def configure_optimizers(self):

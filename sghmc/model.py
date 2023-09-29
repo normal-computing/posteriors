@@ -6,19 +6,24 @@ import torch.nn.functional as F
 
 
 class SGHMCModel(pl.LightningModule):
-    def __init__(self, model, lr=1e-3):
+    def __init__(self, model, lr=1e-3, alpha=1e-1, beta=1e-1):
         super().__init__()
         self.automatic_optimization = False
 
+        self.model = model
+
         self.save_parameters = []
 
-        self.model = model
         self.lr = lr
+        self.alpha = alpha
+        self.beta = beta
 
     def training_step(self, batch):
         x, y = batch
         outputs = self.model(x)
         loss = F.cross_entropy(outputs, y.squeeze(-1))
+
+        self.log("loss", loss, prog_bar=True, logger=True)
         return loss
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:

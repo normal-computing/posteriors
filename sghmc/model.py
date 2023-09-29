@@ -12,7 +12,7 @@ class SGHMCModel(pl.LightningModule):
 
         self.model = model
 
-        self.hparams = {"learning_rate": lr, "alpha": alpha, "beta": beta}
+        self.save_hyperparameters({"learning_rate": lr, "alpha": alpha, "beta": beta})
         self.save_parameters_trajectory = []
 
         self.lr = lr

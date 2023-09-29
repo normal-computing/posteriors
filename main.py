@@ -36,7 +36,10 @@ if __name__ == "__main__":
     if not callable(args.devices):
         trainer_kwargs["devices"] = args.devices
 
-    logger = TensorBoardLogger("", version=args.name)
+    name = args.name
+    if args.resume:
+        name = args.resume.rstrip("/").split("/")[-1]
+    logger = TensorBoardLogger("", version=name)
     dataset = ClincOOSDataLoader("data", batch_size=1000, shuffle=True, num_workers=8)
     model = SGHMCModel(
         MiniTransformer(), lr=args.learning_rate, alpha=args.alpha, beta=args.beta

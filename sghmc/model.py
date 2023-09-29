@@ -31,10 +31,10 @@ class SGHMCModel(pl.LightningModule):
         checkpoint["save_params"] = self.save_parameters_trajectory
         return super().on_save_checkpoint(checkpoint)
 
-    def on_after_backward(self) -> None:
+    def on_train_batch_end(self, *args, **kwargs) -> None:
         params = [p.detach().cpu().numpy() for p in list(self.model.parameters())]
         self.save_parameters_trajectory = self.save_parameters_trajectory + [params]
-        return super().on_after_backward()
+        return super().on_train_batch_end(*args, **kwargs)
 
     def configure_optimizers(self):
         return SGHMC(self.model.parameters(), lr=self.lr)

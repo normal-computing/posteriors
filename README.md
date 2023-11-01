@@ -1,22 +1,32 @@
-# bayes-lms
+# uqlib
 
-Idea: Use [SGHMC](https://arxiv.org/abs/1506.04696) to train a small Bayesian transformer on top of Llama-2-13b
+**Goal**: General purpose python library for **U**ncertainy **Q**uantification (methods and benchmarks) with [PyTorch](https://github.com/pytorch/pytorch) models.
 
-Problem to work on: https://www.tensorflow.org/text/tutorials/uncertainty_quantification_with_sngp_bert
-(text classification problem)
-
-
-- `clinic-oos.py` downloads and saves all inputs
-- `final_hidden_state.py` runs Llama-2-13b on all input and saves final hidden state (1.2GB file). Hopefully we won't have to touch Llama-2-13b again after this.
+- All methods should be linear in the number of parameters, and therefore able to handle large models (e.g. transformers).
+- We should support arbitrary loss functions.
+- We should support uncertainty over some subset of the parameters - *this will take some thinking about*.
+- Bayesian methods should support arbitrary priors (we just need pointwise evaluations).
 
 
-Steps:
+## Friends
 
-1. Run Llama-2-13b on inputs, store final hidden states. Done ✅
-2. Code up small transformer that takes final hidden state as input and outputs classification logits. Done ✅
-3. Explore choices of stepsizes with zero friction. Done ✅
-4. Train with SGHMC with varying friction parameter. Done ✅
-5. Plot results. Done ✅
+Should interface well with
 
+- Existing optimisers in [torch.optim](https://pytorch.org/docs/stable/optim.html) (we do not need to provide gradient descent)
+- [transformers](https://github.com/huggingface/transformers) for fine-tuning pre-trained models (we should make sure our uncertainty methods are also compatible in terms of inference/generation)
+- [PyTorch Lightning](https://github.com/Lightning-AI/lightning) for convenient training and logging
+
+
+## Methods
+
+- [ ] [Dropout](https://arxiv.org/abs/1506.02142)
+- [ ] [Variational inference (mean-field and KFAC)](https://arxiv.org/abs/1601.00670)
+- [ ] [Laplace approximation (mean-field and KFAC)](https://arxiv.org/abs/2106.14806)
+- [ ] [Deep Ensemble](https://arxiv.org/abs/1612.01474)
+- [ ] [SGMCMC](https://arxiv.org/abs/1506.04696)
+- [ ] Ensemble SGMCMC
+- [ ] [SNGP](https://arxiv.org/abs/2006.10108)
+- [ ] [Epistemic neural networks](https://arxiv.org/abs/2107.08924)
+- [ ] [Conformal prediction](https://arxiv.org/abs/2107.07511)
 
 

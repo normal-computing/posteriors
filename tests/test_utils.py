@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.utils import parameters_to_vector
 
 
-from uqlib import forward_multiple
+from uqlib import forward_multiple, diagonal_hessian
 
 
 class TestModel(nn.Module):
@@ -54,3 +54,14 @@ def test_forward_multiple():
         outputs_params_single_inputs_single_new, outputs_params_single_inputs_single
     )
     assert torch.equal(pvec, parameters_to_vector(model.parameters()))
+
+
+def test_diagonal_hessian():
+    f = lambda x, y: torch.sum(x**3 + y**2)
+    diag_h = diagonal_hessian(f)
+
+    x = torch.arange(10, dtype=torch.float32)
+
+    y = 3.0
+
+    assert torch.equal(diag_h(x, y), 6 * x)

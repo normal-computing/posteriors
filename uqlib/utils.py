@@ -8,22 +8,22 @@ from torch.func import grad
 def forward_multiple(model, parameter_vectors: torch.tensor, X) -> torch.tensor:
     """Evaluates multiple forward passes of a model with different parameter vectors.
 
-    Does not use torch.inference_mode() by default
-    (although this should be considered in most cases).
+        Does not use torch.inference_mode() by default
+        (although this should be considered in most cases).
 
-    Does not squeeze output, output is guranateed to be 3D
-    (even if only one parameter vector or one input is passed).
+        Does not squeeze output, output is guranateed to be 3D
+        (even if only one parameter vector or one input is passed).
 
-    Args:
-        model: torch.nn.Module
-        parameter_vectors: torch.tensor
-            Shape: (n_parameter_vectors, dim_parameter)
-        X: torch.tensor
-            Shape: (n_samples, dim_input)
+        Args:
+            model: torch.nn.Module
+            parameter_vectors: torch.tensor
+                Shape: (n_parameter_vectors, dim_parameter)
+            X: torch.tensor
+                Shape: (n_samples, dim_input)
 
     Returns:
-        torch.tensor
-            Shape: (n_samples, n_parameter_vectors, dim_output)
+            torch.tensor
+                Shape: (n_samples, n_parameter_vectors, dim_output)
     """
     parameter_vectors = torch.atleast_2d(parameter_vectors).to(model.device)
 
@@ -63,7 +63,7 @@ def hvp(f, x, v, *args, **kwargs):
     return grad(lambda x: torch.vdot(grad(f)(x, *args, **kwargs), v))(x)
 
 
-def diagonal_hessian(f: Callable[[torch.tensor, Any], float]) -> Callable:
+def diagonal_hessian(f: Callable) -> Callable:
     """Modify a scalar-valued function to return its Hessian diagonal.
 
     Inspired by https://github.com/google/jax/issues/3801

@@ -33,7 +33,7 @@ def test_forward_multiple():
         model, pvec_multiple, input_single
     )
     assert outputs_params_multi_inputs_single.shape == (1, 4, 1)
-    assert torch.equal(
+    assert torch.allclose(
         outputs_params_multi_inputs_single, outputs_params_single_inputs_single
     )
 

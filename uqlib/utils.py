@@ -5,7 +5,9 @@ from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad
 
 
-def forward_multiple(model, parameter_vectors: torch.tensor, X) -> torch.tensor:
+def forward_multiple(
+    model: torch.nn.Module, parameter_vectors: torch.Tensor, X: torch.Tensor
+) -> torch.Tensor:
     """Evaluates multiple forward passes of a model with different parameter vectors.
 
         Does not use torch.inference_mode() by default
@@ -28,7 +30,7 @@ def forward_multiple(model, parameter_vectors: torch.tensor, X) -> torch.tensor:
     parameter_vectors = torch.atleast_2d(parameter_vectors).to(model.device)
 
     # This assumes that X is a tensor, is this a fair assumption?
-    X = torch.atleast_2d(X).to(model)
+    X = torch.atleast_2d(X).to(model.device)
 
     fs = list()
 
@@ -42,7 +44,7 @@ def forward_multiple(model, parameter_vectors: torch.tensor, X) -> torch.tensor:
     return torch.stack(fs).transpose(0, 1)
 
 
-def hvp(f, x, v, *args, **kwargs):
+def hvp(f: Callable, x: torch.Tensor, v: torch.Tensor, *args, **kwargs) -> torch.Tensor:
     """Hessian vector product.
 
     H_f(x, args, kwargs) @ v

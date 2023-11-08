@@ -1,9 +1,8 @@
 from typing import Any, Dict
-from .optimizer.optimizer import SGHMC
-
 import pytorch_lightning as pl
 import torch.nn.functional as F
-from torch.optim import SGD
+
+from uqlib.optimizers.sghmc import SGHMC
 
 
 class SGHMCModel(pl.LightningModule):

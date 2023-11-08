@@ -1,7 +1,7 @@
 from pytorch_lightning.loggers import TensorBoardLogger
 import pytorch_lightning as pl
 
-from sghmc.utils import parse_devices
+from utils import parse_devices
 from sghmc.dataloader import ClincOOSDataLoader
 from sghmc.modules.transformer import MiniTransformer
 from sghmc.model import SGHMCModel

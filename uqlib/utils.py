@@ -2,7 +2,7 @@ from typing import Callable, Any
 
 import torch
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
-from torch.func import grad
+from torch.func import grad, jvp
 
 
 def forward_multiple(
@@ -46,43 +46,42 @@ def forward_multiple(
     return torch.stack(outputs).transpose(0, 1)
 
 
-def hvp(f: Callable, x: torch.Tensor, v: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+def hvp(f, primals, tangents):
     """Hessian vector product.
 
-    H_f(x, args, kwargs) @ v
+    H_f(primals) @ tangents
 
-    Inspired by https://github.com/google/jax/issues/3801
+    Taken from https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html
 
     Args:
-        f: A scalar-valued function that takes a tensor in its first argument and
+        f: A scalar-valued function that takes a dict as its single argument and
         produces a scalar output.
-        x: A tensor.
-        v: A tensor with the same shape as x.
-        args: Additional positional arguments to pass to f.
-        kwargs: Additional keyword arguments to pass to f.
+        x: Tensors.
+        v: Tensors matching x.
 
     Returns:
         A tensor with the same shape as x.
     """
-    return grad(lambda x: torch.vdot(grad(f)(x, *args, **kwargs), v))(x)
+    return jvp(grad(f), primals, tangents)[1]
 
 
 def diagonal_hessian(f: Callable) -> Callable:
-    """Modify a scalar-valued function to return its Hessian diagonal.
+    """Modify a scalar-valued function (that takes a dict with tensor values as first
+    input) to return its Hessian diagonal.
 
     Inspired by https://github.com/google/jax/issues/3801
 
     Args:
-        f: A scalar-valued function that takes a tensor in its first argument and
-        produces a scalar output.
+        f: A scalar-valued function that takes a dict with tensor values in its first
+        argument and produces a scalar output.
 
     Returns:
         A new function that computes the Hessian diagonal.
     """
 
-    def hessian_diag_fn(x: torch.tensor, *args, **kwargs) -> torch.Tensor:
-        # Ensure the input tensor requires a gradient
-        x = x.detach().requires_grad_(True)
-        return hvp(f, x, torch.ones_like(x), *args, **kwargs)
+    def hessian_diag_fn(x: dict[Any, torch.Tensor], *args, **kwargs) -> torch.Tensor:
+        v = {k: torch.ones_like(v) for k, v in x.items()}
+        ftemp = lambda xtemp: f(xtemp, *args, **kwargs)
+        return hvp(ftemp, (x,), (v,))
 
     return hessian_diag_fn

@@ -1,10 +1,14 @@
 from typing import Callable
 
 import torch
-from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.utils.data import DataLoader
+from torch.func import functional_call
 
 from uqlib.utils import diagonal_hessian
+
+
+def add_similar_dicts(d1, d2):
+    return {k: d1[k] + d2[k] for k in d1.keys()}
 
 
 def fit_diagonal_hessian(
@@ -15,7 +19,7 @@ def fit_diagonal_hessian(
     epsilon: float = 0.0,
 ) -> torch.Tensor:
     """Fit diagonal Hessian to data. Rescales by dividing by the number of data points
-    in train_dataloader.
+    in train_dataloader and also negates to give a valid (diagonal) precision matrix.
 
     Args:
         model: Model with parameters trained to MAP estimator.
@@ -31,23 +35,31 @@ def fit_diagonal_hessian(
 
     Returns:
         The fitted diagonal Hessian divided by the number of data points
-        in train_dataloader.
+        in train_dataloader and also negated (to correspond to positive precision).
     """
-    orig_p = parameters_to_vector(model.parameters())
+
+    orig_p = dict(model.named_parameters())
 
     def p_to_log_lik(p, x, y):
-        vector_to_parameters(p, model.parameters())
-        return torch.mean(log_likelihood(y, model(x)))
+        predictions = functional_call(model, p, (x,))
+        return torch.mean(log_likelihood(y, predictions))
 
     diag_prior_hess = diagonal_hessian(log_prior)(orig_p)
-    diag_lik_hess = torch.zeros_like(diag_prior_hess)
+    diag_lik_hess = {k: torch.zeros_like(v) for k, v in diag_prior_hess.items()}
 
     n_data = 0
 
     for x, y in train_dataloader:
         n_data += x.shape[0]
-        diag_lik_hess += diagonal_hessian(p_to_log_lik)(orig_p, x, y)
+        diag_lik_hess = add_similar_dicts(
+            diag_lik_hess, diagonal_hessian(p_to_log_lik)(orig_p, x, y)
+        )
 
-    diag_hess = diag_prior_hess / n_data + diag_lik_hess
-    vector_to_parameters(orig_p, model.parameters())
-    return torch.where(diag_hess > epsilon, diag_hess, torch.zeros_like(diag_hess))
+    diag_prior_hess = {k: v / n_data for k, v in diag_prior_hess.items()}
+
+    diag_hess = add_similar_dicts(diag_prior_hess, diag_lik_hess)
+    diag_hess = {
+        k: torch.where(-v > epsilon, -v, torch.zeros_like(v))
+        for k, v in diag_hess.items()
+    }
+    return diag_hess

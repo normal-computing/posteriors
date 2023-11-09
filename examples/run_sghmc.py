@@ -2,8 +2,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 import pytorch_lightning as pl
 
 from utils import parse_devices
-from sghmc.dataloader import ClincOOSDataLoader
-from sghmc.modules.transformer import MiniTransformer
+from data.clincoos import ClincOOSDataLoader
+from sghmc.modules.classifier import Classifier
 from sghmc.model import SGHMCModel
 
 import argparse
@@ -20,6 +20,7 @@ parser.add_argument("--alpha", default=1e-7, type=float)
 parser.add_argument("--beta", default=0.0, type=float)
 parser.add_argument("--log_frequency", default=10, type=int)
 parser.add_argument("--epochs", default=100, type=int)
+parser.add_argument("--data_path", default="./data", type=str)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -40,9 +41,11 @@ if __name__ == "__main__":
     if args.resume:
         name = args.resume.rstrip("/").split("/")[-1]
     logger = TensorBoardLogger("", version=name)
-    dataset = ClincOOSDataLoader("data", batch_size=1000, shuffle=True, num_workers=8)
+    dataset = ClincOOSDataLoader(
+        args.data_path, batch_size=1000, shuffle=True, num_workers=8
+    )
     model = SGHMCModel(
-        MiniTransformer(), lr=args.learning_rate, alpha=args.alpha, beta=args.beta
+        Classifier(), lr=args.learning_rate, alpha=args.alpha, beta=args.beta
     )
 
     trainer_kwargs["logger"] = logger

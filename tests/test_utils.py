@@ -26,28 +26,28 @@ def test_forward_multiple():
     input_single = torch.randn(10)
     input_multiple = torch.randn(8, 10)
 
-    outputs_params_single_inputs_single = forward_multiple(model, pvec, input_single)
+    outputs_params_single_inputs_single = forward_multiple(model, input_single, pvec)
     assert outputs_params_single_inputs_single.shape == (1, 1, 1)
 
     outputs_params_multi_inputs_single = forward_multiple(
-        model, pvec_multiple, input_single
+        model, input_single, pvec_multiple
     )
     assert outputs_params_multi_inputs_single.shape == (1, 4, 1)
     assert torch.allclose(
         outputs_params_multi_inputs_single, outputs_params_single_inputs_single
     )
 
-    outputs_params_single_inputs_multi = forward_multiple(model, pvec, input_multiple)
+    outputs_params_single_inputs_multi = forward_multiple(model, input_multiple, pvec)
     assert outputs_params_single_inputs_multi.shape == (8, 1, 1)
 
     outputs_params_multi_inputs_multi = forward_multiple(
-        model, pvec_multiple, input_multiple
+        model, input_multiple, pvec_multiple
     )
     assert outputs_params_multi_inputs_multi.shape == (8, 4, 1)
 
     pvec_new = torch.randn_like(pvec)
     outputs_params_single_inputs_single_new = forward_multiple(
-        model, pvec_new, input_single
+        model, input_single, pvec_new
     )
     assert outputs_params_single_inputs_single_new.shape == (1, 1, 1)
     assert not torch.equal(

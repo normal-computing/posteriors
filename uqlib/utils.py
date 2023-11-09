@@ -6,7 +6,9 @@ from torch.func import grad
 
 
 def forward_multiple(
-    model: torch.nn.Module, parameter_vectors: torch.Tensor, X: torch.Tensor
+    model: torch.nn.Module,
+    inputs: torch.Tensor,
+    parameter_vectors: torch.Tensor,
 ) -> torch.Tensor:
     """Evaluates multiple forward passes of a model with different parameter vectors.
 
@@ -20,7 +22,7 @@ def forward_multiple(
             model: torch.nn.Module
             parameter_vectors: torch.tensor
                 Shape: (n_parameter_vectors, dim_parameter)
-            X: torch.tensor
+            inputs: torch.tensor
                 Shape: (n_samples, dim_input)
 
     Returns:
@@ -30,18 +32,18 @@ def forward_multiple(
     parameter_vectors = torch.atleast_2d(parameter_vectors).to(model.device)
 
     # This assumes that X is a tensor, is this a fair assumption?
-    X = torch.atleast_2d(X).to(model.device)
+    inputs = torch.atleast_2d(inputs).to(model.device)
 
-    fs = list()
+    outputs = list()
 
     orig_params = parameters_to_vector(model.parameters())
 
     for vec in parameter_vectors:
         vector_to_parameters(vec, model.parameters())
-        fs.append(model(X))
+        outputs.append(model(inputs))
 
     vector_to_parameters(orig_params, model.parameters())
-    return torch.stack(fs).transpose(0, 1)
+    return torch.stack(outputs).transpose(0, 1)
 
 
 def hvp(f: Callable, x: torch.Tensor, v: torch.Tensor, *args, **kwargs) -> torch.Tensor:

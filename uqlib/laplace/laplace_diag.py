@@ -2,15 +2,16 @@ from typing import Callable
 
 import torch
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
+from torch.utils.data import DataLoader
 
-from utils import diagonal_hessian
+from uqlib.utils import diagonal_hessian
 
 
-def get_covariance(
+def fit_diagonal_hessian(
     model: torch.nn.Module,
     log_prior: Callable,
     log_likelihood: Callable,
-    train_dataloader: Callable,
+    train_dataloader: DataLoader,
     epsilon: float = 0.0,
 ) -> torch.Tensor:
     """Fit diagonal Hessian to data. Rescales by dividing by the number of data points

@@ -1,0 +1,21 @@
+[project]
+name = "uqlib"
+version = "0.0.1"
+description = "Uncertainty Quantification Library for PyTorch"
+readme = "README.md"
+requires-python =">=3.9"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Sam Duffield", email = "sam@normalcomputing.ai"},
+]
+keywords = ["pytorch", "uncertainty"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = ["torch>=2.0.0"]
+
+[tool.ruff]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F821"]

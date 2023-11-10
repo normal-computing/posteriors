@@ -4,11 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.func import functional_call
 
-from uqlib.utils import diagonal_hessian
-
-
-def add_similar_dicts(d1, d2):
-    return {k: d1[k] + d2[k] for k in d1.keys()}
+from uqlib.utils import diagonal_hessian, dict_map
 
 
 def fit_diagonal_hessian(
@@ -45,21 +41,21 @@ def fit_diagonal_hessian(
         return torch.mean(log_likelihood(y, predictions))
 
     diag_prior_hess = diagonal_hessian(log_prior)(orig_p)
-    diag_lik_hess = {k: torch.zeros_like(v) for k, v in diag_prior_hess.items()}
+    diag_lik_hess = dict_map(lambda x: torch.zeros_like(x), diag_prior_hess)
 
     n_data = 0
 
     for x, y in train_dataloader:
         n_data += x.shape[0]
-        diag_lik_hess = add_similar_dicts(
-            diag_lik_hess, diagonal_hessian(p_to_log_lik)(orig_p, x, y)
+        diag_lik_hess = dict_map(
+            lambda x, y: x + y,
+            diag_lik_hess,
+            diagonal_hessian(p_to_log_lik)(orig_p, x, y),
         )
 
-    diag_prior_hess = {k: v / n_data for k, v in diag_prior_hess.items()}
+    diag_hess = dict_map(lambda x, y: x / n_data + y, diag_prior_hess, diag_lik_hess)
+    diag_hess = dict_map(
+        lambda x: torch.where(-x > epsilon, -x, torch.zeros_like(x)), diag_hess
+    )
 
-    diag_hess = add_similar_dicts(diag_prior_hess, diag_lik_hess)
-    diag_hess = {
-        k: torch.where(-v > epsilon, -v, torch.zeros_like(v))
-        for k, v in diag_hess.items()
-    }
     return diag_hess

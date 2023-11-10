@@ -1,8 +1,27 @@
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 
 import torch
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad, jvp
+
+
+def dict_map(f: Callable, d: dict, *rest: Tuple[dict, ...]):
+    """Applies a function to each value in a dictionary or collection of dictionaries
+    with the same keys.
+
+    E.g. zeroed_dict = dict_map(lambda x: torch.zeros_like(x), dict1)
+    or summed_dict = dict_map(lambda x, y: x + y, dict1, dict2)
+
+    Args:
+        f: Function to apply to each value. Takes len(rest) + 1 arguments.
+        d: Dictionary or collection of dictionaries.
+        *rest: Additional dictionaries (all with the same keys as d).
+
+    Returns:
+        Dictionary with the same keys as d, where each value is the result of applying
+        f to the corresponding values in d and *rest.
+    """
+    return {k: f(d[k], *[r[k] for r in rest]) for k in d.keys()}
 
 
 def forward_multiple(
@@ -46,28 +65,28 @@ def forward_multiple(
     return torch.stack(outputs).transpose(0, 1)
 
 
-def hvp(f, primals, tangents):
+def hvp(f: Callable, primals: tuple, tangents: tuple):
     """Hessian vector product.
 
     H_f(primals) @ tangents
 
     Taken from https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html
+    Follows API from https://pytorch.org/docs/stable/generated/torch.func.jvp.html
 
     Args:
-        f: A scalar-valued function that takes a dict as its single argument and
-        produces a scalar output.
-        x: Tensors.
-        v: Tensors matching x.
+        f: A function with scalar output.
+        x: Tuple of e.g. tensor or dict with tensor values to evalute f at.
+        v: Tuple matching structure of x.
 
     Returns:
-        A tensor with the same shape as x.
+        Object matching structure of the elements of x and v.
     """
     return jvp(grad(f), primals, tangents)[1]
 
 
 def diagonal_hessian(f: Callable) -> Callable:
-    """Modify a scalar-valued function (that takes a dict with tensor values as first
-    input) to return its Hessian diagonal.
+    """Modify a scalar-valued function that takes a dict (with tensor values) as first
+    input to return its Hessian diagonal.
 
     Inspired by https://github.com/google/jax/issues/3801
 
@@ -80,8 +99,16 @@ def diagonal_hessian(f: Callable) -> Callable:
     """
 
     def hessian_diag_fn(x: dict[Any, torch.Tensor], *args, **kwargs) -> torch.Tensor:
-        v = {k: torch.ones_like(v) for k, v in x.items()}
-        ftemp = lambda xtemp: f(xtemp, *args, **kwargs)
+        if isinstance(x, torch.Tensor):
+            v = torch.ones_like(x)
+        elif isinstance(x, dict):
+            v = dict_map(lambda v: torch.ones_like(v), x)
+        else:
+            raise ValueError("x must be a tensor or dict with tensor values")
+
+        def ftemp(xtemp):
+            return f(xtemp, *args, **kwargs)
+
         return hvp(ftemp, (x,), (v,))
 
     return hessian_diag_fn

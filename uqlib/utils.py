@@ -2,7 +2,7 @@ from typing import Callable, Any, Tuple
 
 import torch
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
-from torch.func import grad, jvp
+from torch.func import grad, jvp, functional_call
 
 
 def dict_map(f: Callable, d: dict, *rest: Tuple[dict, ...]):
@@ -22,6 +22,23 @@ def dict_map(f: Callable, d: dict, *rest: Tuple[dict, ...]):
         f to the corresponding values in d and *rest.
     """
     return {k: f(d[k], *[r[k] for r in rest]) for k in d.keys()}
+
+
+def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
+    """Converts a model into a function that maps parameters and inputs to outputs.
+
+    Args:
+        model: torch.nn.Module with parameters stored in .named_parameters().
+
+    Returns:
+        Function that takes a dictionary of parameters as well as any input
+        arg or kwargs and returns the output of the model.
+    """
+
+    def func_model(p_dict, *args, **kwargs):
+        return functional_call(model, p_dict, args=args, kwargs=kwargs)
+
+    return func_model
 
 
 def forward_multiple(

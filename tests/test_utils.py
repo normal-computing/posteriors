@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.utils import parameters_to_vector
 
 
-from uqlib import dict_map, forward_multiple, diagonal_hessian
+from uqlib import dict_map, forward_multiple, diagonal_hessian, model_to_function
 
 
 class TestModel(nn.Module):
@@ -14,6 +14,23 @@ class TestModel(nn.Module):
 
     def forward(self, x):
         return self.linear(x)
+
+
+class TestLanguageModel(nn.Module):
+    def __init__(self, vocab_size=1000, embedding_dim=256, hidden_dim=512):
+        super().__init__()
+        self.device = "cpu"
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.linear = nn.Linear(embedding_dim, hidden_dim)
+        self.output_layer = nn.Linear(hidden_dim, vocab_size)
+
+    def forward(self, input_ids, attention_mask):
+        embedded = self.embedding(input_ids)
+        hidden = self.linear(embedded)
+        logits = self.output_layer(hidden)
+        expanded_attention_mask = attention_mask.unsqueeze(-1).expand(logits.size())
+        logits = logits * expanded_attention_mask
+        return {"logits": logits}
 
 
 def test_dict_map():
@@ -33,6 +50,38 @@ def test_dict_map():
     expected = {"a": torch.tensor([6, 8]), "b": torch.tensor([10, 12])}
     for key in result:
         assert torch.equal(result[key], expected[key])
+
+
+def test_model_to_function():
+    model = TestModel()
+
+    xs = torch.randn(100, 10)
+
+    func_model = model_to_function(model)
+
+    output = model(xs)
+    func_output = func_model(dict(model.named_parameters()), xs)
+
+    assert torch.allclose(output, func_output)
+
+    lm = TestLanguageModel()
+
+    input_ids = torch.randint(1000, (10, 10))
+    attention_mask = torch.ones_like(input_ids)
+
+    func_lm = model_to_function(lm)
+
+    output = lm(input_ids, attention_mask)
+
+    func_output1 = func_lm(
+        dict(lm.named_parameters()), input_ids=input_ids, attention_mask=attention_mask
+    )
+
+    func_output2 = func_lm(dict(lm.named_parameters()), input_ids, attention_mask)
+
+    assert type(output) == type(func_output1) == type(func_output2)
+    assert torch.allclose(output["logits"], func_output1["logits"])
+    assert torch.allclose(output["logits"], func_output2["logits"])
 
 
 def test_forward_multiple():

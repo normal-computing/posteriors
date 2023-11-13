@@ -30,3 +30,18 @@ Should interface well with
 - [ ] [Conformal prediction](https://arxiv.org/abs/2107.07511)
 
 
+## Contributing
+
+You can report a bug or request a feature by [creating a new issue on GitHub](https://github.com/normal-computing/uqlib/issues).
+
+Pull requests are welcomed! Please go through the following steps:
+
+1. Create a new branch from `main`.
+2. Run `pip install -e .` to install the package in editable mode.
+3. Add your code and tests.
+4. Run `pre-commit run --all-files` and `pytest` to check your code lints and tests pass.
+5. Commit your changes and push your branch to GitHub.
+6. Create pull request into the `main` branch.
+
+Feel free to open a draft PR to discuss changes or get feedback.
+

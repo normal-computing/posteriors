@@ -1,8 +1,11 @@
 # uqlib
 
-**Goal**: General purpose python library for **U**ncertainy **Q**uantification (methods and benchmarks) with [PyTorch](https://github.com/pytorch/pytorch) models.
+
+
+General purpose python library for **U**ncertainy **Q**uantification (methods and benchmarks) with [PyTorch](https://github.com/pytorch/pytorch) models.
 
 - All methods should be linear in the number of parameters, and therefore able to handle large models (e.g. transformers).
+- We should support uncertainty quantification over subsets of parameters.
 - We should support arbitrary loss functions.
 - We should support uncertainty over some subset of the parameters - *this will take some thinking about*.
 - Bayesian methods should support arbitrary priors (we just need pointwise evaluations).
@@ -27,7 +30,12 @@ Should interface well with
 - [ ] Ensemble SGMCMC
 - [ ] [SNGP](https://arxiv.org/abs/2006.10108)
 - [ ] [Epistemic neural networks](https://arxiv.org/abs/2107.08924)
-- [ ] [Conformal prediction](https://arxiv.org/abs/2107.07511)
+<!-- - [ ] [Conformal prediction](https://arxiv.org/abs/2107.07511) -->
+
+
+## Benchmarks
+
+TODO: sketch out list of initial benchmarks
 
 
 ## Contributing

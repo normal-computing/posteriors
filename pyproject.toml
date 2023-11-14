@@ -16,6 +16,9 @@ classifiers = [
 ]
 dependencies = ["torch>=2.0.0"]
 
+[tool.setuptools]
+packages = ["uqlib"]
+
 [tool.ruff]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F821"]

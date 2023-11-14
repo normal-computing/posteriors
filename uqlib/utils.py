@@ -1,6 +1,7 @@
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Tuple, List
 
 import torch
+import torch.nn as nn
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad, jvp, functional_call
 
@@ -129,3 +130,20 @@ def diagonal_hessian(f: Callable) -> Callable:
         return hvp(ftemp, (x,), (v,))
 
     return hessian_diag_fn
+
+
+def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
+    """Updates the model parameters in-place with the provided optimizer parameters (provided by SGHMC optimizer)
+
+    Args:
+        model: A torch.nn.Module object
+        groups: A list of groups where each group is a list of parameters
+    """
+
+    optimizer_params = []
+    for group in groups:
+        for param in group:
+            optimizer_params.append(torch.from_numpy(param))
+
+    for model_param, optimizer_param in zip(list(model.parameters()), optimizer_params):
+        model_param.data = optimizer_param

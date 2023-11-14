@@ -6,16 +6,18 @@ from uqlib.optimizers.sghmc import SGHMC
 
 
 class SGHMCModel(pl.LightningModule):
-    def __init__(self, model, lr=1e-3, alpha=1e-1, beta=1e-1):
+    def __init__(self, model, lr=1e-3, alpha=1e-1, beta=1e-1, thinning=5):
         super().__init__()
         self.model = model
 
-        self.save_hyperparameters({"learning_rate": lr, "alpha": alpha, "beta": beta})
-        self.save_parameters_trajectory = []
+        self.save_hyperparameters(
+            {"learning_rate": lr, "alpha": alpha, "beta": beta, "thinning": thinning}
+        )
 
         self.lr = lr
         self.alpha = alpha
         self.beta = beta
+        self.thinning = thinning
 
     def training_step(self, batch):
         x, y = batch
@@ -26,15 +28,15 @@ class SGHMCModel(pl.LightningModule):
         return loss
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        checkpoint["save_params"] = self.save_parameters_trajectory
+        trajectory_params = self.optimizers().get_params()
+        checkpoint["save_params"] = trajectory_params
         return super().on_save_checkpoint(checkpoint)
-
-    # def on_train_batch_end(self, *args, **kwargs) -> None:
-    #     params = [p.detach().cpu().numpy() for p in list(self.model.parameters())]
-    #     self.save_parameters_trajectory = self.save_parameters_trajectory + [params]
-    #     return super().on_train_batch_end(*args, **kwargs)
 
     def configure_optimizers(self):
         return SGHMC(
-            self.model.parameters(), lr=self.lr, alpha=self.alpha, beta=self.beta
+            self.model.parameters(),
+            lr=self.lr,
+            alpha=self.alpha,
+            beta=self.beta,
+            thinning=self.thinning,
         )

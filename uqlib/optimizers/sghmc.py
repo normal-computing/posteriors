@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from torch.optim import Optimizer
 import torch.nn as nn
 import torch
@@ -10,10 +11,15 @@ class SGHMC(Optimizer):
         lr: float = 0.01,
         alpha: float = 0.01,
         beta: float = 0.0,
+        thinning=-1,
         momenta=None,
     ):
         params = list(params)
         super().__init__(params, {"lr": lr})
+
+        self.current_step = 0
+        self.thinning = thinning
+        self.parameter_trajectory = {}
 
         self.alpha = alpha
         self.beta = beta
@@ -27,6 +33,29 @@ class SGHMC(Optimizer):
                 group["momenta"].append(
                     nn.Parameter(torch.zeros_like(p), requires_grad=False)
                 )
+
+    def state_dict(self) -> Dict[str, Any]:
+        opt_state_dict = super().state_dict()
+        opt_state_dict["current_step"] = self.current_step
+        return opt_state_dict
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.current_step = state_dict.pop("current_step")
+        return super().load_state_dict(state_dict)
+
+    def save_params(self):
+        if self.thinning > 0 and (self.current_step + 1) % self.thinning == 0:
+            params_to_save = []
+            for group in self.param_groups:
+                params_to_save.append(
+                    [p.detach().cpu().numpy() for p in group["params"]]
+                )
+            self.parameter_trajectory[self.current_step] = params_to_save
+
+        self.current_step += 1
+
+    def get_params(self):
+        return self.parameter_trajectory
 
     def step(self, closure=None):
         loss = None
@@ -51,5 +80,7 @@ class SGHMC(Optimizer):
                     + (lr * (2 * self.alpha - lr * self.beta)) ** 0.5
                     * torch.randn_like(r.data)
                 )
+
+        self.save_params()
 
         return loss

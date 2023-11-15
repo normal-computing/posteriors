@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from utils import parse_devices
 from data.clincoos import ClincOOSDataLoader
 from sghmc.modules.classifier import Classifier
-from sghmc.model import SGHMCModel
+from sghmc.model import SGHMCExample
 
 import argparse
 import os
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     dataset = ClincOOSDataLoader(
         args.data_path, batch_size=1000, shuffle=True, num_workers=8
     )
-    model = SGHMCModel(
+    model = SGHMCExample(
         Classifier(),
         lr=args.learning_rate,
         alpha=args.alpha,

@@ -2,10 +2,10 @@ from typing import Any, Dict
 import pytorch_lightning as pl
 import torch.nn.functional as F
 
-from uqlib.optimizers.sghmc import SGHMC
+from uqlib.sgmcmc.sghmc import SGHMC
 
 
-class SGHMCModel(pl.LightningModule):
+class SGHMCExample(pl.LightningModule):
     def __init__(self, model, lr=1e-3, alpha=1e-1, beta=1e-1, thinning=5):
         super().__init__()
         self.model = model

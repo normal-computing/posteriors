@@ -35,7 +35,14 @@ Should interface well with
 
 ## Benchmarks
 
-TODO: sketch out list of initial benchmarks
+Benchmarks should extend beyond those in [uncertainty-baselines](https://github.com/google/uncertainty-baselines). We can include classification and regression as toy examples but the leaderboard should consist of the following more practically relevant tasks:
+
+- [ ] Generation
+    - [ ] Aleatoric vs epistemic uncertainty (e.g. hallucination detection)
+- [ ] Continual learning
+    - [ ] Regression/classification/generation tasks but with a stream of data. Evaluate perfomance on current and historical data/tasks.
+- [ ] Decision making
+    - [ ] Thompson sampling effectiveness
 
 
 ## Contributing

@@ -18,7 +18,7 @@ class TestModel(nn.Module):
 
 def normal_log_prior(p: dict):
     return torch.sum(
-        torch.tensor([Normal(0, 1).log_prob(ptemp).sum(dim=-1) for ptemp in p.values()])
+        torch.tensor([Normal(0, 1).log_prob(ptemp).sum() for ptemp in p.values()])
     )
 
 

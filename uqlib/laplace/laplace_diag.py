@@ -54,7 +54,8 @@ def fit_diagonal_hessian(
 
     diag_hess = dict_map(lambda x, y: x / n_data + y, diag_prior_hess, diag_lik_hess)
     diag_hess = dict_map(
-        lambda x: torch.where(-x > epsilon, -x, torch.zeros_like(x)), diag_hess
+        lambda x: torch.where(-x > epsilon, -x, torch.zeros_like(x) + epsilon),
+        diag_hess,
     )
 
     return diag_hess

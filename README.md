@@ -24,9 +24,15 @@ Should interface well with
 
 - [ ] [Dropout](https://arxiv.org/abs/1506.02142)
 - [ ] [Variational inference (mean-field and KFAC)](https://arxiv.org/abs/1601.00670)
+    - Basic/naive NELBO added but this should be upgraded (to be optimised + KFAC) 
+    and tested.
 - [ ] [Laplace approximation (mean-field and KFAC)](https://arxiv.org/abs/2106.14806)
+    - Currently we have a basic Hessian diagonal implementation but this should be 
+    replaced with diagonal (and KFAC) Fisher information which is guaranteed to be positive definite.
 - [ ] [Deep Ensemble](https://arxiv.org/abs/1612.01474)
 - [ ] [SGMCMC](https://arxiv.org/abs/1506.04696)
+    - v0 implementation added but needs API finalising and tests on e.g. linear 
+    Gaussian models with known posterior mean + cov.
 - [ ] Ensemble SGMCMC
 - [ ] [SNGP](https://arxiv.org/abs/2006.10108)
 - [ ] [Epistemic neural networks](https://arxiv.org/abs/2107.08924)
@@ -38,11 +44,11 @@ Should interface well with
 Benchmarks should extend beyond those in [uncertainty-baselines](https://github.com/google/uncertainty-baselines). We can include classification and regression as toy examples but the leaderboard should consist of the following more practically relevant tasks:
 
 - [ ] Generation
-    - [ ] Aleatoric vs epistemic uncertainty (e.g. hallucination detection)
+    - Aleatoric vs epistemic uncertainty (e.g. hallucination detection)
 - [ ] Continual learning
-    - [ ] Regression/classification/generation tasks but with a stream of data. Evaluate perfomance on current and historical data/tasks.
+    - Regression/classification/generation tasks but with a stream of data. Evaluate perfomance on current and historical data/tasks.
 - [ ] Decision making
-    - [ ] Thompson sampling effectiveness
+    - Thompson sampling effectiveness
 
 
 ## Contributing

@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 
-from uqlib import laplace, tree_map
+from uqlib import laplace
 
 
 class TestModel(nn.Module):

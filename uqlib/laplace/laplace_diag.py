@@ -16,7 +16,7 @@ def fit_diagonal_hessian(
 ) -> torch.Tensor:
     """Fit diagonal Hessian to data. Rescales by dividing by the number of data points
     in train_dataloader and also negates and reciprocates to give a valid (diagonal)
-    covariance matrix.
+    precision matrix.
 
     Args:
         model: Model with parameters trained to MAP estimator.
@@ -59,8 +59,7 @@ def fit_diagonal_hessian(
         lambda x: torch.where(-x > epsilon, -x, torch.zeros_like(x) + epsilon),
         diag_hess,
     )
-    diag_inv_hess = tree_map(lambda x: 1 / x, diag_hess)
-    return diag_inv_hess
+    return diag_hess
 
 
 def fit_diagonal_empirical_fisher(
@@ -73,7 +72,7 @@ def fit_diagonal_empirical_fisher(
     by dividing by the number of data points in train_dataloader.
 
     Guaranteed to be positive-definite and therefore a valid (diagonal)
-    covariance matrix.
+    precision matrix.
 
     Args:
         model: Model with parameters trained to MAP estimator.

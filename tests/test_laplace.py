@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 
-from uqlib import laplace
+from uqlib import laplace, tree_map
 
 
 class TestModel(nn.Module):
@@ -16,10 +16,18 @@ class TestModel(nn.Module):
         return self.linear(x)
 
 
+# torch.func.grad doesn't work for list comprehension
+# def normal_log_prior(p: dict):
+#     return torch.sum(
+#         torch.tensor([Normal(0, 1).log_prob(ptemp).sum() for ptemp in p.values()])
+#     )
+
+
 def normal_log_prior(p: dict):
-    return torch.sum(
-        torch.tensor([Normal(0, 1).log_prob(ptemp).sum() for ptemp in p.values()])
-    )
+    output = 0
+    for ptemp in p.values():
+        output += Normal(0, 1).log_prob(ptemp).sum()
+    return output
 
 
 def normal_log_likelihood(y, y_pred):
@@ -38,6 +46,27 @@ def test_fit_diagonal_hessian():
     )
 
     diag_hess = laplace.fit_diagonal_hessian(
+        model, normal_log_prior, normal_log_likelihood, dataloader
+    )
+
+    params = dict(model.named_parameters())
+
+    assert all([v.shape == params[k].shape for k, v in diag_hess.items()])
+    assert all([torch.all(v > 0) for v in diag_hess.values()])
+
+
+def test_fit_empirical_fisher():
+    model = TestModel()
+
+    xs = torch.randn(100, 10)
+    ys = model(xs)
+
+    dataloader = DataLoader(
+        TensorDataset(xs, ys),
+        batch_size=20,
+    )
+
+    diag_hess = laplace.fit_diagonal_empirical_fisher(
         model, normal_log_prior, normal_log_likelihood, dataloader
     )
 

@@ -4,25 +4,27 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad, jvp, functional_call
+from torch.utils._pytree import tree_flatten, tree_unflatten
 
 
-def dict_map(f: Callable, d: dict, *rest: Tuple[dict, ...]):
-    """Applies a function to each value in a dictionary or collection of dictionaries
-    with the same keys.
+def tree_map(f: Callable, tree: Any, *rest: Tuple[dict, ...]):
+    """Applies a function to each value in a pytree or collection of pytrees
+    with the same structure (which advances torch.utils._pytree.tree_map).
 
-    E.g. zeroed_dict = dict_map(lambda x: torch.zeros_like(x), dict1)
-    or summed_dict = dict_map(lambda x, y: x + y, dict1, dict2)
+    E.g. zeroed_dict = tree_map(lambda x: torch.zeros_like(x), dict1)
+    or summed_dict = tree_map(lambda x, y: x + y, dict1, dict2)
 
     Args:
         f: Function to apply to each value. Takes len(rest) + 1 arguments.
-        d: Dictionary or collection of dictionaries.
-        *rest: Additional dictionaries (all with the same keys as d).
+        tree: Pytree.
+        *rest: Additional pytree (all with the same structure as tree).
 
     Returns:
-        Dictionary with the same keys as d, where each value is the result of applying
-        f to the corresponding values in d and *rest.
+        Pytree with the same structure as tree.
     """
-    return {k: f(d[k], *[r[k] for r in rest]) for k in d.keys()}
+    leaves, spec = tree_flatten(tree)
+    all_leaves = [leaves] + [tree_flatten(r)[0] for r in rest]
+    return tree_unflatten([f(*xs) for xs in zip(*all_leaves)], spec)
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
@@ -120,7 +122,7 @@ def diagonal_hessian(f: Callable) -> Callable:
         if isinstance(x, torch.Tensor):
             v = torch.ones_like(x)
         elif isinstance(x, dict):
-            v = dict_map(lambda v: torch.ones_like(v), x)
+            v = tree_map(lambda v: torch.ones_like(v), x)
         else:
             raise ValueError("x must be a tensor or dict with tensor values")
 

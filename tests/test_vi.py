@@ -50,4 +50,5 @@ def test_nelbo():
     # Check if the loss is a scalar and has the correct type
     assert loss.dim() == 0
     assert loss.dtype == torch.float32
+    assert loss != loss2
     assert torch.isclose(loss, loss2, atol=1e0)

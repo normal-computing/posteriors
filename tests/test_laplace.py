@@ -16,18 +16,11 @@ class TestModel(nn.Module):
         return self.linear(x)
 
 
-# torch.func.grad doesn't work for list comprehension/generators
-# def normal_log_prior(p: dict):
-#     return torch.sum(
-#         torch.tensor([Normal(0, 1).log_prob(ptemp).sum() for ptemp in p.values()])
-#     )
-
-
+# Note this won't work if you replace torch.stack with torch.tensor
 def normal_log_prior(p: dict):
-    output = 0
-    for ptemp in p.values():
-        output += Normal(0, 1).log_prob(ptemp).sum()
-    return output
+    return torch.sum(
+        torch.stack([Normal(0, 1).log_prob(ptemp).sum() for ptemp in p.values()])
+    )
 
 
 def normal_log_likelihood(y, y_pred):

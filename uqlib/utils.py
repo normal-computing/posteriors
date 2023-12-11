@@ -1,4 +1,4 @@
-from typing import Callable, Any, Tuple, List
+from typing import Callable, Any, Tuple, List, Union
 
 import torch
 import torch.nn as nn
@@ -118,13 +118,10 @@ def diagonal_hessian(f: Callable) -> Callable:
         A new function that computes the Hessian diagonal.
     """
 
-    def hessian_diag_fn(x: dict[Any, torch.Tensor], *args, **kwargs) -> torch.Tensor:
-        if isinstance(x, torch.Tensor):
-            v = torch.ones_like(x)
-        elif isinstance(x, dict):
-            v = tree_map(lambda v: torch.ones_like(v), x)
-        else:
-            raise ValueError("x must be a tensor or dict with tensor values")
+    def hessian_diag_fn(
+        x: Union[torch.Tensor, dict[Any, torch.Tensor]], *args, **kwargs
+    ) -> torch.Tensor:
+        v = tree_map(lambda v: torch.ones_like(v, requires_grad=False), x)
 
         def ftemp(xtemp):
             return f(xtemp, *args, **kwargs)

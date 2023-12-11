@@ -1,4 +1,5 @@
 import torch
+from torch.distributions import Normal, Categorical
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
@@ -6,8 +7,10 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import get_scheduler
 from tqdm.auto import tqdm
 import evaluate
+import uqlib
 
-# Replication of https://huggingface.co/docs/transformers/training#train-in-native-pytorch
+# Replication/modification of
+# https://huggingface.co/docs/transformers/training#train-in-native-pytorch
 
 dataset = load_dataset("yelp_review_full")
 
@@ -34,9 +37,13 @@ model = AutoModelForSequenceClassification.from_pretrained(
     "bert-base-cased", num_labels=5
 )
 
+# Turn off Dropout
+model.eval()
+
 optimizer = AdamW(model.parameters(), lr=5e-5)
 
 num_epochs = 3
+num_data = len(train_dataloader.dataset)
 num_training_steps = num_epochs * len(train_dataloader)
 lr_scheduler = get_scheduler(
     name="linear",
@@ -46,19 +53,41 @@ lr_scheduler = get_scheduler(
 )
 
 
+def categorical_log_likelihood(labels, logits):
+    return Categorical(logits=logits).log_prob(labels).mean(dim=-1)
+
+
+prior_sd = 1
+
+
+def normal_log_prior(p: dict):
+    return torch.sum(
+        torch.stack([Normal(0, prior_sd).log_prob(ptemp).sum() for ptemp in p.values()])
+    )
+
+
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
 
 
 progress_bar = tqdm(range(num_training_steps))
 
-model.train()
+losses = []
+
+# model.train()
 for epoch in range(num_epochs):
     for batch in train_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
         outputs = model(**batch)
-        loss = outputs.loss
+
+        loss = (
+            -categorical_log_likelihood(batch["labels"], outputs.logits)
+            - normal_log_prior(dict(model.named_parameters())) / num_data
+        )
+
+        # loss = outputs.loss
         loss.backward()
+        losses.append(loss.item())
 
         optimizer.step()
         lr_scheduler.step()
@@ -66,15 +95,26 @@ for epoch in range(num_epochs):
         progress_bar.update(1)
 
 
-metric = evaluate.load("accuracy")
-model.eval()
-for batch in eval_dataloader:
+model_func = uqlib.model_to_function(model)
+
+
+def param_to_log_posterior(p, batch):
+    return (
+        -categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
+        - normal_log_prior(p) / num_data
+    )
+
+
+params = dict(model.named_parameters())
+diag_hess = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=False), params)
+
+for batch in train_dataloader:
     batch = {k: v.to(device) for k, v in batch.items()}
     with torch.no_grad():
-        outputs = model(**batch)
+        batch_diag_hess = uqlib.diagonal_hessian(param_to_log_posterior)(params, batch)
+    diag_hess = uqlib.tree_map(lambda x, y: x + y, diag_hess, batch_diag_hess)
 
-    logits = outputs.logits
-    predictions = torch.argmax(logits, dim=-1)
-    metric.add_batch(predictions=predictions, references=batch["labels"])
 
-metric.compute()
+diag_prec = uqlib.laplace.fit_diagonal_hessian(
+    model, normal_log_prior, categorical_log_likelihood, train_dataloader
+)

@@ -41,18 +41,20 @@ def fit_diagonal_hessian(
         predictions = model_func(p, x)
         return torch.mean(log_likelihood(y, predictions))
 
-    diag_prior_hess = diagonal_hessian(log_prior)(param_dict)
+    with torch.no_grad():
+        diag_prior_hess = diagonal_hessian(log_prior)(param_dict)
     diag_lik_hess = tree_map(lambda x: torch.zeros_like(x), diag_prior_hess)
 
     n_data = 0
 
     for x, y in train_dataloader:
         n_data += x.shape[0]
-        diag_lik_hess = tree_map(
-            lambda x, y: x + y,
-            diag_lik_hess,
-            diagonal_hessian(p_to_log_lik)(param_dict, x, y),
-        )
+        with torch.no_grad():
+            diag_lik_hess = tree_map(
+                lambda a, b: a + b,
+                diag_lik_hess,
+                diagonal_hessian(p_to_log_lik)(param_dict, x, y),
+            )
 
     diag_hess = tree_map(lambda x, y: x / n_data + y, diag_prior_hess, diag_lik_hess)
     diag_hess = tree_map(
@@ -97,7 +99,8 @@ def fit_diagonal_empirical_fisher(
         predictions = model_func(p, x)
         return torch.mean(log_likelihood(y, predictions))
 
-    prior_score = grad(log_prior)(param_dict)
+    with torch.no_grad():
+        prior_score = grad(log_prior)(param_dict)
     prior_score_sq = tree_map(lambda x: x**2, prior_score)
     lik_score_sq = tree_map(lambda x: torch.zeros_like(x), prior_score_sq)
 
@@ -105,7 +108,8 @@ def fit_diagonal_empirical_fisher(
 
     for x, y in train_dataloader:
         n_data += x.shape[0]
-        single_lik_score = grad(p_to_log_lik)(param_dict, x, y)
+        with torch.no_grad():
+            single_lik_score = grad(p_to_log_lik)(param_dict, x, y)
         single_lik_score_sq = tree_map(lambda x: x**2, single_lik_score)
 
         lik_score_sq = tree_map(

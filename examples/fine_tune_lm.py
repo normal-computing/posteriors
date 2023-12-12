@@ -3,10 +3,11 @@ from torch.distributions import Normal, Categorical
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.func import grad
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import get_scheduler
 from tqdm.auto import tqdm
-import evaluate
+
 import uqlib
 
 # Replication/modification of
@@ -61,13 +62,23 @@ prior_sd = 1
 
 
 def normal_log_prior(p: dict):
-    return torch.sum(
-        torch.stack([Normal(0, prior_sd).log_prob(ptemp).sum() for ptemp in p.values()])
-    )
+    return torch.stack(
+        [Normal(0, prior_sd).log_prob(ptemp).sum() for ptemp in p.values()]
+    ).sum()
 
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
+
+
+model_func = uqlib.model_to_function(model)
+
+
+def param_to_neg_log_posterior(p, batch):
+    return (
+        -categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
+        - normal_log_prior(p) / num_data
+    )
 
 
 progress_bar = tqdm(range(num_training_steps))
@@ -78,14 +89,9 @@ losses = []
 for epoch in range(num_epochs):
     for batch in train_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
-        outputs = model(**batch)
 
-        loss = (
-            -categorical_log_likelihood(batch["labels"], outputs.logits)
-            - normal_log_prior(dict(model.named_parameters())) / num_data
-        )
+        loss = param_to_neg_log_posterior(dict(model.named_parameters()), batch)
 
-        # loss = outputs.loss
         loss.backward()
         losses.append(loss.item())
 
@@ -95,26 +101,25 @@ for epoch in range(num_epochs):
         progress_bar.update(1)
 
 
-model_func = uqlib.model_to_function(model)
-
-
-def param_to_log_posterior(p, batch):
-    return (
-        -categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
-        - normal_log_prior(p) / num_data
-    )
-
-
 params = dict(model.named_parameters())
-diag_hess = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=False), params)
+
+# # Laplace with diagonal Hessian for approximate precision matrix
+# diag_hess = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=False), params)
+
+# for batch in train_dataloader:
+#     batch = {k: v.to(device) for k, v in batch.items()}
+#     with torch.no_grad():
+#         batch_diag_hess = uqlib.diagonal_hessian(param_to_neg_log_posterior)(
+#             params, batch
+#         )
+#     diag_hess = uqlib.tree_map(lambda x, y: x + y, diag_hess, batch_diag_hess)
+
+
+# Laplace with diagonal empirical Fisher for approximate precision matrix
+diag_fish = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=False), params)
 
 for batch in train_dataloader:
     batch = {k: v.to(device) for k, v in batch.items()}
     with torch.no_grad():
-        batch_diag_hess = uqlib.diagonal_hessian(param_to_log_posterior)(params, batch)
-    diag_hess = uqlib.tree_map(lambda x, y: x + y, diag_hess, batch_diag_hess)
-
-
-diag_prec = uqlib.laplace.fit_diagonal_hessian(
-    model, normal_log_prior, categorical_log_likelihood, train_dataloader
-)
+        batch_diag_score = grad(param_to_neg_log_posterior)(params, batch)
+    diag_fish = uqlib.tree_map(lambda x, y: x + y**2, diag_fish, batch_diag_score)

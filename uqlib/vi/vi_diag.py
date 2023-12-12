@@ -1,9 +1,9 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Any
 
 import torch
 from torch.distributions import Normal
 
-from uqlib.utils import tree_map, model_to_function
+from uqlib.utils import tree_map
 
 
 def diagonal_normal_log_prob(x: dict, mean: dict, sd_diag: dict) -> float:
@@ -14,12 +14,10 @@ def diagonal_normal_log_prob(x: dict, mean: dict, sd_diag: dict) -> float:
 
 
 def diagonal_nelbo(
-    model: torch.nn.Module,
-    log_prior: Callable,
-    log_likelihood: Callable,
+    log_posterior: Callable[[Any, Any], float],
     batch: Tuple,
     mean: dict,
-    log_var_diag: dict,
+    log_sd_diag: dict,
     n_samples: int = 1,
 ) -> float:
     """Returns the negative evidence lower bound (NELBO) for a diagonal Gaussian
@@ -31,40 +29,28 @@ def diagonal_nelbo(
 
     Args:
         model: Model.
-        log_prior: Function that takes a dictionary of parameters and
-            returns the log prior (which can be unnormalised).
-        log_likelihood: Function that takes a batch of output data
-            and output data from the model and returns the log likelihood
-            (which can be unnormalised).
-            log_lik = log_likelihood(y, model(X))
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior (which can be unnormalised).
         batch: Tuple of (x, y) data.
         mean: Mean of the variational distribution.
-        log_var_diag: Log of the diagonal of the covariance matrix of the
+        log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.
         n_samples: Number of samples to use for Monte Carlo estimate.
 
     Returns:
         The sampled approximate NELBO averaged over the batch.
     """
-    model_func = model_to_function(model)
-
-    x, y = batch
-
-    sd_diag = tree_map(lambda x: x.exp() ** 0.5, log_var_diag)
+    sd_diag = tree_map(lambda x: x.exp(), log_sd_diag)
 
     def sample_params():
         return tree_map(lambda m, s: m + torch.randn_like(m) * s, mean, sd_diag)
 
     def single_nelbo(sampled_params):
-        log_p = log_prior(sampled_params)
+        log_p = log_posterior(sampled_params, batch)
         log_q = diagonal_normal_log_prob(sampled_params, mean, sd_diag)
+        return -(log_p - log_q).mean()
 
-        log_p_y_given_xp = log_likelihood(y, model_func(sampled_params, x))
-
-        return -(log_p + log_p_y_given_xp - log_q).mean()
-
-    loss = 0
+    nelbo = 0
     for _ in range(n_samples):
-        loss += single_nelbo(sample_params()) / n_samples
-
-    return loss
+        nelbo += single_nelbo(sample_params()) / n_samples
+    return nelbo

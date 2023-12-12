@@ -123,3 +123,43 @@ for batch in train_dataloader:
     with torch.no_grad():
         batch_diag_score = grad(param_to_neg_log_posterior)(params, batch)
     diag_fish = uqlib.tree_map(lambda x, y: x + y**2, diag_fish, batch_diag_score)
+
+
+# VI
+num_vi_epochs = num_epochs
+num_vi_training_steps = num_vi_epochs * len(train_dataloader)
+
+
+mu = params.copy()
+log_sigma = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=True), params)
+
+vi_params_tensors = list(mu.values()) + list(log_sigma.values())
+
+vi_optimizer = AdamW(vi_params_tensors, lr=5e-5)
+vi_lr_scheduler = get_scheduler(
+    name="linear",
+    optimizer=vi_optimizer,
+    num_warmup_steps=0,
+    num_training_steps=num_vi_training_steps,
+)
+
+progress_bar = tqdm(range(num_vi_training_steps))
+
+nelbos = []
+
+# model.train()
+for epoch in range(num_epochs):
+    for batch in train_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+
+        nelbo = uqlib.vi.diagonal_nelbo(
+            param_to_neg_log_posterior, batch, mu, log_sigma
+        )
+
+        nelbo.backward()
+        nelbos.append(nelbo.item())
+
+        vi_optimizer.step()
+        vi_lr_scheduler.step()
+        vi_optimizer.zero_grad()
+        progress_bar.update(1)

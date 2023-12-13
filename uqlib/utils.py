@@ -1,10 +1,10 @@
 from typing import Callable, Any, Tuple, List, Union
-
 import torch
 import torch.nn as nn
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad, jvp, functional_call
 from torch.utils._pytree import tree_flatten, tree_unflatten
+from torch.distributions import Normal
 
 
 def tree_map(f: Callable, tree: Any, *rest: Tuple[dict, ...]):
@@ -104,7 +104,7 @@ def hvp(f: Callable, primals: tuple, tangents: tuple):
     return jvp(grad(f), primals, tangents)[1]
 
 
-def diagonal_hessian(f: Callable) -> Callable:
+def hessian_diag(f: Callable) -> Callable:
     """Modify a scalar-valued function that takes a dict (with tensor values) as first
     input to return its Hessian diagonal.
 
@@ -131,8 +131,41 @@ def diagonal_hessian(f: Callable) -> Callable:
     return hessian_diag_fn
 
 
+def diag_normal_log_prob(x: Any, mean: Any, sd_diag: Any) -> float:
+    """Evaluate multivariate normal log probability for a diagonal covariance matrix.
+
+    Args:
+        x: Value to evaluate log probability at.
+        mean: Mean of the distribution.
+        sd_diag: Square-root diagonal of the covariance matrix.
+
+    Returns:
+        Log probability.
+    """
+    log_probs = tree_map(
+        lambda v, m, sd: Normal(m, sd).log_prob(v).sum(), x, mean, sd_diag
+    )
+    log_prob = torch.stack(
+        tree_flatten(log_probs)[0]
+    ).sum()  # Replace if torch gets tree_reduce
+    return log_prob
+
+
+def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=[]) -> dict:
+    """Single sample from multivariate normal with diagonal covariance matrix.
+
+    Args:
+        mean: Mean of the distribution.
+        sd_diag: Square-root diagonal of the covariance matrix.
+
+    Returns:
+        Sample from normal distribution with the same structure as mean and sd_diag.
+    """
+    return tree_map(lambda m, sd: Normal(m, sd).sample(sample_shape), mean, sd_diag)
+
+
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
-    """Updates the model parameters in-place with the provided optimizer parameters (provided by SGHMC optimizer)
+    """Updates the model parameters in-place with the provided grouped parameters.
 
     Args:
         model: A torch.nn.Module object

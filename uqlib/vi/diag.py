@@ -27,6 +27,7 @@ def init(
     init_mean: Any,
     optimizer_cls: Type[torch.optim.Optimizer],
     init_log_sds: Any = None,
+    maximize: bool = True,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
@@ -46,6 +47,8 @@ def init(
         optimizer_cls: Optimizer class for updating the variational parameters.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
             of the variational distribution. Defaults to zero.
+        maximize: Whether to maximise the ELBO with respect to the given log_posterior
+            function. Defaults to True.
 
     Returns:
         Initial DiagVIState.
@@ -57,7 +60,7 @@ def init(
 
     mean_leaves = tree_flatten(init_mean)[0]
     init_log_sds_leaves = tree_flatten(init_log_sds)[0]
-    optimizer = optimizer_cls(mean_leaves + init_log_sds_leaves, maximize=True)
+    optimizer = optimizer_cls(mean_leaves + init_log_sds_leaves, maximize=maximize)
     return VIDiagState(init_mean, init_log_sds, optimizer)
 
 
@@ -66,6 +69,7 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
     n_samples: int = 1,
+    stl: bool = True,
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the ELBO.
 
@@ -82,13 +86,15 @@ def update(
             returns the log posterior (which can be unnormalised).
         batch: Input data to log_posterior.
         n_samples: Number of samples to use for Monte Carlo estimate.
+        stl: Whether to use the `stick-the-landing` estimator
+            https://arxiv.org/abs/1703.09194.
 
     Returns:
         Updated DiagVIState.
     """
     state.optimizer.zero_grad()
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    elbo_val = elbo(log_posterior, batch, state.mean, sd_diag, n_samples)
+    elbo_val = elbo(log_posterior, batch, state.mean, sd_diag, n_samples, stl)
     elbo_val.backward()
     state.optimizer.step()
     return VIDiagState(state.mean, state.log_sd_diag, state.optimizer, elbo_val.item())
@@ -100,6 +106,7 @@ def elbo(
     mean: dict,
     sd_diag: dict,
     n_samples: int = 1,
+    stl: bool = True,
 ) -> float:
     """Returns the evidence lower bound (ELBO) for a diagonal Normal
     variational distribution over the parameters of a model.
@@ -108,37 +115,48 @@ def elbo(
 
     ELBO = E_q[log p(y|x, θ) + log p(θ) - log q(θ)]
 
-    log_posterior expects to take parameters and input batch and return the scalar log
-    posterior:
+    log_posterior expects to take parameters and input batch and return a tensor
+    containing log posterior evaluations for each batch member:
 
     ```
-    val = log_posterior(params, batch)
+    batch_vals = log_posterior(params, batch)
     ```
+
+    where each element of batch_vals is an unbiased estimate of the log posterior.
+    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         model: Model.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
         mean: Mean of the variational distribution.
         sd_diag: Square-root diagonal of the covariance matrix of the
             variational distribution.
         n_samples: Number of samples to use for Monte Carlo estimate.
+        stl: Whether to use the `stick-the-landing` estimator
+            https://arxiv.org/abs/1703.09194.
 
     Returns:
         The sampled approximate ELBO averaged over the batch.
     """
 
-    def single_elbo(sampled_params):
+    def single_elbo(m, sd):
+        sampled_params = diag_normal_sample(m, sd)
+        if stl:
+            # Stop gradients
+            m = tree_map(lambda x: x.detach(), m)
+            sd = tree_map(lambda x: x.detach(), sd)
         log_p = log_posterior(sampled_params, batch).mean()
-        log_q = diag_normal_log_prob(sampled_params, mean, sd_diag)
+        log_q = diag_normal_log_prob(sampled_params, m, sd)
         return log_p - log_q
 
-    # Maybe we should change this loop to a vmap? If its supported
+    # Maybe we should change this loop to a vmap? If torch supports it
     elbo = 0
     for _ in range(n_samples):
-        elbo += single_elbo(diag_normal_sample(mean, sd_diag)) / n_samples
-    return elbo
+        elbo += single_elbo(mean, sd_diag) / n_samples
+
+    return elbo.requires_grad_(True)
 
 
 def sample(state: VIDiagState):

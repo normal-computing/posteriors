@@ -42,19 +42,23 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
 ) -> DiagLaplaceState:
-    """Adds diagonal Fisher square-root of covariance for given batch.
+    """Adds diagonal empirical Fisher information matrix of covariance summed over
+    given batch.
 
-    log_posterior expects to take parameters and input batch and return the scalar log
-    posterior:
+    log_posterior expects to take parameters and input batch and return a tensor
+    containing log posterior evaluations for each batch member:
 
     ```
-    val = log_posterior(params, batch)
+    batch_vals = log_posterior(params, batch)
     ```
+
+    where each element of batch_vals is an unbiased estimate of the log posterior.
+    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         state: Current state.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
 
     Returns:
@@ -62,7 +66,7 @@ def update(
     """
     with torch.no_grad():
         batch_diag_score_sq = tree_map(
-            lambda jac: jac.square().mean(0), jacrev(log_posterior)(state.mean, batch)
+            lambda jac: jac.square().sum(0), jacrev(log_posterior)(state.mean, batch)
         )
     diag_prec = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
     return DiagLaplaceState(state.mean, diag_prec)

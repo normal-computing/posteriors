@@ -22,7 +22,7 @@ def categorical_log_likelihood(labels, logits):
 prior_sd = 1
 
 
-def normal_log_prior(p: dict):
+def normal_log_prior(p: dict) -> float:
     return torch.stack(
         [Normal(0, prior_sd).log_prob(ptemp).sum() for ptemp in p.values()]
     ).sum()
@@ -34,14 +34,14 @@ model.to(device)
 model_func = uqlib.model_to_function(model)
 
 
-def param_to_log_posterior(p, batch):
+def param_to_log_posterior(p, batch) -> torch.tensor:
     return (
         categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
         + normal_log_prior(p) / num_data
     )
 
 
-# Train (as usual using native PyTorch) for MAP
+# Train (as usual, using native PyTorch) for MAP
 optimizer = AdamW(model.parameters(), lr=5e-5, maximize=True)
 
 num_epochs = 3
@@ -86,3 +86,16 @@ for batch in train_dataloader:
         laplace_state, param_to_log_posterior, batch
     )
     progress_bar_2.update(1)
+
+
+# # Diagonal Hessian covariance matrix
+# progress_bar_2 = tqdm(range(len(train_dataloader)))
+
+# laplace_state = uqlib.laplace.diag_hessian.init(dict(model.named_parameters()))
+
+# for batch in train_dataloader:
+#     batch = {k: v.to(device) for k, v in batch.items()}
+#     laplace_state = uqlib.laplace.diag_hessian.update(
+#         laplace_state, param_to_log_posterior, batch
+#     )
+#     progress_bar_2.update(1)

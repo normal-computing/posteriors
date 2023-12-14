@@ -30,33 +30,35 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
 ) -> DiagLaplaceState:
-    """Adds diagonal square-root of inverse negative Hessian for given batch.
+    """Adds diagonal negative Hessian summed across given batch.
 
     At the MAP estimate, the inverse negative Hessian approximates the covariance, but
     it needs to be semipositive-definite which is not guaranteed.
 
-    log_posterior expects to take parameters and input batch and return the scalar log
-    posterior:
+    log_posterior expects to take parameters and input batch and return a tensor
+    containing log posterior evaluations for each batch member:
 
     ```
-    val = log_posterior(params, batch)
+    batch_vals = log_posterior(params, batch)
     ```
+
+    where each element of batch_vals is an unbiased estimate of the log posterior.
+    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         state: Current state.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
-        epsilon: Minimum value of the negative diagonal Hessian. Defaults to 0.
 
     Returns:
         Updated DiagLaplaceState.
     """
     with torch.no_grad():
-        batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch).mean())(
+        batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch).sum())(
             state.mean
         )
-    batch_prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_hess)
+    batch_prec_diag = tree_map(lambda x, y: x - y, state.prec_diag, batch_diag_hess)
     return DiagLaplaceState(state.mean, batch_prec_diag)
 
 

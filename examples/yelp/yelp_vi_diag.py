@@ -21,7 +21,7 @@ num_training_steps = num_epochs * len(train_dataloader)
 
 
 def categorical_log_likelihood(labels, logits):
-    return Categorical(logits=logits).log_prob(labels).mean(dim=-1)
+    return Categorical(logits=logits).log_prob(labels)
 
 
 prior_sd = 1
@@ -70,10 +70,11 @@ elbos = []
 for epoch in range(num_epochs):
     for batch in train_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
-        vi_state = uqlib.vi.diag.update(vi_state, param_to_log_posterior, batch)
+        vi_state = uqlib.vi.diag.update(vi_state, param_to_log_posterior, batch, 10)
         elbos.append(vi_state.elbo)
         lr_scheduler.step()
         progress_bar.update(1)
+
 
 # # Alternative implementation that updates mu and log_sigma directly without using the
 # # uqlib init+update API

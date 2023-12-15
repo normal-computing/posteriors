@@ -55,7 +55,7 @@ def init(
     """
     if init_log_sds is None:
         init_log_sds = tree_map(
-            lambda x: torch.zeros_like(x).requires_grad_(True), init_mean
+            lambda x: torch.zeros_like(x, requires_grad=True), init_mean
         )
 
     mean_leaves = tree_flatten(init_mean)[0]
@@ -68,7 +68,7 @@ def update(
     state: VIDiagState,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
-    n_samples: int = 1,
+    n_samples: int = 1000,
     stl: bool = True,
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the ELBO.
@@ -144,7 +144,6 @@ def elbo(
     def single_elbo(m, sd):
         sampled_params = diag_normal_sample(m, sd)
         if stl:
-            # Stop gradients
             m = tree_map(lambda x: x.detach(), m)
             sd = tree_map(lambda x: x.detach(), sd)
         log_p = log_posterior(sampled_params, batch).mean()
@@ -152,11 +151,11 @@ def elbo(
         return log_p - log_q
 
     # Maybe we should change this loop to a vmap? If torch supports it
-    elbo = 0
+    elbo = torch.tensor(0.0)
     for _ in range(n_samples):
         elbo += single_elbo(mean, sd_diag) / n_samples
 
-    return elbo.requires_grad_(True)
+    return elbo
 
 
 def sample(state: VIDiagState):

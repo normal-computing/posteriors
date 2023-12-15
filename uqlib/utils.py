@@ -151,7 +151,7 @@ def diag_normal_log_prob(x: Any, mean: Any, sd_diag: Any) -> float:
     return log_prob
 
 
-def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=[]) -> dict:
+def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> dict:
     """Single sample from multivariate normal with diagonal covariance matrix.
 
     Args:
@@ -161,7 +161,9 @@ def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=[]) -> dict:
     Returns:
         Sample from normal distribution with the same structure as mean and sd_diag.
     """
-    return tree_map(lambda m, sd: Normal(m, sd).sample(sample_shape), mean, sd_diag)
+    return tree_map(
+        lambda m, sd: m + torch.randn(sample_shape + m.shape) * sd, mean, sd_diag
+    )
 
 
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):

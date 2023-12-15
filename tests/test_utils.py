@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import parameters_to_vector
 
 
 from uqlib import (
     tree_map,
-    forward_multiple,
+    tree_reduce,
     hessian_diag,
     model_to_function,
     diag_normal_log_prob,
@@ -66,6 +65,25 @@ def test_tree_map():
         assert torch.equal(result[key], expected[key])
 
 
+def test_tree_reduce():
+    t = (1, 2, 3, 4)
+    result = tree_reduce(lambda x, y: x + y, t)
+    result2 = tree_reduce(torch.add, t)
+    assert result == 10
+    assert result2 == 10
+
+    d = {"a": 1, "b": 2, "c": 3, "d": 4}
+    result = tree_reduce(lambda x, y: x + y, d)
+    result2 = tree_reduce(torch.add, t)
+    assert result == 10
+    assert result2 == 10
+
+    d = {"a": torch.tensor([1, 2]), "b": torch.tensor([3, 4])}
+    result = tree_reduce(torch.add, d)
+    expected = torch.tensor([4, 6])
+    assert torch.equal(result, expected)
+
+
 def test_model_to_function():
     model = TestModel()
 
@@ -96,46 +114,6 @@ def test_model_to_function():
     assert type(output) == type(func_output1) == type(func_output2)
     assert torch.allclose(output["logits"], func_output1["logits"])
     assert torch.allclose(output["logits"], func_output2["logits"])
-
-
-def test_forward_multiple():
-    model = TestModel()
-
-    pvec = parameters_to_vector(model.parameters())
-
-    pvec_multiple = torch.tile(pvec, (4, 1))
-
-    input_single = torch.randn(10)
-    input_multiple = torch.randn(8, 10)
-
-    outputs_params_single_inputs_single = forward_multiple(model, input_single, pvec)
-    assert outputs_params_single_inputs_single.shape == (1, 1, 1)
-
-    outputs_params_multi_inputs_single = forward_multiple(
-        model, input_single, pvec_multiple
-    )
-    assert outputs_params_multi_inputs_single.shape == (1, 4, 1)
-    assert torch.allclose(
-        outputs_params_multi_inputs_single, outputs_params_single_inputs_single
-    )
-
-    outputs_params_single_inputs_multi = forward_multiple(model, input_multiple, pvec)
-    assert outputs_params_single_inputs_multi.shape == (8, 1, 1)
-
-    outputs_params_multi_inputs_multi = forward_multiple(
-        model, input_multiple, pvec_multiple
-    )
-    assert outputs_params_multi_inputs_multi.shape == (8, 4, 1)
-
-    pvec_new = torch.randn_like(pvec)
-    outputs_params_single_inputs_single_new = forward_multiple(
-        model, input_single, pvec_new
-    )
-    assert outputs_params_single_inputs_single_new.shape == (1, 1, 1)
-    assert not torch.equal(
-        outputs_params_single_inputs_single_new, outputs_params_single_inputs_single
-    )
-    assert torch.equal(pvec, parameters_to_vector(model.parameters()))
 
 
 def test_hessian_diag():

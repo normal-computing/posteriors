@@ -1,10 +1,10 @@
-from typing import Callable, Any, Tuple, List
-
+from functools import reduce
+from typing import Callable, Any, Tuple, List, Union
 import torch
 import torch.nn as nn
-from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.func import grad, jvp, functional_call
 from torch.utils._pytree import tree_flatten, tree_unflatten
+from torch.distributions import Normal
 
 
 def tree_map(f: Callable, tree: Any, *rest: Tuple[dict, ...]):
@@ -27,6 +27,22 @@ def tree_map(f: Callable, tree: Any, *rest: Tuple[dict, ...]):
     return tree_unflatten([f(*xs) for xs in zip(*all_leaves)], spec)
 
 
+def tree_reduce(f: Callable, tree: Any) -> Any:
+    """Apply a function of two arguments cumulatively to the items of a pytree.
+    See functools.reduce
+
+    E.g. sum_dict = tree_reduce(torch.add, dict1)
+
+    Args:
+        f: Function to apply to each value.
+        tree: Pytree.
+
+    Returns:
+        Reduced output of f.
+    """
+    return reduce(f, tree_flatten(tree)[0])
+
+
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
     """Converts a model into a function that maps parameters and inputs to outputs.
 
@@ -42,47 +58,6 @@ def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
         return functional_call(model, p_dict, args=args, kwargs=kwargs)
 
     return func_model
-
-
-def forward_multiple(
-    model: torch.nn.Module,
-    inputs: torch.Tensor,
-    parameter_vectors: torch.Tensor,
-) -> torch.Tensor:
-    """Evaluates multiple forward passes of a model with different parameter vectors.
-
-        Does not use torch.inference_mode() by default
-        (although this should be considered in most cases).
-
-        Does not squeeze output, output is guranateed to be 3D
-        (even if only one parameter vector or one input is passed).
-
-        Args:
-            model: torch.nn.Module
-            parameter_vectors: torch.tensor
-                Shape: (n_parameter_vectors, dim_parameter)
-            inputs: torch.tensor
-                Shape: (n_samples, dim_input)
-
-    Returns:
-            torch.tensor
-                Shape: (n_samples, n_parameter_vectors, dim_output)
-    """
-    parameter_vectors = torch.atleast_2d(parameter_vectors).to(model.device)
-
-    # This assumes that X is a tensor, is this a fair assumption?
-    inputs = torch.atleast_2d(inputs).to(model.device)
-
-    outputs = list()
-
-    orig_params = parameters_to_vector(model.parameters())
-
-    for vec in parameter_vectors:
-        vector_to_parameters(vec, model.parameters())
-        outputs.append(model(inputs))
-
-    vector_to_parameters(orig_params, model.parameters())
-    return torch.stack(outputs).transpose(0, 1)
 
 
 def hvp(f: Callable, primals: tuple, tangents: tuple):
@@ -104,7 +79,7 @@ def hvp(f: Callable, primals: tuple, tangents: tuple):
     return jvp(grad(f), primals, tangents)[1]
 
 
-def diagonal_hessian(f: Callable) -> Callable:
+def hessian_diag(f: Callable) -> Callable:
     """Modify a scalar-valued function that takes a dict (with tensor values) as first
     input to return its Hessian diagonal.
 
@@ -118,13 +93,10 @@ def diagonal_hessian(f: Callable) -> Callable:
         A new function that computes the Hessian diagonal.
     """
 
-    def hessian_diag_fn(x: dict[Any, torch.Tensor], *args, **kwargs) -> torch.Tensor:
-        if isinstance(x, torch.Tensor):
-            v = torch.ones_like(x)
-        elif isinstance(x, dict):
-            v = tree_map(lambda v: torch.ones_like(v), x)
-        else:
-            raise ValueError("x must be a tensor or dict with tensor values")
+    def hessian_diag_fn(
+        x: Union[torch.Tensor, dict[Any, torch.Tensor]], *args, **kwargs
+    ) -> torch.Tensor:
+        v = tree_map(lambda v: torch.ones_like(v, requires_grad=False), x)
 
         def ftemp(xtemp):
             return f(xtemp, *args, **kwargs)
@@ -134,8 +106,41 @@ def diagonal_hessian(f: Callable) -> Callable:
     return hessian_diag_fn
 
 
+def diag_normal_log_prob(x: Any, mean: Any, sd_diag: Any) -> float:
+    """Evaluate multivariate normal log probability for a diagonal covariance matrix.
+
+    Args:
+        x: Value to evaluate log probability at.
+        mean: Mean of the distribution.
+        sd_diag: Square-root diagonal of the covariance matrix.
+
+    Returns:
+        Log probability.
+    """
+    log_probs = tree_map(
+        lambda v, m, sd: Normal(m, sd).log_prob(v).sum(), x, mean, sd_diag
+    )
+    log_prob = tree_reduce(torch.add, log_probs)
+    return log_prob
+
+
+def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> dict:
+    """Single sample from multivariate normal with diagonal covariance matrix.
+
+    Args:
+        mean: Mean of the distribution.
+        sd_diag: Square-root diagonal of the covariance matrix.
+
+    Returns:
+        Sample from normal distribution with the same structure as mean and sd_diag.
+    """
+    return tree_map(
+        lambda m, sd: m + torch.randn(sample_shape + m.shape) * sd, mean, sd_diag
+    )
+
+
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
-    """Updates the model parameters in-place with the provided optimizer parameters (provided by SGHMC optimizer)
+    """Updates the model parameters in-place with the provided grouped parameters.
 
     Args:
         model: A torch.nn.Module object

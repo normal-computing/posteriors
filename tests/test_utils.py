@@ -1,9 +1,15 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import parameters_to_vector
 
 
-from uqlib import tree_map, forward_multiple, diagonal_hessian, model_to_function
+from uqlib import (
+    tree_map,
+    tree_reduce,
+    hessian_diag,
+    model_to_function,
+    diag_normal_log_prob,
+    diag_normal_sample,
+)
 
 
 class TestModel(nn.Module):
@@ -59,6 +65,25 @@ def test_tree_map():
         assert torch.equal(result[key], expected[key])
 
 
+def test_tree_reduce():
+    t = (1, 2, 3, 4)
+    result = tree_reduce(lambda x, y: x + y, t)
+    result2 = tree_reduce(torch.add, t)
+    assert result == 10
+    assert result2 == 10
+
+    d = {"a": 1, "b": 2, "c": 3, "d": 4}
+    result = tree_reduce(lambda x, y: x + y, d)
+    result2 = tree_reduce(torch.add, t)
+    assert result == 10
+    assert result2 == 10
+
+    d = {"a": torch.tensor([1, 2]), "b": torch.tensor([3, 4])}
+    result = tree_reduce(torch.add, d)
+    expected = torch.tensor([4, 6])
+    assert torch.equal(result, expected)
+
+
 def test_model_to_function():
     model = TestModel()
 
@@ -91,59 +116,19 @@ def test_model_to_function():
     assert torch.allclose(output["logits"], func_output2["logits"])
 
 
-def test_forward_multiple():
-    model = TestModel()
-
-    pvec = parameters_to_vector(model.parameters())
-
-    pvec_multiple = torch.tile(pvec, (4, 1))
-
-    input_single = torch.randn(10)
-    input_multiple = torch.randn(8, 10)
-
-    outputs_params_single_inputs_single = forward_multiple(model, input_single, pvec)
-    assert outputs_params_single_inputs_single.shape == (1, 1, 1)
-
-    outputs_params_multi_inputs_single = forward_multiple(
-        model, input_single, pvec_multiple
-    )
-    assert outputs_params_multi_inputs_single.shape == (1, 4, 1)
-    assert torch.allclose(
-        outputs_params_multi_inputs_single, outputs_params_single_inputs_single
-    )
-
-    outputs_params_single_inputs_multi = forward_multiple(model, input_multiple, pvec)
-    assert outputs_params_single_inputs_multi.shape == (8, 1, 1)
-
-    outputs_params_multi_inputs_multi = forward_multiple(
-        model, input_multiple, pvec_multiple
-    )
-    assert outputs_params_multi_inputs_multi.shape == (8, 4, 1)
-
-    pvec_new = torch.randn_like(pvec)
-    outputs_params_single_inputs_single_new = forward_multiple(
-        model, input_single, pvec_new
-    )
-    assert outputs_params_single_inputs_single_new.shape == (1, 1, 1)
-    assert not torch.equal(
-        outputs_params_single_inputs_single_new, outputs_params_single_inputs_single
-    )
-    assert torch.equal(pvec, parameters_to_vector(model.parameters()))
-
-
-def test_diagonal_hessian():
+def test_hessian_diag():
     # Test with a constant function
     def const_fn(_):
         return torch.tensor(3.0)
 
-    hessian_diag = diagonal_hessian(const_fn)
+    hessian_diag_func = hessian_diag(const_fn)
     x = torch.tensor([1.0, 2.0])
-    result = hessian_diag(x)
+    result = hessian_diag_func(x)
     expected = torch.zeros_like(x)
     assert torch.equal(result, expected)
 
     x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag(x)
+    result = hessian_diag_func(x)
     expected = tree_map(lambda v: torch.zeros_like(v), x)
     for key in result:
         assert torch.equal(result[key], expected[key])
@@ -152,9 +137,9 @@ def test_diagonal_hessian():
     def linear_fn(x):
         return x["a"].sum() + x["b"].sum()
 
-    hessian_diag = diagonal_hessian(linear_fn)
+    hessian_diag_func = hessian_diag(linear_fn)
     x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag(x)
+    result = hessian_diag_func(x)
     for key in result:
         assert torch.equal(result[key], expected[key])
 
@@ -162,9 +147,48 @@ def test_diagonal_hessian():
     def quad_fn(x):
         return (x["a"] ** 2).sum() + (x["b"] ** 2).sum()
 
-    hessian_diag = diagonal_hessian(quad_fn)
+    hessian_diag_func = hessian_diag(quad_fn)
     x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag(x)
+    result = hessian_diag_func(x)
     expected = tree_map(lambda v: 2 * torch.ones_like(v), x)
     for key in result:
         assert torch.equal(result[key], expected[key])
+
+
+def test_diag_normal_log_prob():
+    mean = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
+    sd_diag = {"a": torch.tensor([0.1, 0.2]), "b": torch.tensor([0.3, 0.4])}
+    x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
+
+    mean_flat = torch.stack([mean["a"], mean["b"]]).flatten()
+    sd_flat = torch.stack([sd_diag["a"], sd_diag["b"]]).flatten()
+    x_flat = torch.stack([x["a"], x["b"]]).flatten()
+
+    result = diag_normal_log_prob(x, mean, sd_diag)
+    expected = torch.distributions.Normal(mean_flat, sd_flat).log_prob(x_flat).sum()
+
+    assert torch.allclose(result, expected)
+
+
+def test_diag_normal_sample():
+    mean = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
+    sd_diag = {"a": torch.tensor([0.1, 0.2]), "b": torch.tensor([0.3, 0.4])}
+
+    torch.manual_seed(42)
+    result = diag_normal_sample(mean, sd_diag)
+    torch.manual_seed(42)
+    expected = tree_map(
+        lambda m, sd: torch.distributions.Normal(m, sd).sample(), mean, sd_diag
+    )
+
+    for key in result:
+        assert torch.equal(result[key], expected[key])
+
+    n_samps = 1000
+    result = diag_normal_sample(mean, sd_diag, sample_shape=(n_samps,))
+    result_mean = tree_map(lambda v: v.mean(dim=0), result)
+    result_std = tree_map(lambda v: v.std(dim=0), result)
+
+    for key in result_mean:
+        assert torch.allclose(result_mean[key], mean[key], atol=1e-1)
+        assert torch.allclose(result_std[key], sd_diag[key], atol=1e-1)

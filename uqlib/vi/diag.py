@@ -1,6 +1,8 @@
-from typing import Callable, Any, NamedTuple, Type
+from typing import Callable, Any, NamedTuple
 import torch
 from torch.utils._pytree import tree_flatten
+from torch.func import grad_and_value, vmap
+import torchopt
 
 from uqlib.utils import tree_map, diag_normal_log_prob, diag_normal_sample
 
@@ -12,43 +14,42 @@ class VIDiagState(NamedTuple):
         mean: Mean of the variational distribution.
         log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.
-        optimizer: torch.optim.Optimizer instance for updating the
+        optimizer_state: torchopt state storing optimizer data for updating the
             variational parameters.
-        elbo: Evidence lower bound (higher is better).
+        nelbo: Negative evidence lower bound (lower is better).
     """
 
     mean: Any
     log_sd_diag: Any
-    optimizer: torch.optim.Optimizer
-    elbo: float = 0
+    optimizer_state: tuple
+    nelbo: float = 0
 
 
 def init(
     init_mean: Any,
-    optimizer_cls: Type[torch.optim.Optimizer],
+    optimizer: torchopt.base.GradientTransformation,
     init_log_sds: Any = None,
-    maximize: bool = True,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
-    optimizer_cls will be called on flattened variational parameters so hyperparameters
-    such as learning rate need to prespecifed with e.g.
+    optimizer.initi will be called on flattened variational parameters so hyperparameters
+    such as learning rate need to prespecifed through torchopt's functional API:
 
     ```
-    from functools import partial
-    from torch.optim import Adam
+    import torchopt
 
-    optimizer_cls = partial(Adam, lr=0.01)
-    vi_state = init(init_mean, optimizer_cls)
+    optimizer = torchopt.adam(lr=1e-2)
+    vi_state = init(init_mean, optimizer)
     ```
+
+    It's assumed maximize=False for the optimizer, so that we minimize the NELBO.
 
     Args:
         init_mean: Initial mean of the variational distribution.
-        optimizer_cls: Optimizer class for updating the variational parameters.
+        optimizer: torchopt functional optimizer for updating the variational
+            parameters.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
             of the variational distribution. Defaults to zero.
-        maximize: Whether to maximise the ELBO with respect to the given log_posterior
-            function. Defaults to True.
 
     Returns:
         Initial DiagVIState.
@@ -60,16 +61,18 @@ def init(
 
     mean_leaves = tree_flatten(init_mean)[0]
     init_log_sds_leaves = tree_flatten(init_log_sds)[0]
-    optimizer = optimizer_cls(mean_leaves + init_log_sds_leaves, maximize=maximize)
-    return VIDiagState(init_mean, init_log_sds, optimizer)
+    optimizer_state = optimizer.init(mean_leaves + init_log_sds_leaves)
+    return VIDiagState(init_mean, init_log_sds, optimizer_state)
 
 
 def update(
     state: VIDiagState,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
-    n_samples: int = 1000,
+    optimizer: torchopt.base.GradientTransformation,
+    n_samples: int = 1,
     stl: bool = True,
+    inplace: bool = True,
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the ELBO.
 
@@ -85,26 +88,38 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
         batch: Input data to log_posterior.
+        optimizer: torchopt functional optimizer for updating the variational
+            parameters.
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
+        inplace: Whether to update the state parameters in place.
 
     Returns:
         Updated DiagVIState.
     """
-    state.optimizer.zero_grad()
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    elbo_val = elbo(log_posterior, batch, state.mean, sd_diag, n_samples, stl)
-    elbo_val.backward()
-    state.optimizer.step()
-    return VIDiagState(state.mean, state.log_sd_diag, state.optimizer, elbo_val.item())
+    nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
+        state.mean, sd_diag, log_posterior, batch, n_samples, stl
+    )
+
+    mean_leaves = tree_flatten(state.mean)[0]
+    init_log_sds_leaves = tree_flatten(state.log_sd_diag)[0]
+
+    updates, optimizer_state = optimizer.update(
+        nelbo_grads, state.optimizer_state, params=mean_leaves + init_log_sds_leaves
+    )
+    mean, log_sd_diag = torchopt.apply_updates(
+        (state.mean, state.log_sd_diag), updates, inplace=inplace
+    )
+    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.item())
 
 
-def elbo(
-    log_posterior: Callable[[Any, Any], float],
-    batch: Any,
+def nelbo(
     mean: dict,
     sd_diag: dict,
+    log_posterior: Callable[[Any, Any], float],
+    batch: Any,
     n_samples: int = 1,
     stl: bool = True,
 ) -> float:
@@ -122,13 +137,12 @@ def elbo(
     ```
 
     Args:
-        model: Model.
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised) for each batch member.
-        batch: Input data to log_posterior.
         mean: Mean of the variational distribution.
         sd_diag: Square-root diagonal of the covariance matrix of the
             variational distribution.
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior (which can be unnormalised) for each batch member.
+        batch: Input data to log_posterior.
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
@@ -136,22 +150,14 @@ def elbo(
     Returns:
         The sampled approximate ELBO averaged over the batch.
     """
+    sampled_params = diag_normal_sample(mean, sd_diag, sample_shape=(n_samples,))
+    if stl:
+        mean = tree_map(lambda x: x.detach(), mean)
+        sd_diag = tree_map(lambda x: x.detach(), sd_diag)
 
-    def single_elbo(m, sd):
-        sampled_params = diag_normal_sample(m, sd)
-        if stl:
-            m = tree_map(lambda x: x.detach(), m)
-            sd = tree_map(lambda x: x.detach(), sd)
-        log_p = log_posterior(sampled_params, batch)
-        log_q = diag_normal_log_prob(sampled_params, m, sd)
-        return log_p - log_q
-
-    # Maybe we should change this loop to a vmap? If torch supports it
-    elbo = torch.tensor(0.0)
-    for _ in range(n_samples):
-        elbo += single_elbo(mean, sd_diag) / n_samples
-
-    return elbo
+    log_p = vmap(log_posterior, (0, None))(sampled_params, batch)
+    log_q = vmap(diag_normal_log_prob, (0, None, None))(sampled_params, mean, sd_diag)
+    return -(log_p - log_q).mean()
 
 
 def sample(state: VIDiagState):

@@ -106,19 +106,26 @@ def hessian_diag(f: Callable) -> Callable:
     return hessian_diag_fn
 
 
-def diag_normal_log_prob(x: Any, mean: Any, sd_diag: Any) -> float:
+def diag_normal_log_prob(
+    x: Any, mean: Any, sd_diag: Any, validate_args: bool = False
+) -> float:
     """Evaluate multivariate normal log probability for a diagonal covariance matrix.
 
     Args:
         x: Value to evaluate log probability at.
         mean: Mean of the distribution.
         sd_diag: Square-root diagonal of the covariance matrix.
+        validate_args: Whether to validate arguments, defaults to False as
+            torch.func.vmap doesn't like the control flows (if statements).
 
     Returns:
         Log probability.
     """
     log_probs = tree_map(
-        lambda v, m, sd: Normal(m, sd).log_prob(v).sum(), x, mean, sd_diag
+        lambda v, m, sd: Normal(m, sd, validate_args=validate_args).log_prob(v).sum(),
+        x,
+        mean,
+        sd_diag,
     )
     log_prob = tree_reduce(torch.add, log_probs)
     return log_prob

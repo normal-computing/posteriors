@@ -1,6 +1,6 @@
 from typing import Callable, Any, NamedTuple
 import torch
-from torch.func import jacrev
+from torch.func import jacrev, vmap
 
 from uqlib.utils import tree_map, diag_normal_sample
 
@@ -45,28 +45,29 @@ def update(
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
 
-    log_posterior expects to take parameters and input batch and return a tensor
-    containing log posterior evaluations for each batch member:
+    log_posterior expects to take parameters and input batch and return a scalar
+    unbiased estimate of the full batch log posterior:
 
     ```
-    batch_vals = log_posterior(params, batch)
+    log_posterior_eval = log_posterior(params, batch)
     ```
-
-    where each element of batch_vals is an unbiased estimate of the log posterior.
-    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         state: Current state.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised) for each batch member.
+            returns the scalar log posterior (which can be unnormalised).
         batch: Input data to log_posterior.
 
     Returns:
         Updated DiagLaplaceState.
     """
+
+    log_posterior_per_sample = vmap(log_posterior, in_dims=(None, 0))
+
     with torch.no_grad():
         batch_diag_score_sq = tree_map(
-            lambda jac: jac.square().sum(0), jacrev(log_posterior)(state.mean, batch)
+            lambda jac: jac.square().sum(0),
+            jacrev(log_posterior_per_sample)(state.mean, batch),
         )
     diag_prec = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
     return DiagLaplaceState(state.mean, diag_prec)

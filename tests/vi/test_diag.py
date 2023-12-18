@@ -9,7 +9,7 @@ from uqlib.utils import tree_map, diag_normal_log_prob
 def batch_normal_log_prob(
     p: dict, batch: Any, mean: dict, sd_diag: dict
 ) -> torch.Tensor:
-    return diag_normal_log_prob(p, mean, sd_diag).repeat(batch.shape[0])
+    return diag_normal_log_prob(p, mean, sd_diag)
 
 
 def test_batch_normal_log_prob():
@@ -22,7 +22,9 @@ def test_batch_normal_log_prob():
         batch_normal_log_prob, mean=mean, sd_diag=sd_diag
     )
 
-    single_batch_evals = torch.cat([batch_normal_log_prob_spec(p, b) for b in batch])
+    single_batch_evals = torch.stack(
+        [batch_normal_log_prob_spec(p, b) for b in batch]
+    ).mean()
     full_batch_evals = batch_normal_log_prob_spec(p, batch)
 
     assert torch.allclose(single_batch_evals, full_batch_evals)

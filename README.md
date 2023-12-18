@@ -59,7 +59,7 @@ Pull requests are welcomed! Please go through the following steps:
 
 1. Create a new branch from `main`.
 2. Run `pip install -e .` to install the package in editable mode.
-3. Add your code and tests.
+3. Add your code and tests (`tests` has the same structure as `uqlib`).
 4. Run `pre-commit run --all-files` and `pytest` to check your code lints and tests pass.
 5. Commit your changes and push your branch to GitHub.
 6. Create pull request into the `main` branch.

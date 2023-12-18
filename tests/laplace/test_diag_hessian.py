@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
+from torch.func import functional_call
 
 from uqlib import tree_map, hessian_diag
 from uqlib.laplace import diag_hessian
@@ -29,8 +30,11 @@ def normal_log_likelihood(y, y_pred):
     return Normal(y_pred, 1).log_prob(y).sum(dim=-1)
 
 
-def log_posterior_n(params, batch, n_data):
-    return normal_log_prior(params) + normal_log_likelihood(*batch) * n_data
+def log_posterior_n(params, batch, model, n_data):
+    y_pred = functional_call(model, params, batch[0])
+    return (
+        normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
+    ).mean()
 
 
 def test_diag_hessian():
@@ -44,7 +48,7 @@ def test_diag_hessian():
         batch_size=20,
     )
 
-    log_posterior = partial(log_posterior_n, n_data=len(xs))
+    log_posterior = partial(log_posterior_n, model=model, n_data=len(xs))
 
     params = dict(model.named_parameters())
     laplace_state = diag_hessian.init(params)

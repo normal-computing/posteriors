@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
+from torch.func import functional_call
 
 from uqlib import tree_map
 from uqlib.laplace import diag_fisher
@@ -26,11 +27,20 @@ def normal_log_prior(p: dict):
 
 
 def normal_log_likelihood(y, y_pred):
-    return Normal(y_pred, 1).log_prob(y).sum(dim=-1)
+    return (
+        Normal(y_pred, 1, validate_args=False).log_prob(y).sum(dim=-1)
+    )  # validate args introduces control flows not yet supported in torch.func.vmap
 
 
-def log_posterior_n(params, batch, n_data):
-    return normal_log_prior(params) + normal_log_likelihood(*batch) * n_data
+# def normal_log_likelihood(y, y_pred):
+#     return (y - y_pred).square().sum(dim=-1)
+
+
+def log_posterior_n(params, batch, model, n_data):
+    y_pred = functional_call(model, params, batch[0])
+    return (
+        normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
+    ).mean()
 
 
 def test_diag_fisher():
@@ -44,7 +54,7 @@ def test_diag_fisher():
         batch_size=20,
     )
 
-    log_posterior = partial(log_posterior_n, n_data=len(xs))
+    log_posterior = partial(log_posterior_n, model=model, n_data=len(xs))
 
     params = dict(model.named_parameters())
     laplace_state = diag_fisher.init(params)
@@ -58,11 +68,11 @@ def test_diag_fisher():
         expected = tree_map(lambda x, y: x + y**2, expected, g)
 
     for key in expected:
-        assert torch.allclose(expected[key], laplace_state.prec_diag[key])
+        assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)
 
     # Also check full batch
     laplace_state_fb = diag_fisher.init(params)
     laplace_state_fb = diag_fisher.update(laplace_state_fb, log_posterior, (xs, ys))
 
     for key in expected:
-        assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key])
+        assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)

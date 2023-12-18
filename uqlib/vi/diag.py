@@ -73,8 +73,8 @@ def update(
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the ELBO.
 
-    log_posterior expects to take parameters and input batch and return the scalar log
-    posterior:
+    log_posterior expects to take parameters and input batch and return a scalar
+    unbiased estimate of the full batch log posterior:
 
     ```
     val = log_posterior(params, batch)
@@ -115,15 +115,11 @@ def elbo(
 
     ELBO = E_q[log p(y|x, θ) + log p(θ) - log q(θ)]
 
-    log_posterior expects to take parameters and input batch and return a tensor
-    containing log posterior evaluations for each batch member:
+    log_posterior expects to take parameters and input batch and return a scalar:
 
     ```
-    batch_vals = log_posterior(params, batch)
+    log_posterior_eval = log_posterior(params, batch)
     ```
-
-    where each element of batch_vals is an unbiased estimate of the log posterior.
-    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         model: Model.
@@ -146,7 +142,7 @@ def elbo(
         if stl:
             m = tree_map(lambda x: x.detach(), m)
             sd = tree_map(lambda x: x.detach(), sd)
-        log_p = log_posterior(sampled_params, batch).mean()
+        log_p = log_posterior(sampled_params, batch)
         log_q = diag_normal_log_prob(sampled_params, m, sd)
         return log_p - log_q
 

@@ -1,5 +1,6 @@
 from typing import Callable, Any
 import torch
+from torch.utils._pytree import tree_flatten
 
 from uqlib.utils import hessian_diag, tree_map, diag_normal_sample
 from uqlib.laplace.diag_fisher import DiagLaplaceState
@@ -32,18 +33,15 @@ def update(
 ) -> DiagLaplaceState:
     """Adds diagonal negative Hessian summed across given batch.
 
-    At the MAP estimate, the inverse negative Hessian approximates the covariance, but
-    it needs to be semipositive-definite which is not guaranteed.
+    At the MAP estimate, the negative Hessian approximates the precision matrix, but
+    note it needs to be semi-positive-definite which is not guaranteed.
 
-    log_posterior expects to take parameters and input batch and return a tensor
-    containing log posterior evaluations for each batch member:
+    log_posterior expects to take parameters and input batch and return a scalar
+    unbiased estimate of the full batch log posterior:
 
     ```
-    batch_vals = log_posterior(params, batch)
+    log_posterior_eval = log_posterior(params, batch)
     ```
-
-    where each element of batch_vals is an unbiased estimate of the log posterior.
-    I.e. batch_vals.mean() is an unbiased estimate of the log posterior.
 
     Args:
         state: Current state.
@@ -54,11 +52,13 @@ def update(
     Returns:
         Updated DiagLaplaceState.
     """
+    batch_size = len(tree_flatten(batch)[0][0])
+
     with torch.no_grad():
-        batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch).sum())(
-            state.mean
-        )
-    batch_prec_diag = tree_map(lambda x, y: x - y, state.prec_diag, batch_diag_hess)
+        batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch))(state.mean)
+    batch_prec_diag = tree_map(
+        lambda x, y: x - y * batch_size, state.prec_diag, batch_diag_hess
+    )
     return DiagLaplaceState(state.mean, batch_prec_diag)
 
 

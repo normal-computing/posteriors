@@ -70,8 +70,8 @@ def hvp(f: Callable, primals: tuple, tangents: tuple):
 
     Args:
         f: A function with scalar output.
-        x: Tuple of e.g. tensor or dict with tensor values to evalute f at.
-        v: Tuple matching structure of x.
+        primals: Tuple of e.g. tensor or dict with tensor values to evalute f at.
+        tangents: Tuple matching structure of primals.
 
     Returns:
         Object matching structure of the elements of x and v.

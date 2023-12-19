@@ -142,7 +142,9 @@ def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> 
         Sample from normal distribution with the same structure as mean and sd_diag.
     """
     return tree_map(
-        lambda m, sd: m + torch.randn(sample_shape + m.shape) * sd, mean, sd_diag
+        lambda m, sd: m + torch.randn(sample_shape + m.shape, device=m.device) * sd,
+        mean,
+        sd_diag,
     )
 
 

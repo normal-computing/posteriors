@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
@@ -60,7 +61,12 @@ def update(
         Updated DiagLaplaceState.
     """
 
-    log_posterior_per_sample = vmap(log_posterior, in_dims=(None, 0))
+    # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+    # this is slow, not sure why
+    @partial(vmap, in_dims=(None, 0))
+    def log_posterior_per_sample(params, batch):
+        batch = tree_map(lambda x: x.unsqueeze(0), batch)
+        return log_posterior(params, batch)
 
     with torch.no_grad():
         batch_diag_score_sq = tree_map(

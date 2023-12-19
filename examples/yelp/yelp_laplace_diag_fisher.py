@@ -16,7 +16,7 @@ model.eval()
 
 
 def categorical_log_likelihood(labels, logits):
-    return Categorical(logits=logits).log_prob(labels)
+    return Categorical(logits=logits, validate_args=False).log_prob(labels)
 
 
 prior_sd = 1
@@ -24,7 +24,10 @@ prior_sd = 1
 
 def normal_log_prior(p: dict) -> float:
     return torch.stack(
-        [Normal(0, prior_sd).log_prob(ptemp).sum() for ptemp in p.values()]
+        [
+            Normal(0, prior_sd, validate_args=False).log_prob(ptemp).sum()
+            for ptemp in p.values()
+        ]
     ).sum()
 
 
@@ -38,7 +41,7 @@ def param_to_log_posterior(p, batch) -> torch.tensor:
     return (
         categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
         + normal_log_prior(p) / num_data
-    )
+    ).mean()
 
 
 # Train (as usual, using native PyTorch) for MAP
@@ -64,7 +67,7 @@ for epoch in range(num_epochs):
     for batch in train_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
 
-        log_post = param_to_log_posterior(dict(model.named_parameters()), batch).mean()
+        log_post = param_to_log_posterior(dict(model.named_parameters()), batch)
 
         log_post.backward()
         log_posts.append(log_post.item())

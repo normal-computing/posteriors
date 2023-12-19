@@ -1,6 +1,5 @@
 from typing import Callable, Any, NamedTuple
 import torch
-from torch.utils._pytree import tree_flatten
 from torch.func import grad_and_value, vmap
 import torchopt
 
@@ -59,9 +58,7 @@ def init(
             lambda x: torch.zeros_like(x, requires_grad=True), init_mean
         )
 
-    mean_leaves = tree_flatten(init_mean)[0]
-    init_log_sds_leaves = tree_flatten(init_log_sds)[0]
-    optimizer_state = optimizer.init(mean_leaves + init_log_sds_leaves)
+    optimizer_state = optimizer.init([init_mean, init_log_sds])
     return VIDiagState(init_mean, init_log_sds, optimizer_state)
 
 
@@ -93,21 +90,19 @@ def update(
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
-        inplace: Whether to update the state parameters in place.
+        inplace: Whether to update the state parameters in-place.
 
     Returns:
         Updated DiagVIState.
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
-        state.mean, sd_diag, log_posterior, batch, n_samples, stl
-    )
-
-    mean_leaves = tree_flatten(state.mean)[0]
-    init_log_sds_leaves = tree_flatten(state.log_sd_diag)[0]
+    with torch.no_grad():
+        nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
+            state.mean, sd_diag, log_posterior, batch, n_samples, stl
+        )
 
     updates, optimizer_state = optimizer.update(
-        nelbo_grads, state.optimizer_state, params=mean_leaves + init_log_sds_leaves
+        nelbo_grads, state.optimizer_state, params=[state.mean, state.log_sd_diag]
     )
     mean, log_sd_diag = torchopt.apply_updates(
         (state.mean, state.log_sd_diag), updates, inplace=inplace

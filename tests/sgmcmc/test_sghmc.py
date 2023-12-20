@@ -6,6 +6,7 @@ import torchopt
 from optree import tree_map
 
 from uqlib.sgmcmc import sghmc
+from uqlib.sgmcmc.optim import SGHMC
 from uqlib.utils import diag_normal_log_prob
 
 
@@ -26,6 +27,7 @@ def test_sghmc():
     )
 
     batch = torch.arange(3).reshape(-1, 1)
+    n_steps = 1000
 
     # Test manual
     torch.manual_seed(42)
@@ -34,8 +36,6 @@ def test_sghmc():
     sampler = sghmc.build(lr=1e-2, alpha=0.01, beta=0.0)
 
     sghmc_state = sampler.init(params)
-
-    n_steps = 1000
 
     log_posts_manual = []
 
@@ -53,9 +53,6 @@ def test_sghmc():
     params = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
 
     func_sampler = torchopt.FuncOptimizer(sghmc.build(lr=1e-2, alpha=0.01, beta=0.0))
-    # func_sampler = torchopt.FuncOptimizer(torchopt.adam())
-
-    n_steps = 1000
 
     log_posts_FuncO = []
 
@@ -73,5 +70,29 @@ def test_sghmc():
     assert torch.allclose(
         torch.tensor(log_posts_manual),
         torch.tensor(log_posts_FuncO),
+        atol=1e-6,
+    )
+
+    # Test PyTorch API
+    # Breaks because inplace = True not implemented
+    torch.manual_seed(42)
+    params = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
+
+    param_leaves, tree_spec = torch.utils._pytree.tree_flatten(params)
+    sampler = SGHMC(param_leaves, lr=1e-2, alpha=0.01, beta=0.0)
+
+    log_posts_C = []
+
+    for _ in range(n_steps):
+        log_post = batch_normal_log_prob_spec(params, batch)
+        log_post.backward()
+        sampler.step()
+        log_posts_C.append(log_post.item())
+
+    assert log_posts_C[-1] > log_posts_C[0]
+
+    assert torch.allclose(
+        torch.tensor(log_posts_manual),
+        torch.tensor(log_posts_C),
         atol=1e-6,
     )

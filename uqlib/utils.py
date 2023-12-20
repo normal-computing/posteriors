@@ -1,46 +1,9 @@
-from functools import reduce
-from typing import Callable, Any, Tuple, List, Union
+from typing import Callable, Any, List
 import torch
 import torch.nn as nn
 from torch.func import grad, jvp, functional_call
-from torch.utils._pytree import tree_flatten, tree_unflatten
 from torch.distributions import Normal
-
-
-def tree_map(f: Callable, tree: Any, *rest: Tuple[dict, ...]):
-    """Applies a function to each value in a pytree or collection of pytrees
-    with the same structure (which advances torch.utils._pytree.tree_map).
-
-    E.g. zeroed_dict = tree_map(lambda x: torch.zeros_like(x), dict1)
-    or summed_dict = tree_map(lambda x, y: x + y, dict1, dict2)
-
-    Args:
-        f: Function to apply to each value. Takes len(rest) + 1 arguments.
-        tree: Pytree.
-        *rest: Additional pytree (all with the same structure as tree).
-
-    Returns:
-        Pytree with the same structure as tree.
-    """
-    leaves, spec = tree_flatten(tree)
-    all_leaves = [leaves] + [tree_flatten(r)[0] for r in rest]
-    return tree_unflatten([f(*xs) for xs in zip(*all_leaves)], spec)
-
-
-def tree_reduce(f: Callable, tree: Any) -> Any:
-    """Apply a function of two arguments cumulatively to the items of a pytree.
-    See functools.reduce
-
-    E.g. sum_dict = tree_reduce(torch.add, dict1)
-
-    Args:
-        f: Function to apply to each value.
-        tree: Pytree.
-
-    Returns:
-        Reduced output of f.
-    """
-    return reduce(f, tree_flatten(tree)[0])
+from optree import tree_map, tree_reduce
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
@@ -93,9 +56,7 @@ def hessian_diag(f: Callable) -> Callable:
         A new function that computes the Hessian diagonal.
     """
 
-    def hessian_diag_fn(
-        x: Union[torch.Tensor, dict[Any, torch.Tensor]], *args, **kwargs
-    ) -> torch.Tensor:
+    def hessian_diag_fn(x: Any, *args, **kwargs) -> torch.Tensor:
         v = tree_map(lambda v: torch.ones_like(v, requires_grad=False), x)
 
         def ftemp(xtemp):

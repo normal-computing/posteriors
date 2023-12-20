@@ -1,8 +1,6 @@
 from . import laplace
 from . import vi
 
-from .utils import tree_map
-from .utils import tree_reduce
 from .utils import model_to_function
 from .utils import hvp
 from .utils import hessian_diag

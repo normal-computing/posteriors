@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-
+from optree import tree_map
 
 from uqlib import (
-    tree_map,
-    tree_reduce,
     hessian_diag,
     model_to_function,
     diag_normal_log_prob,
@@ -37,51 +35,6 @@ class TestLanguageModel(nn.Module):
         expanded_attention_mask = attention_mask.unsqueeze(-1).expand(logits.size())
         logits = logits * expanded_attention_mask
         return {"logits": logits}
-
-
-def test_tree_map():
-    t1 = (1, 2)
-    t2 = (3, 4)
-    result = tree_map(lambda x, y: x + y, t1, t2)
-    assert result == (4, 6)
-
-    d1 = {"a": 1, "b": 2}
-    d2 = {"a": 3, "b": 4}
-    result = tree_map(lambda x, y: x + y, d1, d2)
-    assert result == {"a": 4, "b": 6}
-
-    # This test breaks as torch just treats the list as a tensor,
-    # this may be desired behaviour
-    # d1 = {"a": 10, "b": [1, 2]}
-    # d2 = {"a": 20, "b": [3, 4]}
-    # result = tree_map(lambda x, y: x + y, d1, d2)
-    # assert result == {"a": 30, "b": [1, 2, 3, 4]}
-
-    d1 = {"a": torch.tensor([1, 2]), "b": torch.tensor([3, 4])}
-    d2 = {"a": torch.tensor([5, 6]), "b": torch.tensor([7, 8])}
-    result = tree_map(torch.add, d1, d2)
-    expected = {"a": torch.tensor([6, 8]), "b": torch.tensor([10, 12])}
-    for key in result:
-        assert torch.equal(result[key], expected[key])
-
-
-def test_tree_reduce():
-    t = (1, 2, 3, 4)
-    result = tree_reduce(lambda x, y: x + y, t)
-    result2 = tree_reduce(torch.add, t)
-    assert result == 10
-    assert result2 == 10
-
-    d = {"a": 1, "b": 2, "c": 3, "d": 4}
-    result = tree_reduce(lambda x, y: x + y, d)
-    result2 = tree_reduce(torch.add, t)
-    assert result == 10
-    assert result2 == 10
-
-    d = {"a": torch.tensor([1, 2]), "b": torch.tensor([3, 4])}
-    result = tree_reduce(torch.add, d)
-    expected = torch.tensor([4, 6])
-    assert torch.equal(result, expected)
 
 
 def test_model_to_function():

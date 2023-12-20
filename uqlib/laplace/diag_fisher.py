@@ -2,8 +2,9 @@ from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
+from optree import tree_map
 
-from uqlib.utils import tree_map, diag_normal_sample
+from uqlib.utils import diag_normal_sample
 
 
 class DiagLaplaceState(NamedTuple):

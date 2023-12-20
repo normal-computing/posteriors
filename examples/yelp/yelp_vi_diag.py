@@ -2,6 +2,7 @@ import torch
 from torch.distributions import Normal, Categorical
 from torchopt import adamw
 from tqdm.auto import tqdm
+from optree import tree_map
 
 import uqlib
 
@@ -49,7 +50,7 @@ def param_to_log_posterior(p, batch):
 
 
 init_mean = dict(model.named_parameters())
-init_log_sds = uqlib.tree_map(
+init_log_sds = tree_map(
     lambda x: (torch.zeros_like(x) - 2.0).requires_grad_(True), init_mean
 )
 
@@ -79,7 +80,7 @@ for epoch in range(num_epochs):
 
 
 # mu = dict(model.named_parameters())
-# log_sigma = uqlib.tree_map(lambda x: torch.zeros_like(x, requires_grad=True), mu)
+# log_sigma = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), mu)
 
 # vi_params_tensors = list(mu.values()) + list(log_sigma.values())
 
@@ -101,7 +102,7 @@ for epoch in range(num_epochs):
 #         batch = {k: v.to(device) for k, v in batch.items()}
 #         vi_optimizer.zero_grad()
 
-#         sigma = uqlib.tree_map(torch.exp, log_sigma)
+#         sigma = tree_map(torch.exp, log_sigma)
 
 #         nelbo = uqlib.vi.diag.nelbo(
 #             mu,

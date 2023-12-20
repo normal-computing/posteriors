@@ -2,9 +2,10 @@ from functools import partial
 from typing import Any
 import torch
 import torchopt
+from optree import tree_map
 
 from uqlib import vi
-from uqlib.utils import tree_map, diag_normal_log_prob
+from uqlib.utils import diag_normal_log_prob
 
 
 def batch_normal_log_prob(

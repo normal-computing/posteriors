@@ -1,8 +1,8 @@
 from typing import Callable, Any
 import torch
-from torch.utils._pytree import tree_flatten
+from optree import tree_map, tree_flatten
 
-from uqlib.utils import hessian_diag, tree_map, diag_normal_sample
+from uqlib.utils import hessian_diag, diag_normal_sample
 from uqlib.laplace.diag_fisher import DiagLaplaceState
 
 

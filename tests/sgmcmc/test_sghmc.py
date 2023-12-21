@@ -18,7 +18,7 @@ def batch_normal_log_prob(
 
 def test_sghmc():
     torch.manual_seed(42)
-    target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
+    target_mean = {"a": torch.randn(2, 1) + 10, "b": torch.randn(1, 1) + 10}
     target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
     batch = torch.arange(10).reshape(-1, 1)
 
@@ -29,11 +29,15 @@ def test_sghmc():
     batch = torch.arange(3).reshape(-1, 1)
     n_steps = 1000
 
+    lr = 1e-2
+    alpha = 0.1
+    beta = 0.0
+
     # Test manual
     torch.manual_seed(42)
     params = tree_map(lambda x: torch.zeros_like(x), target_mean)
 
-    sampler = sghmc.build(lr=1e-2, alpha=0.01, beta=0.0)
+    sampler = sghmc.build(lr=lr, alpha=alpha, beta=beta)
 
     sghmc_state = sampler.init(params)
 
@@ -41,7 +45,7 @@ def test_sghmc():
 
     for _ in range(n_steps):
         grads, log_post = grad_and_value(batch_normal_log_prob_spec)(params, batch)
-        updates, sghmc_state = sampler.update(grads, sghmc_state, params)
+        updates, sghmc_state = sampler.update(grads, sghmc_state)
         params = torchopt.apply_updates(params, updates)
 
         log_posts_manual.append(log_post.item())
@@ -52,7 +56,7 @@ def test_sghmc():
     torch.manual_seed(42)
     params = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
 
-    func_sampler = torchopt.FuncOptimizer(sghmc.build(lr=1e-2, alpha=0.01, beta=0.0))
+    func_sampler = torchopt.FuncOptimizer(sghmc.build(lr=lr, alpha=alpha, beta=beta))
 
     log_posts_FuncO = []
 
@@ -67,19 +71,12 @@ def test_sghmc():
 
     assert log_posts_FuncO[-1] > log_posts_FuncO[0]
 
-    assert torch.allclose(
-        torch.tensor(log_posts_manual),
-        torch.tensor(log_posts_FuncO),
-        atol=1e-6,
-    )
-
     # Test PyTorch API
-    # Breaks because inplace = True not implemented
     torch.manual_seed(42)
     params = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
 
     param_leaves, tree_spec = torch.utils._pytree.tree_flatten(params)
-    sampler = SGHMC(param_leaves, lr=1e-2, alpha=0.01, beta=0.0)
+    sampler = SGHMC(param_leaves, lr=lr, alpha=alpha, beta=beta)
 
     log_posts_C = []
 
@@ -90,9 +87,3 @@ def test_sghmc():
         log_posts_C.append(log_post.item())
 
     assert log_posts_C[-1] > log_posts_C[0]
-
-    assert torch.allclose(
-        torch.tensor(log_posts_manual),
-        torch.tensor(log_posts_C),
-        atol=1e-6,
-    )

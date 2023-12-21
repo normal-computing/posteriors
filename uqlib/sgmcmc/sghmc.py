@@ -4,6 +4,8 @@ import torch
 from torchopt.base import GradientTransformation
 from optree import tree_map
 
+from uqlib.utils import inplacify
+
 
 class SGHMCState(NamedTuple):
     momenta: Any
@@ -15,18 +17,15 @@ def init(params: Any, momenta: Any | None = None) -> SGHMCState:
     return SGHMCState(momenta)
 
 
+@inplacify
 def update(
     grads: Any,
     state: SGHMCState,
-    params: Any,
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
-    inplace: bool = False,
+    params: Any | None = None,
 ) -> Tuple[Any, SGHMCState]:
-    if inplace:
-        raise NotImplementedError("inplace updates not implemented")
-
     def transform_momenta(g, m):
         return (
             m

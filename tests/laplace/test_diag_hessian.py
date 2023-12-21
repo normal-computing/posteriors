@@ -4,8 +4,9 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
+from optree import tree_map
 
-from uqlib import tree_map, hessian_diag
+from uqlib import hessian_diag
 from uqlib.laplace import diag_hessian
 
 

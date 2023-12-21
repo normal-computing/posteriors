@@ -14,7 +14,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics",
     "License :: OSI Approved :: Apache Software License",
 ]
-dependencies = ["torch>=2.0.0", "torchopt>=0.7.3"]
+dependencies = ["torch>=2.0.0", "torchopt>=0.7.3", "optree>=0.10.0"]
 
 [tool.setuptools]
 packages = ["uqlib"]

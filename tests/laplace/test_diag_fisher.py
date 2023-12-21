@@ -4,8 +4,8 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
+from optree import tree_map
 
-from uqlib import tree_map
 from uqlib.laplace import diag_fisher
 
 
@@ -44,6 +44,7 @@ def log_posterior_n(params, batch, model, n_data):
 
 
 def test_diag_fisher():
+    torch.manual_seed(42)
     model = TestModel()
 
     xs = torch.randn(100, 10)

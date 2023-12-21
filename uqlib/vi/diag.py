@@ -1,9 +1,10 @@
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import grad_and_value, vmap
+from optree import tree_map
 import torchopt
 
-from uqlib.utils import tree_map, diag_normal_log_prob, diag_normal_sample
+from uqlib.utils import diag_normal_log_prob, diag_normal_sample
 
 
 class VIDiagState(NamedTuple):

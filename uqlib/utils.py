@@ -1,10 +1,9 @@
 from typing import Callable, Any, List
-from functools import wraps
 import torch
 import torch.nn as nn
 from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
-from optree import tree_map, tree_map_, tree_reduce
+from optree import tree_map, tree_reduce
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
@@ -125,36 +124,3 @@ def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tens
 
     for model_param, optimizer_param in zip(list(model.parameters()), optimizer_params):
         model_param.data = optimizer_param
-
-
-def inplacify(f: Callable, default: bool = True):
-    """Decorate a pure update function to make it modify updates and states in-place.
-
-    Args:
-        f: A pure update function that takes updates, states and other args and kwargs.
-        default: Whether to use inplace updates by default.
-
-    Returns:
-        A decorated function that takes updates, states and other args and kwargs as
-        well as an optional inplace argument.
-    """
-
-    def update_inplace(a, b):
-        a.data = b.data
-
-    @torch.compile
-    def inplace_f(updates, state, *args, **kwargs):
-        new_updates, new_state = f(updates, state, *args, **kwargs)
-
-        updates = tree_map_(update_inplace, updates, new_updates)
-        state = tree_map_(update_inplace, state, new_state)
-
-    @wraps(f)
-    def decorated_f(updates, state, *args, inplace=default, **kwargs):
-        if inplace:
-            inplace_f(updates, state, *args, **kwargs)
-            return updates, state
-        else:
-            return f(updates, state, *args, **kwargs)
-
-    return decorated_f

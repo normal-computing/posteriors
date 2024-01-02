@@ -45,7 +45,7 @@ def test_sghmc():
 
     for _ in range(n_steps):
         grads, log_post = grad_and_value(batch_normal_log_prob_spec)(params, batch)
-        updates, sghmc_state = sampler.update(grads, sghmc_state)
+        updates, sghmc_state = sampler.update(grads, sghmc_state, inplace=False)
         params = torchopt.apply_updates(params, updates)
 
         log_posts_manual.append(log_post.item())

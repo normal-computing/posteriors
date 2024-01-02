@@ -36,8 +36,11 @@ def update(
         def transform_momenta_(m, g):
             m += momenta_updates(m, g)
 
+        def update_(u, m):
+            u.data = lr * m.data
+
         tree_map_(transform_momenta_, state.momenta, updates)
-        tree_map_(lambda _, m: lr * m, updates, state.momenta)
+        tree_map_(update_, updates, state.momenta)
         return updates, state
 
     else:

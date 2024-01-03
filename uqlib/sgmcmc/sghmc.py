@@ -6,10 +6,25 @@ from optree import tree_map, tree_map_
 
 
 class SGHMCState(NamedTuple):
+    """State enconding momenta for SGHMC.
+
+    Args:
+        momenta: Momenta for each parameter.
+    """
+
     momenta: Any
 
 
 def init(params: Any, momenta: Any | None = None) -> SGHMCState:
+    """Initialise momenta for SGHMC.
+
+    Args:
+        params: Parameters for which to initialise.
+        momenta: Initial momenta. Defaults to all zeroes.
+
+    Returns:
+        Initial SGHMCState containing momenta.
+    """
     if momenta is None:
         momenta = tree_map(torch.zeros_like, params)
     return SGHMCState(momenta)
@@ -21,12 +36,30 @@ def update(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    maximize: bool = True,
     params: Any | None = None,
     inplace: bool = True,
 ) -> Tuple[Any, SGHMCState]:
+    """Updates gradients and momenta for SGHMC.
+
+    Args:
+        updates: Gradients to update.
+        state: SGHMCState containing momenta.
+        lr: Learning rate.
+        alpha: Friction coefficient.
+        beta: Gradient noise coefficient (estimated variance).
+        maximize: Whether to maximize (ascend) or minimise (descend).
+        params: Values of parameters, not used for SGHMC update.
+        inplace: Whether to modify updates and state in place.
+
+    Returns:
+        Updated gradients and state (which are pointers to the inputted
+        updates and state if inplace=True).
+    """
+
     def momenta_updates(m, g):
         return (
-            lr * g
+            lr * g * (-1) ** ~maximize
             - lr * alpha * m
             + (lr * (2 * alpha - lr * beta)) ** 0.5 * torch.randn_like(m)
         )
@@ -58,8 +91,21 @@ def build(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    maximize: bool = True,
     momenta: Any | None = None,
 ) -> GradientTransformation:
+    """Builds SGHMC optimizer.
+
+    Args:
+        lr: Learning rate.
+        alpha: Friction coefficient.
+        beta: Gradient noise coefficient (estimated variance).
+        maximize: Whether to maximize (ascend) or minimise (descend).
+        momenta: Initial momenta. Defaults to all zeroes.
+
+    Returns:
+        SGHMC optimizer (torchopt.base.GradientTransformation instance).
+    """
     init_fn = partial(init, momenta=momenta)
-    update_fn = partial(update, lr=lr, alpha=alpha, beta=beta)
+    update_fn = partial(update, lr=lr, alpha=alpha, beta=beta, maximize=maximize)
     return GradientTransformation(init_fn, update_fn)

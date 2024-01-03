@@ -36,6 +36,7 @@ def update(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    temperature: float = 1.0,
     maximize: bool = True,
     params: Any | None = None,
     inplace: bool = True,
@@ -48,6 +49,7 @@ def update(
         lr: Learning rate.
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
+        temperature: Temperature of the joint parameter + momenta distribution.
         maximize: Whether to maximize (ascend) or minimise (descend).
         params: Values of parameters, not used for SGHMC update.
         inplace: Whether to modify updates and state in place.
@@ -61,7 +63,8 @@ def update(
         return (
             lr * g * (-1) ** ~maximize
             - lr * alpha * m
-            + (lr * (2 * alpha - lr * beta)) ** 0.5 * torch.randn_like(m)
+            + (temperature * lr * (2 * alpha - temperature * lr * beta)) ** 0.5
+            * torch.randn_like(m)
         )
 
     if inplace:
@@ -91,6 +94,7 @@ def build(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    temperature: float = 1.0,
     maximize: bool = True,
     momenta: Any | None = None,
 ) -> GradientTransformation:
@@ -107,5 +111,12 @@ def build(
         SGHMC optimizer (torchopt.base.GradientTransformation instance).
     """
     init_fn = partial(init, momenta=momenta)
-    update_fn = partial(update, lr=lr, alpha=alpha, beta=beta, maximize=maximize)
+    update_fn = partial(
+        update,
+        lr=lr,
+        alpha=alpha,
+        beta=beta,
+        temperature=temperature,
+        maximize=maximize,
+    )
     return GradientTransformation(init_fn, update_fn)

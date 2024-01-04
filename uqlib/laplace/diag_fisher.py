@@ -84,11 +84,11 @@ def update(
             lambda jac: jac.square().sum(0),
             jacrev(log_posterior_per_sample)(state.mean, batch),
         )
-    diag_prec = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
-    return DiagLaplaceState(state.mean, diag_prec)
+    prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
+    return DiagLaplaceState(state.mean, prec_diag)
 
 
-def sample(state: DiagLaplaceState):
+def sample(state: DiagLaplaceState, sample_shape: torch.Size = torch.Size([])):
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
@@ -97,5 +97,5 @@ def sample(state: DiagLaplaceState):
     Returns:
         Sample from Normal distribution.
     """
-    sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.diag_prec)
-    return diag_normal_sample(state.mean, sd_diag)
+    sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.prec_diag)
+    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)

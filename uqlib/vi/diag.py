@@ -156,7 +156,7 @@ def nelbo(
     return -(log_p - log_q).mean()
 
 
-def sample(state: VIDiagState):
+def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])):
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
@@ -166,4 +166,4 @@ def sample(state: VIDiagState):
         Sample from Normal distribution.
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    return diag_normal_sample(state.mean, sd_diag)
+    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)

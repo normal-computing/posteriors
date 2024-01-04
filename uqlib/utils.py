@@ -92,7 +92,9 @@ def diag_normal_log_prob(
     return log_prob
 
 
-def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> dict:
+def diag_normal_sample(
+    mean: Any, sd_diag: Any, sample_shape: torch.Size = torch.Size([])
+) -> dict:
     """Single sample from multivariate normal with diagonal covariance matrix.
 
     Args:

@@ -41,6 +41,7 @@ def update(
     state: DiagLaplaceState,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
+    per_sample: bool = False,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
@@ -55,19 +56,28 @@ def update(
     Args:
         state: Current state.
         log_posterior: Function that takes parameters and input batch and
-            returns the scalar log posterior (which can be unnormalised).
+            returns the log posterior (which can be unnormalised).
         batch: Input data to log_posterior.
+        per_sample: If True, then log_posterior is assumed to return a vector of
+            log posteriors for each sample in the batch. If False, then log_posterior
+            is assumed to return a scalar log posterior for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_posterior to be per sample.
 
     Returns:
         Updated DiagLaplaceState.
     """
 
-    # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-    # this is slow, not sure why
-    @partial(vmap, in_dims=(None, 0))
-    def log_posterior_per_sample(params, batch):
-        batch = tree_map(lambda x: x.unsqueeze(0), batch)
-        return log_posterior(params, batch)
+    if per_sample:
+        log_posterior_per_sample = log_posterior
+    else:
+        # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+        @partial(vmap, in_dims=(None, 0))
+        def log_posterior_vmap(params, batch):
+            batch = tree_map(lambda x: x.unsqueeze(0), batch)
+            return log_posterior(params, batch)
+
+        log_posterior_per_sample = log_posterior_vmap
 
     with torch.no_grad():
         batch_diag_score_sq = tree_map(

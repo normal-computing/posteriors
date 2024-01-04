@@ -37,7 +37,7 @@ def load_dataloaders(small=False, batch_size=8):
     return train_dataloader, eval_dataloader
 
 
-def load_model(prior_sd=1, num_data=None):
+def load_model(prior_sd=1, num_data=None, per_sample=False):
     model = AutoModelForSequenceClassification.from_pretrained(
         "bert-base-cased", num_labels=5
     )
@@ -55,11 +55,18 @@ def load_model(prior_sd=1, num_data=None):
             ]
         ).sum()
 
-    def param_to_log_posterior(p, batch, num_data) -> torch.tensor:
+    def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
         return (
             categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
             + normal_log_prior(p) / num_data
-        ).mean()
+        )
+
+    if per_sample:
+        param_to_log_posterior = param_to_log_posterior_per_sample
+    else:
+
+        def param_to_log_posterior(p, batch, num_data) -> torch.tensor:
+            return param_to_log_posterior_per_sample(p, batch, num_data).mean()
 
     if num_data is not None:
         param_to_log_posterior = partial(param_to_log_posterior, num_data=num_data)

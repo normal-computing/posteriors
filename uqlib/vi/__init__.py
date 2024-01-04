@@ -1,1 +1,1 @@
-from . import diag
+from uqlib.vi import diag

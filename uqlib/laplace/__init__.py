@@ -1,2 +1,2 @@
-from . import diag_hessian
-from . import diag_fisher
+from uqlib.laplace import diag_hessian
+from uqlib.laplace import diag_fisher

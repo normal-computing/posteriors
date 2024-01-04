@@ -1,86 +1,122 @@
-from typing import Any, Dict
-from torch.optim import Optimizer
-import torch.nn as nn
+from typing import Any, NamedTuple, Tuple
+from functools import partial
 import torch
+from torchopt.base import GradientTransformation
+from optree import tree_map, tree_map_
 
 
-class SGHMC(Optimizer):
-    def __init__(
-        self,
-        params,
-        lr: float = 0.01,
-        alpha: float = 0.01,
-        beta: float = 0.0,
-        thinning=-1,
-        momenta=None,
-    ):
-        params = list(params)
-        super().__init__(params, {"lr": lr})
+class SGHMCState(NamedTuple):
+    """State enconding momenta for SGHMC.
 
-        self.current_step = 0
-        self.thinning = thinning
-        self.parameter_trajectory = {}
+    Args:
+        momenta: Momenta for each parameter.
+    """
 
-        self.alpha = alpha
-        self.beta = beta
+    momenta: Any
 
-        if momenta is None:
-            momenta = [torch.zeros_like(p) for p in params]
 
-        for group in self.param_groups:
-            group["momenta"] = []
-            for p in group["params"]:
-                group["momenta"].append(
-                    nn.Parameter(torch.zeros_like(p), requires_grad=False)
-                )
+def init(params: Any, momenta: Any | None = None) -> SGHMCState:
+    """Initialise momenta for SGHMC.
 
-    def state_dict(self) -> Dict[str, Any]:
-        opt_state_dict = super().state_dict()
-        opt_state_dict["current_step"] = self.current_step
-        return opt_state_dict
+    Args:
+        params: Parameters for which to initialise.
+        momenta: Initial momenta. Defaults to all zeroes.
 
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        self.current_step = state_dict.pop("current_step")
-        return super().load_state_dict(state_dict)
+    Returns:
+        Initial SGHMCState containing momenta.
+    """
+    if momenta is None:
+        momenta = tree_map(torch.zeros_like, params)
+    return SGHMCState(momenta)
 
-    def save_params(self):
-        if self.thinning > 0 and (self.current_step + 1) % self.thinning == 0:
-            params_to_save = []
-            for group in self.param_groups:
-                params_to_save.append(
-                    [p.detach().cpu().numpy() for p in group["params"]]
-                )
-            self.parameter_trajectory[self.current_step] = params_to_save
 
-        self.current_step += 1
+def update(
+    updates: Any,
+    state: SGHMCState,
+    lr: float,
+    alpha: float = 0.01,
+    beta: float = 0.0,
+    temperature: float = 1.0,
+    maximize: bool = True,
+    params: Any | None = None,
+    inplace: bool = True,
+) -> Tuple[Any, SGHMCState]:
+    """Updates gradients and momenta for SGHMC.
 
-    def get_params(self):
-        return self.parameter_trajectory
+    Args:
+        updates: Gradients to update.
+        state: SGHMCState containing momenta.
+        lr: Learning rate.
+        alpha: Friction coefficient.
+        beta: Gradient noise coefficient (estimated variance).
+        temperature: Temperature of the joint parameter + momenta distribution.
+        maximize: Whether to maximize (ascend) or minimise (descend).
+        params: Values of parameters, not used for SGHMC update.
+        inplace: Whether to modify updates and state in place.
 
-    def step(self, closure=None):
-        loss = None
-        if closure is not None:
-            with torch.enable_grad():
-                loss = closure()
+    Returns:
+        Updated gradients and state (which are pointers to the inputted
+        updates and state if inplace=True).
+    """
 
-        # Perform the optimization step for each parameter group
-        for group in self.param_groups:
-            # Iterate over the parameters in the current group
-            for p, r in zip(group["params"], group["momenta"]):
-                if p.grad is None:
-                    continue
+    def momenta_updates(m, g):
+        return (
+            lr * g * (-1) ** ~maximize
+            - lr * alpha * m
+            + (temperature * lr * (2 * alpha - temperature * lr * beta)) ** 0.5
+            * torch.randn_like(m)
+        )
 
-                # Update the parameter using the SGD update rule
-                lr = group["lr"]
-                p.data += lr * r.data
-                r.data = (
-                    r.data
-                    - lr * p.grad
-                    - lr * self.alpha * r.data
-                    + (lr * (2 * self.alpha - lr * self.beta)) ** 0.5
-                    * torch.randn_like(r.data)
-                )
+    if inplace:
 
-        self.save_params()
+        def transform_momenta_(m, g):
+            m += momenta_updates(m, g)
 
-        return loss
+        def update_(u, m):
+            u.data = lr * m.data
+
+        tree_map_(transform_momenta_, state.momenta, updates)
+        tree_map_(update_, updates, state.momenta)
+        return updates, state
+
+    else:
+
+        def transform_momenta(m, g):
+            return m + momenta_updates(m, g)
+
+        momenta = tree_map(transform_momenta, state.momenta, updates)
+        updates = tree_map(lambda m: lr * m, momenta)
+
+        return updates, SGHMCState(momenta)
+
+
+def build(
+    lr: float,
+    alpha: float = 0.01,
+    beta: float = 0.0,
+    temperature: float = 1.0,
+    maximize: bool = True,
+    momenta: Any | None = None,
+) -> GradientTransformation:
+    """Builds SGHMC optimizer.
+
+    Args:
+        lr: Learning rate.
+        alpha: Friction coefficient.
+        beta: Gradient noise coefficient (estimated variance).
+        maximize: Whether to maximize (ascend) or minimise (descend).
+        momenta: Initial momenta. Defaults to all zeroes.
+
+    Returns:
+        SGHMC optimizer (torchopt.base.GradientTransformation instance).
+    """
+    init_fn = partial(init, momenta=momenta)
+    update_fn = partial(
+        update,
+        lr=lr,
+        alpha=alpha,
+        beta=beta,
+        temperature=temperature,
+        maximize=maximize,
+    )
+    return GradientTransformation(init_fn, update_fn)

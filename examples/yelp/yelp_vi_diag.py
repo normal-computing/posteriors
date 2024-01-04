@@ -1,5 +1,4 @@
 import torch
-from torch.distributions import Normal, Categorical
 from torchopt import adamw
 from tqdm.auto import tqdm
 from optree import tree_map
@@ -8,53 +7,29 @@ import uqlib
 
 from examples.yelp.load import load_dataloaders, load_model
 
+# Load data
 train_dataloader, eval_dataloader = load_dataloaders(small=True)
-model = load_model()
+num_data = len(train_dataloader.dataset)
+
+# Load model (with Gaussian prior)
+model, param_to_log_posterior = load_model(num_data=num_data)
 
 # Turn off Dropout
 model.eval()
 
-num_epochs = 3
-num_data = len(train_dataloader.dataset)
-num_training_steps = num_epochs * len(train_dataloader)
-
-
-def categorical_log_likelihood(labels, logits):
-    return Categorical(logits=logits, validate_args=False).log_prob(labels)
-
-
-prior_sd = 1
-
-
-def normal_log_prior(p: dict):
-    return torch.stack(
-        [
-            Normal(0, prior_sd, validate_args=False).log_prob(ptemp).sum()
-            for ptemp in p.values()
-        ]
-    ).sum()
-
-
+# Move to GPU if available
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
-
-
-model_func = uqlib.model_to_function(model)
-
-
-def param_to_log_posterior(p, batch):
-    return (
-        categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
-        + normal_log_prior(p) / num_data
-    ).mean()
-
 
 init_mean = dict(model.named_parameters())
 init_log_sds = tree_map(
     lambda x: (torch.zeros_like(x) - 2.0).requires_grad_(True), init_mean
 )
 
-optimizer = adamw(lr=5e-5)
+num_epochs = 3
+num_training_steps = num_epochs * len(train_dataloader)
+
+optimizer = adamw(lr=5e-1)
 
 vi_state = uqlib.vi.diag.init(init_mean, optimizer=optimizer, init_log_sds=init_log_sds)
 

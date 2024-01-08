@@ -73,11 +73,9 @@ def update(
     else:
         # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
         @partial(vmap, in_dims=(None, 0))
-        def log_posterior_vmap(params, batch):
+        def log_posterior_per_sample(params, batch):
             batch = tree_map(lambda x: x.unsqueeze(0), batch)
             return log_posterior(params, batch)
-
-        log_posterior_per_sample = log_posterior_vmap
 
     with torch.no_grad():
         batch_diag_score_sq = tree_map(

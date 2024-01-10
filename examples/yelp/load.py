@@ -1,5 +1,6 @@
 from functools import partial
 from datasets import load_dataset
+from optree import tree_map
 import torch
 from torch.utils.data import DataLoader
 from torch.distributions import Normal, Categorical
@@ -37,35 +38,52 @@ def load_dataloaders(small=False, batch_size=8):
     return train_dataloader, eval_dataloader
 
 
-def load_model(prior_sd=1, num_data=None, per_sample=False):
+def load_model(
+    trained_prior_sd=1,
+    untrained_prior_sd=1,
+    num_data=None,
+    per_sample=False,
+    device="cuda",
+):
     model = AutoModelForSequenceClassification.from_pretrained(
         "bert-base-cased", num_labels=5
     )
+
+    # Turn off Dropout
+    model.eval()
+
+    model.to(device)
 
     model_func = model_to_function(model)
 
     def categorical_log_likelihood(labels, logits):
         return Categorical(logits=logits, validate_args=False).log_prob(labels)
 
+    model_params = tree_map(
+        lambda p: p.detach().clone(), dict(model.named_parameters())
+    )
+
+    def univariate_normal_log_prob(x, mean, sd):
+        return -0.5 * ((x - mean) / sd) ** 2
+
     def normal_log_prior(p: dict) -> float:
-        return torch.stack(
-            [
-                Normal(0, prior_sd, validate_args=False).log_prob(ptemp).sum()
-                for ptemp in p.values()
-            ]
-        ).sum()
+        val = 0.0
+        for k, v in p.items():
+            sd = trained_prior_sd if "bert" in k else untrained_prior_sd
+            val += univariate_normal_log_prob(v, model_params[k], sd).sum()
+
+        return val
 
     def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
         return (
             categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
-            + normal_log_prior(p) / num_data
-        )
+        ) + normal_log_prior(p) / num_data
 
     if per_sample:
         param_to_log_posterior = param_to_log_posterior_per_sample
     else:
 
-        def param_to_log_posterior(p, batch, num_data) -> torch.tensor:
+        def param_to_log_posterior(p, batch, num_data) -> float:
             return param_to_log_posterior_per_sample(p, batch, num_data).mean()
 
     if num_data is not None:

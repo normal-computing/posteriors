@@ -1,4 +1,5 @@
-from typing import Any
+from collections import defaultdict
+from typing import Any, DefaultDict
 from torchopt.optim.base import Optimizer
 
 from uqlib.sgmcmc import sghmc
@@ -10,6 +11,9 @@ class SGHMC(Optimizer):
     See Also:
         - The functional SGHMC sampler in `uqlib.sgmcmc.sghmc`.
     """
+
+    defaults: dict = {}
+    state: DefaultDict = defaultdict()
 
     def __init__(
         self,

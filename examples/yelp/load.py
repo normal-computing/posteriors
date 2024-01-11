@@ -1,9 +1,9 @@
 from functools import partial
 from datasets import load_dataset
-from optree import tree_map
+from optree import tree_map, tree_reduce
 import torch
 from torch.utils.data import DataLoader
-from torch.distributions import Normal, Categorical
+from torch.distributions import Categorical
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from uqlib import model_to_function
@@ -39,40 +39,27 @@ def load_dataloaders(small=False, batch_size=8):
 
 
 def load_model(
-    trained_prior_sd=1,
-    untrained_prior_sd=1,
+    prior_sd=1,
     num_data=None,
     per_sample=False,
-    device="cuda",
 ):
     model = AutoModelForSequenceClassification.from_pretrained(
         "bert-base-cased", num_labels=5
     )
-
-    # Turn off Dropout
-    model.eval()
-
-    model.to(device)
 
     model_func = model_to_function(model)
 
     def categorical_log_likelihood(labels, logits):
         return Categorical(logits=logits, validate_args=False).log_prob(labels)
 
-    model_params = tree_map(
-        lambda p: p.detach().clone(), dict(model.named_parameters())
-    )
-
     def univariate_normal_log_prob(x, mean, sd):
         return -0.5 * ((x - mean) / sd) ** 2
 
-    def normal_log_prior(p: dict) -> float:
-        val = 0.0
-        for k, v in p.items():
-            sd = trained_prior_sd if "bert" in k else untrained_prior_sd
-            val += univariate_normal_log_prob(v, model_params[k], sd).sum()
-
-        return val
+    def normal_log_prior(p) -> float:
+        per_group_vals = tree_map(
+            lambda p: univariate_normal_log_prob(p, 0, prior_sd).sum(), p
+        )
+        return tree_reduce(torch.add, per_group_vals)
 
     def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
         return (

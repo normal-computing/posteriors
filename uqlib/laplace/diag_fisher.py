@@ -2,7 +2,7 @@ from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
-from optree import tree_map
+from optree import tree_map, tree_map_
 
 from uqlib.utils import diag_normal_sample
 
@@ -42,6 +42,7 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
     per_sample: bool = False,
+    respect_requires_grad: bool = True,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
@@ -63,6 +64,8 @@ def update(
             is assumed to return a scalar log posterior for the whole batch, in this
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_posterior to be per sample.
+        respect_requires_grad: If True, then the diagonal of the Fisher information
+            matrix will be set to zero for parameters that do not require gradients.
 
     Returns:
         Updated DiagLaplaceState.
@@ -83,6 +86,15 @@ def update(
             jacrev(log_posterior_per_sample)(state.mean, batch),
         )
     prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
+
+    if respect_requires_grad:
+
+        def zero_if_not_requires_grad(x, p):
+            if not p.requires_grad:
+                x *= 0
+
+        tree_map_(zero_if_not_requires_grad, prec_diag, state.mean)
+
     return DiagLaplaceState(state.mean, prec_diag)
 
 

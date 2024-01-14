@@ -26,14 +26,7 @@ def init(params: Any, momenta: Any | None = None) -> SGHMCState:
         Initial SGHMCState containing momenta.
     """
     if momenta is None:
-
-        def init_momenta(p):
-            if p.requires_grad:
-                return torch.zeros_like(p)
-            else:
-                return None
-
-        momenta = tree_map(init_momenta, params)
+        momenta = tree_map(torch.zeros_like, params)
     return SGHMCState(momenta)
 
 

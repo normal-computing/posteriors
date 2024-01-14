@@ -24,13 +24,16 @@ def test_sghmc_torch_api():
 
     batch = torch.arange(3).reshape(-1, 1)
 
-    n_steps = 5000
+    n_steps = 10000
     lr = 1e-2
     alpha = 1.0
     beta = 0.0
 
     # Test PyTorch API
-    params = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
+    params = {
+        "a": torch.zeros_like(target_mean["a"], requires_grad=True),
+        "b": target_mean["b"],
+    }
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     param_leaves, tree_spec = torch.utils._pytree.tree_flatten(params)

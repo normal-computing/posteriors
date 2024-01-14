@@ -26,7 +26,7 @@ def test_sghmc_manual():
 
     batch = torch.arange(3).reshape(-1, 1)
 
-    n_steps = 5000
+    n_steps = 10000
     lr = 1e-2
     alpha = 1.0
     beta = 0.0
@@ -73,7 +73,7 @@ def test_sghmc_funcopt():
 
     batch = torch.arange(3).reshape(-1, 1)
 
-    n_steps = 5000
+    n_steps = 10000
     lr = 1e-2
     alpha = 1.0
     beta = 0.0

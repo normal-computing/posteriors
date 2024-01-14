@@ -59,35 +59,30 @@ def update(
         updates and state if inplace=True).
     """
 
-    def momenta_updates(m, g):
+    def transform_momenta(m, g):
+        if g is None:
+            return g
         return (
-            lr * g * (-1) ** ~maximize
+            m
+            + lr * g * (-1) ** ~maximize
             - lr * alpha * m
             + (temperature * lr * (2 * alpha - temperature * lr * beta)) ** 0.5
             * torch.randn_like(m)
         )
 
-    if inplace:
+    momenta = tree_map(transform_momenta, state.momenta, updates)
 
-        def transform_momenta_(m, g):
-            m += momenta_updates(m, g)
+    if inplace:
 
         def update_(u, m):
             u.data = lr * m.data
 
-        tree_map_(transform_momenta_, state.momenta, updates)
-        tree_map_(update_, updates, state.momenta)
-        return updates, state
+        tree_map_(update_, updates, momenta)
 
     else:
-
-        def transform_momenta(m, g):
-            return m + momenta_updates(m, g)
-
-        momenta = tree_map(transform_momenta, state.momenta, updates)
         updates = tree_map(lambda m: lr * m, momenta)
 
-        return updates, SGHMCState(momenta)
+    return updates, SGHMCState(momenta)
 
 
 def build(

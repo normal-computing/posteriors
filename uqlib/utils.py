@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
-from optree import tree_map, tree_reduce
+from optree import tree_map, tree_map_, tree_reduce
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
@@ -109,6 +109,57 @@ def diag_normal_sample(
         mean,
         sd_diag,
     )
+
+
+def extract_requires_grad(tree: Any) -> Any:
+    """Extracts only parameters that require gradients.
+
+    Args:
+        tree: A PyTree of tensors.
+
+    Returns:
+        A PyTree of tensors that require gradients.
+    """
+    return tree_map(
+        lambda x: x if x.requires_grad else torch.tensor([], device=x.device), tree
+    )
+
+
+def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
+    """Inserts sub_tree into full_tree where full_tree tensors requires_grad.
+    Both PyTrees must have the same structure.
+
+    Args:
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A PyTree with sub_tree inserted into full_tree.
+    """
+    return tree_map(
+        lambda sub, full: sub if full.requires_grad else full,
+        sub_tree,
+        full_tree,
+    )
+
+
+def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
+    """Inserts sub_pytree into full_tree in-place where full_tree tensors requires_grad.
+    Both PyTrees must have the same structure.
+
+    Args:
+        full_pytree: A PyTree to insert sub_tree into.
+        sub_pytree: A PyTree to insert into full_tree.
+
+    Returns:
+        A pointer to full_tree with sub_tree inserted.
+    """
+
+    def insert_(full, sub):
+        if full.requires_grad:
+            full.data = sub.data
+
+    return tree_map_(insert_, full_tree, sub_tree)
 
 
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):

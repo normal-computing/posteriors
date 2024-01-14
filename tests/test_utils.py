@@ -3,10 +3,13 @@ import torch.nn as nn
 from optree import tree_map
 
 from uqlib import (
-    hessian_diag,
     model_to_function,
+    hessian_diag,
     diag_normal_log_prob,
     diag_normal_sample,
+    extract_requires_grad,
+    insert_requires_grad,
+    insert_requires_grad_,
 )
 
 
@@ -145,3 +148,53 @@ def test_diag_normal_sample():
     for key in result_mean:
         assert torch.allclose(result_mean[key], mean[key], atol=1e-1)
         assert torch.allclose(result_std[key], sd_diag[key], atol=1e-1)
+
+
+def test_extract_requires_grad():
+    params = {
+        "a": torch.tensor([1.0, 2.0], requires_grad=True),
+        "b": torch.tensor([3.0, 4.0], requires_grad=False),
+    }
+
+    result = extract_requires_grad(params)
+
+    expected = {
+        "a": torch.tensor([1.0, 2.0], requires_grad=True),
+        "b": torch.tensor([], requires_grad=False),
+    }
+
+    for key in expected:
+        assert torch.equal(result[key], expected[key])
+        assert result[key].requires_grad == expected[key].requires_grad
+
+
+def test_insert_requires_grad():
+    params = {
+        "a": torch.tensor([1.0, 2.0], requires_grad=True),
+        "b": torch.tensor([3.0, 4.0], requires_grad=False),
+    }
+
+    params_copy = {k: v.clone() for k, v in params.items()}
+
+    sub_params = {
+        "a": torch.tensor([5.0, 6.0], requires_grad=True),
+        "b": torch.tensor([]),
+    }
+
+    params2 = insert_requires_grad(params, sub_params)
+
+    expected = {
+        "a": torch.tensor([5.0, 6.0], requires_grad=True),
+        "b": torch.tensor([3.0, 4.0], requires_grad=False),
+    }
+
+    for key in expected:
+        assert torch.equal(params2[key], expected[key])
+        assert params2[key].requires_grad == expected[key].requires_grad
+        assert torch.equal(params[key], params_copy[key])
+
+    params = insert_requires_grad_(params, sub_params)
+
+    for key in expected:
+        assert torch.equal(params[key], expected[key])
+        assert params[key].requires_grad == expected[key].requires_grad

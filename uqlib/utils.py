@@ -162,6 +162,33 @@ def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
     return tree_map_(insert_, full_tree, sub_tree)
 
 
+def extract_requires_grad_and_func(
+    tree: Any, func: Callable, inplace: bool = False
+) -> Any:
+    """Extracts only parameters that require gradients and converts a function
+    that takes the full parameter tree (in its first argument)
+    into one that takes the subtree.
+
+    Args:
+        tree: A PyTree of tensors.
+        func: A function that takes tree in its first argument.
+        inplace: Whether to modify the tree inplace or not whe the new function
+            is called.
+
+    Returns:
+        A PyTree of tensors that require gradients and a modified func that takes the
+        subtree structure rather than full tree in its first argument.
+    """
+    subtree = extract_requires_grad(tree)
+
+    insert = insert_requires_grad_ if inplace else insert_requires_grad
+
+    def subfunc(subtree, *args, **kwargs):
+        return func(insert(tree, subtree), *args, **kwargs)
+
+    return subtree, subfunc
+
+
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
     """Updates the model parameters in-place with the provided grouped parameters.
 

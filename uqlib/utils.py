@@ -111,6 +111,63 @@ def diag_normal_sample(
     )
 
 
+def tree_extract(f: Callable[[torch.tensor], bool], tree: Any) -> Any:
+    """Extracts values from a PyTree where f returns True.
+    False values are replaced with empty tensors.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        tree: A PyTree.
+
+    Returns:
+        A PyTree with the same structure as tree where f returns True.
+    """
+    return tree_map(lambda x: x if f(x) else torch.tensor([], device=x.device), tree)
+
+
+def tree_insert(
+    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
+) -> Any:
+    """Inserts sub_tree into full_tree where full_tree tensors evaluate f to True.
+    Both PyTrees must have the same structure.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A PyTree with sub_tree inserted into full_tree.
+    """
+    return tree_map(
+        lambda sub, full: sub if f(full) else full,
+        sub_tree,
+        full_tree,
+    )
+
+
+def tree_insert_(
+    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
+) -> Any:
+    """Inserts sub_tree into full_tree in-place where full_tree tensors evaluate
+    f to True. Both PyTrees must have the same structure.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A pointer to full_tree with sub_tree inserted.
+    """
+
+    def insert_(full, sub):
+        if f(full):
+            full.data = sub.data
+
+    return tree_map_(insert_, full_tree, sub_tree)
+
+
 def extract_requires_grad(tree: Any) -> Any:
     """Extracts only parameters that require gradients.
 
@@ -120,9 +177,7 @@ def extract_requires_grad(tree: Any) -> Any:
     Returns:
         A PyTree of tensors that require gradients.
     """
-    return tree_map(
-        lambda x: x if x.requires_grad else torch.tensor([], device=x.device), tree
-    )
+    return tree_extract(lambda x: x.requires_grad, tree)
 
 
 def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
@@ -136,11 +191,7 @@ def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
     Returns:
         A PyTree with sub_tree inserted into full_tree.
     """
-    return tree_map(
-        lambda sub, full: sub if full.requires_grad else full,
-        sub_tree,
-        full_tree,
-    )
+    return tree_insert(lambda x: x.requires_grad, full_tree, sub_tree)
 
 
 def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
@@ -154,12 +205,7 @@ def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
     Returns:
         A pointer to full_tree with sub_tree inserted.
     """
-
-    def insert_(full, sub):
-        if full.requires_grad:
-            full.data = sub.data
-
-    return tree_map_(insert_, full_tree, sub_tree)
+    return tree_insert_(lambda x: x.requires_grad, full_tree, sub_tree)
 
 
 def extract_requires_grad_and_func(

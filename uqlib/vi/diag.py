@@ -73,13 +73,13 @@ def update(
     stl: bool = True,
     inplace: bool = True,
 ) -> VIDiagState:
-    """Updates the variational parameters to minimise the ELBO.
+    """Updates the variational parameters to minimise the NELBO.
 
     log_posterior expects to take parameters and input batch and return a scalar
     unbiased estimate of the full batch log posterior:
 
     ```
-    val = log_posterior(params, batch)
+    val = log_posterior(params, batch) / temperature
     ```
 
     Args:
@@ -90,7 +90,7 @@ def update(
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.0.
+            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
             Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
@@ -125,12 +125,12 @@ def nelbo(
     n_samples: int = 1,
     stl: bool = True,
 ) -> float:
-    """Returns the evidence lower bound (ELBO) for a diagonal Normal
+    """Returns the negative evidence lower bound (NELBO) for a diagonal Normal
     variational distribution over the parameters of a model.
 
-    Averages ELBO over the batch. Monte Carlo estimate with n_samples from q.
+    Averages NELBO over the batch. Monte Carlo estimate with n_samples from q.
 
-    ELBO = E_q[log p(y|x, θ) + log p(θ) - log q(θ)]
+    NELBO = - (E_q[log p(y|x, θ) + log p(θ) - log q(θ) * temperature])
 
     log_posterior expects to take parameters and input batch and return a scalar:
 
@@ -146,7 +146,7 @@ def nelbo(
             returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
         temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.0.
+            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
             Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
@@ -154,16 +154,16 @@ def nelbo(
             Defaults to True.
 
     Returns:
-        The sampled approximate ELBO averaged over the batch.
+        The sampled approximate NELBO averaged over the batch.
     """
     sampled_params = diag_normal_sample(mean, sd_diag, sample_shape=(n_samples,))
     if stl:
         mean = tree_map(lambda x: x.detach(), mean)
         sd_diag = tree_map(lambda x: x.detach(), sd_diag)
 
-    log_p = vmap(log_posterior, (0, None))(sampled_params, batch) / temperature
+    log_p = vmap(log_posterior, (0, None))(sampled_params, batch)
     log_q = vmap(diag_normal_log_prob, (0, None, None))(sampled_params, mean, sd_diag)
-    return -(log_p - log_q).mean()
+    return -(log_p - log_q * temperature).mean()
 
 
 def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])):

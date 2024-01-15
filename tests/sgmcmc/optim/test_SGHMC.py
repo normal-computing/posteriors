@@ -60,3 +60,5 @@ def test_sghmc_torch_api():
     for k in target_mean.keys():
         assert torch.allclose(param_means[k], target_mean[k], atol=1e0, rtol=1e-1)
         assert torch.allclose(param_sds[k], target_sds[k], atol=1e0, rtol=1e-1)
+
+    assert torch.allclose(all_params["b"], target_mean["b"], atol=1e-9)

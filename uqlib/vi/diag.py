@@ -32,7 +32,7 @@ def init(
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
-    optimizer.initi will be called on flattened variational parameters so hyperparameters
+    optimizer.init will be called on flattened variational parameters so hyperparameters
     such as learning rate need to prespecifed through torchopt's functional API:
 
     ```
@@ -68,6 +68,7 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
     optimizer: torchopt.base.GradientTransformation,
+    temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
     inplace: bool = True,
@@ -88,9 +89,13 @@ def update(
         batch: Input data to log_posterior.
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.0.
         n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
+            Defaults to True.
         inplace: Whether to update the state parameters in-place.
 
     Returns:
@@ -99,7 +104,7 @@ def update(
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
     with torch.no_grad():
         nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
-            state.mean, sd_diag, log_posterior, batch, n_samples, stl
+            state.mean, sd_diag, log_posterior, batch, temperature, n_samples, stl
         )
 
     updates, optimizer_state = optimizer.update(
@@ -116,6 +121,7 @@ def nelbo(
     sd_diag: dict,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
+    temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
 ) -> float:
@@ -139,9 +145,13 @@ def nelbo(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.0.
         n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
+            Defaults to True.
 
     Returns:
         The sampled approximate ELBO averaged over the batch.
@@ -151,7 +161,7 @@ def nelbo(
         mean = tree_map(lambda x: x.detach(), mean)
         sd_diag = tree_map(lambda x: x.detach(), sd_diag)
 
-    log_p = vmap(log_posterior, (0, None))(sampled_params, batch)
+    log_p = vmap(log_posterior, (0, None))(sampled_params, batch) / temperature
     log_q = vmap(diag_normal_log_prob, (0, None, None))(sampled_params, mean, sd_diag)
     return -(log_p - log_q).mean()
 

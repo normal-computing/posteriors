@@ -1,4 +1,4 @@
-from typing import Callable, Any, List
+from typing import Callable, Any, List, Tuple
 import torch
 import torch.nn as nn
 from torch.func import grad, jvp, functional_call
@@ -210,7 +210,7 @@ def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
 
 def extract_requires_grad_and_func(
     tree: Any, func: Callable, inplace: bool = False
-) -> Any:
+) -> Tuple[Any, Callable]:
     """Extracts only parameters that require gradients and converts a function
     that takes the full parameter tree (in its first argument)
     into one that takes the subtree.

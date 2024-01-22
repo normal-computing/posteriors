@@ -38,12 +38,10 @@ def normal_log_likelihood(y, y_pred):
 
 def log_posterior_n(params, batch, model, n_data):
     y_pred = functional_call(model, params, batch[0])
-    return (
-        normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
-    ).mean()
+    return normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
 
 
-def test_diag_fisher():
+def test_diag_fisher_vmap():
     torch.manual_seed(42)
     model = TestModel()
 
@@ -55,7 +53,8 @@ def test_diag_fisher():
         batch_size=20,
     )
 
-    log_posterior = partial(log_posterior_n, model=model, n_data=len(xs))
+    def log_posterior(p, b):
+        return log_posterior_n(p, b, model, len(xs)).mean()
 
     params = dict(model.named_parameters())
     laplace_state = diag_fisher.init(params)
@@ -77,3 +76,16 @@ def test_diag_fisher():
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)
+
+    #  Test per_sample
+    log_posterior_per_sample = partial(log_posterior_n, model=model, n_data=len(xs))
+    laplace_state_ps = diag_fisher.init(params)
+    for batch in dataloader:
+        laplace_state_ps = diag_fisher.update(
+            laplace_state_ps, log_posterior_per_sample, batch, per_sample=True
+        )
+
+    for key in expected:
+        assert torch.allclose(
+            laplace_state_ps.prec_diag[key], laplace_state_fb.prec_diag[key], atol=1e-5
+        )

@@ -32,7 +32,7 @@ def init(
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
-    optimizer.initi will be called on flattened variational parameters so hyperparameters
+    optimizer.init will be called on flattened variational parameters so hyperparameters
     such as learning rate need to prespecifed through torchopt's functional API:
 
     ```
@@ -68,17 +68,18 @@ def update(
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
     optimizer: torchopt.base.GradientTransformation,
+    temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
     inplace: bool = True,
 ) -> VIDiagState:
-    """Updates the variational parameters to minimise the ELBO.
+    """Updates the variational parameters to minimise the NELBO.
 
     log_posterior expects to take parameters and input batch and return a scalar
     unbiased estimate of the full batch log posterior:
 
     ```
-    val = log_posterior(params, batch)
+    val = log_posterior(params, batch) / temperature
     ```
 
     Args:
@@ -88,9 +89,13 @@ def update(
         batch: Input data to log_posterior.
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
+            Defaults to True.
         inplace: Whether to update the state parameters in-place.
 
     Returns:
@@ -99,7 +104,7 @@ def update(
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
     with torch.no_grad():
         nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
-            state.mean, sd_diag, log_posterior, batch, n_samples, stl
+            state.mean, sd_diag, log_posterior, batch, temperature, n_samples, stl
         )
 
     updates, optimizer_state = optimizer.update(
@@ -116,15 +121,16 @@ def nelbo(
     sd_diag: dict,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
+    temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
 ) -> float:
-    """Returns the evidence lower bound (ELBO) for a diagonal Normal
+    """Returns the negative evidence lower bound (NELBO) for a diagonal Normal
     variational distribution over the parameters of a model.
 
-    Averages ELBO over the batch. Monte Carlo estimate with n_samples from q.
+    Averages NELBO over the batch. Monte Carlo estimate with n_samples from q.
 
-    ELBO = E_q[log p(y|x, θ) + log p(θ) - log q(θ)]
+    NELBO = - (E_q[log p(y|x, θ) + log p(θ) - log q(θ) * temperature])
 
     log_posterior expects to take parameters and input batch and return a scalar:
 
@@ -139,12 +145,16 @@ def nelbo(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised) for each batch member.
         batch: Input data to log_posterior.
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
+            Defaults to True.
 
     Returns:
-        The sampled approximate ELBO averaged over the batch.
+        The sampled approximate NELBO averaged over the batch.
     """
     sampled_params = diag_normal_sample(mean, sd_diag, sample_shape=(n_samples,))
     if stl:
@@ -153,10 +163,10 @@ def nelbo(
 
     log_p = vmap(log_posterior, (0, None))(sampled_params, batch)
     log_q = vmap(diag_normal_log_prob, (0, None, None))(sampled_params, mean, sd_diag)
-    return -(log_p - log_q).mean()
+    return -(log_p - log_q * temperature).mean()
 
 
-def sample(state: VIDiagState):
+def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])):
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
@@ -166,4 +176,4 @@ def sample(state: VIDiagState):
         Sample from Normal distribution.
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    return diag_normal_sample(state.mean, sd_diag)
+    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)

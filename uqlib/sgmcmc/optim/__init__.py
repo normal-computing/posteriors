@@ -1,1 +1,1 @@
-from uqlib.sgmcmc.optim.sghmc import SGHMC
+from uqlib.sgmcmc.optim.SGHMC import SGHMC

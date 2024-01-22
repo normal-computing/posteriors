@@ -20,27 +20,29 @@ class DiagLaplaceState(NamedTuple):
 
 
 def init(
-    init_mean: Any,
+    mean: Any,
     init_prec_diag: Any = None,
 ) -> DiagLaplaceState:
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
-        init_mean: Initial mean of the variational distribution.
+        mean: Mean of the Normal distribution.
         init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
 
     Returns:
         Initial DiagVIState.
     """
     if init_prec_diag is None:
-        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), init_mean)
-    return DiagLaplaceState(init_mean, init_prec_diag)
+        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), mean)
+
+    return DiagLaplaceState(mean, init_prec_diag)
 
 
 def update(
     state: DiagLaplaceState,
     log_posterior: Callable[[Any, Any], float],
     batch: Any,
+    per_sample: bool = False,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
@@ -55,30 +57,38 @@ def update(
     Args:
         state: Current state.
         log_posterior: Function that takes parameters and input batch and
-            returns the scalar log posterior (which can be unnormalised).
+            returns the log posterior (which can be unnormalised).
         batch: Input data to log_posterior.
+        per_sample: If True, then log_posterior is assumed to return a vector of
+            log posteriors for each sample in the batch. If False, then log_posterior
+            is assumed to return a scalar log posterior for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_posterior to be per sample.
 
     Returns:
         Updated DiagLaplaceState.
     """
 
-    # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-    # this is slow, not sure why
-    @partial(vmap, in_dims=(None, 0))
-    def log_posterior_per_sample(params, batch):
-        batch = tree_map(lambda x: x.unsqueeze(0), batch)
-        return log_posterior(params, batch)
+    if per_sample:
+        log_posterior_per_sample = log_posterior
+    else:
+        # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+        @partial(vmap, in_dims=(None, 0))
+        def log_posterior_per_sample(params, batch):
+            batch = tree_map(lambda x: x.unsqueeze(0), batch)
+            return log_posterior(params, batch)
 
     with torch.no_grad():
         batch_diag_score_sq = tree_map(
             lambda jac: jac.square().sum(0),
             jacrev(log_posterior_per_sample)(state.mean, batch),
         )
-    diag_prec = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
-    return DiagLaplaceState(state.mean, diag_prec)
+    prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
+
+    return DiagLaplaceState(state.mean, prec_diag)
 
 
-def sample(state: DiagLaplaceState):
+def sample(state: DiagLaplaceState, sample_shape: torch.Size = torch.Size([])):
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
@@ -87,5 +97,5 @@ def sample(state: DiagLaplaceState):
     Returns:
         Sample from Normal distribution.
     """
-    sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.diag_prec)
-    return diag_normal_sample(state.mean, sd_diag)
+    sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.prec_diag)
+    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)

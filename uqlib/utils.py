@@ -1,9 +1,9 @@
-from typing import Callable, Any, List
+from typing import Callable, Any, List, Tuple
 import torch
 import torch.nn as nn
 from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
-from optree import tree_map, tree_reduce
+from optree import tree_map, tree_map_, tree_reduce
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
@@ -92,7 +92,9 @@ def diag_normal_log_prob(
     return log_prob
 
 
-def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> dict:
+def diag_normal_sample(
+    mean: Any, sd_diag: Any, sample_shape: torch.Size = torch.Size([])
+) -> dict:
     """Single sample from multivariate normal with diagonal covariance matrix.
 
     Args:
@@ -107,6 +109,130 @@ def diag_normal_sample(mean: Any, sd_diag: Any, sample_shape=torch.Size([])) -> 
         mean,
         sd_diag,
     )
+
+
+def tree_extract(f: Callable[[torch.tensor], bool], tree: Any) -> Any:
+    """Extracts values from a PyTree where f returns True.
+    False values are replaced with empty tensors.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        tree: A PyTree.
+
+    Returns:
+        A PyTree with the same structure as tree where f returns True.
+    """
+    return tree_map(lambda x: x if f(x) else torch.tensor([], device=x.device), tree)
+
+
+def tree_insert(
+    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
+) -> Any:
+    """Inserts sub_tree into full_tree where full_tree tensors evaluate f to True.
+    Both PyTrees must have the same structure.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A PyTree with sub_tree inserted into full_tree.
+    """
+    return tree_map(
+        lambda sub, full: sub if f(full) else full,
+        sub_tree,
+        full_tree,
+    )
+
+
+def tree_insert_(
+    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
+) -> Any:
+    """Inserts sub_tree into full_tree in-place where full_tree tensors evaluate
+    f to True. Both PyTrees must have the same structure.
+
+    Args:
+        f: A function that takes a PyTree element and returns True or False.
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A pointer to full_tree with sub_tree inserted.
+    """
+
+    def insert_(full, sub):
+        if f(full):
+            full.data = sub.data
+
+    return tree_map_(insert_, full_tree, sub_tree)
+
+
+def extract_requires_grad(tree: Any) -> Any:
+    """Extracts only parameters that require gradients.
+
+    Args:
+        tree: A PyTree of tensors.
+
+    Returns:
+        A PyTree of tensors that require gradients.
+    """
+    return tree_extract(lambda x: x.requires_grad, tree)
+
+
+def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
+    """Inserts sub_tree into full_tree where full_tree tensors requires_grad.
+    Both PyTrees must have the same structure.
+
+    Args:
+        full_pytree: A PyTree to insert sub_pytree into.
+        sub_pytree: A PyTree to insert into full_pytree.
+
+    Returns:
+        A PyTree with sub_tree inserted into full_tree.
+    """
+    return tree_insert(lambda x: x.requires_grad, full_tree, sub_tree)
+
+
+def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
+    """Inserts sub_pytree into full_tree in-place where full_tree tensors requires_grad.
+    Both PyTrees must have the same structure.
+
+    Args:
+        full_pytree: A PyTree to insert sub_tree into.
+        sub_pytree: A PyTree to insert into full_tree.
+
+    Returns:
+        A pointer to full_tree with sub_tree inserted.
+    """
+    return tree_insert_(lambda x: x.requires_grad, full_tree, sub_tree)
+
+
+def extract_requires_grad_and_func(
+    tree: Any, func: Callable, inplace: bool = False
+) -> Tuple[Any, Callable]:
+    """Extracts only parameters that require gradients and converts a function
+    that takes the full parameter tree (in its first argument)
+    into one that takes the subtree.
+
+    Args:
+        tree: A PyTree of tensors.
+        func: A function that takes tree in its first argument.
+        inplace: Whether to modify the tree inplace or not whe the new function
+            is called.
+
+    Returns:
+        A PyTree of tensors that require gradients and a modified func that takes the
+        subtree structure rather than full tree in its first argument.
+    """
+    subtree = extract_requires_grad(tree)
+
+    insert = insert_requires_grad_ if inplace else insert_requires_grad
+
+    def subfunc(subtree, *args, **kwargs):
+        return func(insert(tree, subtree), *args, **kwargs)
+
+    return subtree, subfunc
 
 
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):

@@ -4,7 +4,7 @@ def parse_devices(devices):
     for device in devices:
         try:
             device = int(device)
-        except:
+        except ValueError:
             pass
         devices_list.append(device)
     return devices_list

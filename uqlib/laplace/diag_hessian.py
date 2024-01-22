@@ -2,13 +2,14 @@ from typing import Callable, Any
 import torch
 from optree import tree_map, tree_flatten
 
+from uqlib.types import TensorTree
 from uqlib.utils import hessian_diag, diag_normal_sample
 from uqlib.laplace.diag_fisher import DiagLaplaceState
 
 
 def init(
-    init_mean: Any,
-    init_prec_diag: Any = None,
+    init_mean: TensorTree,
+    init_prec_diag: TensorTree = None,
 ) -> DiagLaplaceState:
     """Initialise diagonal Normal distribution over parameters.
 
@@ -26,7 +27,7 @@ def init(
 
 def update(
     state: DiagLaplaceState,
-    log_posterior: Callable[[Any, Any], float],
+    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
 ) -> DiagLaplaceState:
     """Adds diagonal negative Hessian summed across given batch.
@@ -60,14 +61,16 @@ def update(
     return DiagLaplaceState(state.mean, batch_prec_diag)
 
 
-def sample(state: DiagLaplaceState, sample_shape: torch.Size = torch.Size([])):
-    """Single sample from diagonal Normal distribution over parameters.
+def sample(
+    state: DiagLaplaceState, sample_shape: torch.Size = torch.Size([])
+) -> TensorTree:
+    """Sample from diagonal Normal distribution over parameters.
 
     Args:
         state: State encoding mean and diagonal precision.
 
     Returns:
-        Sample from Normal distribution.
+        Sample(s) from Normal distribution.
     """
     sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.prec_diag)
     return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)

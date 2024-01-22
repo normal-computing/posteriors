@@ -4,6 +4,7 @@ from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
 
+from uqlib.types import TensorTree
 from uqlib.utils import diag_normal_log_prob, diag_normal_sample
 
 
@@ -19,16 +20,16 @@ class VIDiagState(NamedTuple):
         nelbo: Negative evidence lower bound (lower is better).
     """
 
-    mean: Any
-    log_sd_diag: Any
+    mean: TensorTree
+    log_sd_diag: TensorTree
     optimizer_state: tuple
     nelbo: float = 0
 
 
 def init(
-    init_mean: Any,
+    init_mean: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
-    init_log_sds: Any = None,
+    init_log_sds: TensorTree | None = None,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
@@ -65,7 +66,7 @@ def init(
 
 def update(
     state: VIDiagState,
-    log_posterior: Callable[[Any, Any], float],
+    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
     optimizer: torchopt.base.GradientTransformation,
     temperature: float = 1.0,
@@ -119,7 +120,7 @@ def update(
 def nelbo(
     mean: dict,
     sd_diag: dict,
-    log_posterior: Callable[[Any, Any], float],
+    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
     temperature: float = 1.0,
     n_samples: int = 1,

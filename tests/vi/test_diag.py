@@ -108,7 +108,12 @@ def _test_vi_diag(optimizer_cls, stl):
 
     for _ in range(n_steps):
         state = vi.diag.update(
-            state, batch_normal_log_prob_spec, batch, optimizer, n_vi_samps, stl
+            state,
+            batch_normal_log_prob_spec,
+            batch,
+            optimizer,
+            n_samples=n_vi_samps,
+            stl=stl,
         )
         nelbos.append(state.nelbo)
 

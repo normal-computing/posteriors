@@ -3,7 +3,7 @@ from typing import Any
 import torch
 from torch.func import grad_and_value
 import torchopt
-from optree import tree_map, tree_flatten, tree_unflatten
+from optree import tree_map, tree_flatten
 
 from uqlib.sgmcmc import sghmc
 from uqlib.utils import diag_normal_log_prob
@@ -91,7 +91,7 @@ def test_sghmc_funcopt():
 
         param_leaves, tree_spec = tree_flatten(params)
         param_leaves = func_sampler.step(log_post, tuple(param_leaves))
-        params = tree_unflatten(param_leaves, tree_spec)
+        params = tree_spec.unflatten(param_leaves)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, params

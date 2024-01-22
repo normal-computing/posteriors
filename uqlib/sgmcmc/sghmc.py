@@ -1,8 +1,10 @@
-from typing import Any, NamedTuple, Tuple
+from typing import NamedTuple, Tuple
 from functools import partial
 import torch
 from torchopt.base import GradientTransformation
 from optree import tree_map, tree_map_
+
+from uqlib.types import TensorTree
 
 
 class SGHMCState(NamedTuple):
@@ -12,10 +14,10 @@ class SGHMCState(NamedTuple):
         momenta: Momenta for each parameter.
     """
 
-    momenta: Any
+    momenta: TensorTree
 
 
-def init(params: Any, momenta: Any | None = None) -> SGHMCState:
+def init(params: TensorTree, momenta: TensorTree | None = None) -> SGHMCState:
     """Initialise momenta for SGHMC.
 
     Args:
@@ -31,16 +33,16 @@ def init(params: Any, momenta: Any | None = None) -> SGHMCState:
 
 
 def update(
-    updates: Any,
+    updates: TensorTree,
     state: SGHMCState,
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
     temperature: float = 1.0,
     maximize: bool = True,
-    params: Any | None = None,
+    params: TensorTree | None = None,
     inplace: bool = True,
-) -> Tuple[Any, SGHMCState]:
+) -> Tuple[TensorTree, SGHMCState]:
     """Updates gradients and momenta for SGHMC.
 
     Args:
@@ -91,7 +93,7 @@ def build(
     beta: float = 0.0,
     temperature: float = 1.0,
     maximize: bool = True,
-    momenta: Any | None = None,
+    momenta: TensorTree | None = None,
 ) -> GradientTransformation:
     """Builds SGHMC optimizer.
 

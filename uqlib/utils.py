@@ -5,15 +5,17 @@ from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce
 
+from uqlib.types import TensorTree
 
-def model_to_function(model: torch.nn.Module) -> Callable[[dict, Any], Any]:
+
+def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
     """Converts a model into a function that maps parameters and inputs to outputs.
 
     Args:
         model: torch.nn.Module with parameters stored in .named_parameters().
 
     Returns:
-        Function that takes a dictionary of parameters as well as any input
+        Function that takes a PyTree of parameters as well as any input
         arg or kwargs and returns the output of the model.
     """
 
@@ -43,7 +45,7 @@ def hvp(f: Callable, primals: tuple, tangents: tuple):
 
 
 def hessian_diag(f: Callable) -> Callable:
-    """Modify a scalar-valued function that takes a dict (with tensor values) as first
+    """Modify a scalar-valued function that takes a PyTree (with tensor values) as first
     input to return its Hessian diagonal.
 
     Inspired by https://github.com/google/jax/issues/3801
@@ -68,7 +70,7 @@ def hessian_diag(f: Callable) -> Callable:
 
 
 def diag_normal_log_prob(
-    x: Any, mean: Any, sd_diag: Any, validate_args: bool = False
+    x: TensorTree, mean: TensorTree, sd_diag: TensorTree, validate_args: bool = False
 ) -> float:
     """Evaluate multivariate normal log probability for a diagonal covariance matrix.
 
@@ -93,16 +95,17 @@ def diag_normal_log_prob(
 
 
 def diag_normal_sample(
-    mean: Any, sd_diag: Any, sample_shape: torch.Size = torch.Size([])
+    mean: TensorTree, sd_diag: TensorTree, sample_shape: torch.Size = torch.Size([])
 ) -> dict:
-    """Single sample from multivariate normal with diagonal covariance matrix.
+    """Sample from multivariate normal with diagonal covariance matrix.
 
     Args:
         mean: Mean of the distribution.
         sd_diag: Square-root diagonal of the covariance matrix.
+        sample_shape: Shape of the sample.
 
     Returns:
-        Sample from normal distribution with the same structure as mean and sd_diag.
+        Sample(s) from normal distribution with the same structure as mean and sd_diag.
     """
     return tree_map(
         lambda m, sd: m + torch.randn(sample_shape + m.shape, device=m.device) * sd,
@@ -111,7 +114,7 @@ def diag_normal_sample(
     )
 
 
-def tree_extract(f: Callable[[torch.tensor], bool], tree: Any) -> Any:
+def tree_extract(f: Callable[[torch.tensor], bool], tree: TensorTree) -> TensorTree:
     """Extracts values from a PyTree where f returns True.
     False values are replaced with empty tensors.
 
@@ -126,8 +129,8 @@ def tree_extract(f: Callable[[torch.tensor], bool], tree: Any) -> Any:
 
 
 def tree_insert(
-    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
-) -> Any:
+    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
+) -> TensorTree:
     """Inserts sub_tree into full_tree where full_tree tensors evaluate f to True.
     Both PyTrees must have the same structure.
 
@@ -147,8 +150,8 @@ def tree_insert(
 
 
 def tree_insert_(
-    f: Callable[[torch.tensor], bool], full_tree: Any, sub_tree: Any
-) -> Any:
+    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
+) -> TensorTree:
     """Inserts sub_tree into full_tree in-place where full_tree tensors evaluate
     f to True. Both PyTrees must have the same structure.
 
@@ -168,7 +171,7 @@ def tree_insert_(
     return tree_map_(insert_, full_tree, sub_tree)
 
 
-def extract_requires_grad(tree: Any) -> Any:
+def extract_requires_grad(tree: TensorTree) -> TensorTree:
     """Extracts only parameters that require gradients.
 
     Args:
@@ -180,7 +183,7 @@ def extract_requires_grad(tree: Any) -> Any:
     return tree_extract(lambda x: x.requires_grad, tree)
 
 
-def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
+def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
     """Inserts sub_tree into full_tree where full_tree tensors requires_grad.
     Both PyTrees must have the same structure.
 
@@ -194,7 +197,7 @@ def insert_requires_grad(full_tree: Any, sub_tree: Any) -> Any:
     return tree_insert(lambda x: x.requires_grad, full_tree, sub_tree)
 
 
-def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
+def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
     """Inserts sub_pytree into full_tree in-place where full_tree tensors requires_grad.
     Both PyTrees must have the same structure.
 
@@ -209,8 +212,8 @@ def insert_requires_grad_(full_tree: Any, sub_tree: Any) -> Any:
 
 
 def extract_requires_grad_and_func(
-    tree: Any, func: Callable, inplace: bool = False
-) -> Tuple[Any, Callable]:
+    tree: TensorTree, func: Callable, inplace: bool = False
+) -> Tuple[TensorTree, Callable]:
     """Extracts only parameters that require gradients and converts a function
     that takes the full parameter tree (in its first argument)
     into one that takes the subtree.

@@ -1,7 +1,8 @@
 from collections import defaultdict
-from typing import Any, DefaultDict
+from typing import DefaultDict
 from torchopt.optim.base import Optimizer
 
+from uqlib.types import TensorTree
 from uqlib.sgmcmc import sghmc
 
 
@@ -17,13 +18,13 @@ class SGHMC(Optimizer):
 
     def __init__(
         self,
-        params: Any,
+        params: TensorTree,
         lr: float,
         alpha: float = 0.01,
         beta: float = 0.0,
         temperature: float = 1.0,
         maximize: bool = True,
-        momenta: Any | None = None,
+        momenta: TensorTree | None = None,
     ) -> None:
         """Initialise SGHMC.
 

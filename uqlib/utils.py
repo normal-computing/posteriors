@@ -238,6 +238,26 @@ def extract_requires_grad_and_func(
     return subtree, subfunc
 
 
+def inplacify(func: Callable) -> Callable:
+    """Converts a function that takes a tensor as its first argument
+    into one that takes the same arguments but modifies the first arguent
+    tensor in-place with the output of the function.
+
+    Args:
+        func: A function that takes a tensor as its first argument and a returns
+            a modified version of said tensor.
+
+    Returns:
+        A function that takes a tensor as its first argument and modifies it
+        in-place.
+    """
+
+    def func_(tens, *args, **kwargs):
+        tens.data = func(tens, *args, **kwargs)
+
+    return func_
+
+
 def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
     """Updates the model parameters in-place with the provided grouped parameters.
 

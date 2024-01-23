@@ -1,10 +1,11 @@
 from typing import Callable, Any, NamedTuple
+from functools import partial
 import torch
 from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
 
-from uqlib.types import TensorTree
+from uqlib.types import TensorTree, Transform
 from uqlib.utils import diag_normal_log_prob, diag_normal_sample
 
 
@@ -27,7 +28,7 @@ class VIDiagState(NamedTuple):
 
 
 def init(
-    init_mean: TensorTree,
+    params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
     init_log_sds: TensorTree | None = None,
 ) -> VIDiagState:
@@ -46,7 +47,7 @@ def init(
     It's assumed maximize=False for the optimizer, so that we minimize the NELBO.
 
     Args:
-        init_mean: Initial mean of the variational distribution.
+        params: Initial mean of the variational distribution.
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
@@ -57,17 +58,17 @@ def init(
     """
     if init_log_sds is None:
         init_log_sds = tree_map(
-            lambda x: torch.zeros_like(x, requires_grad=True), init_mean
+            lambda x: torch.zeros_like(x, requires_grad=True), params
         )
 
-    optimizer_state = optimizer.init([init_mean, init_log_sds])
-    return VIDiagState(init_mean, init_log_sds, optimizer_state)
+    optimizer_state = optimizer.init([params, init_log_sds])
+    return VIDiagState(params, init_log_sds, optimizer_state)
 
 
 def update(
     state: VIDiagState,
-    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
+    log_posterior: Callable[[TensorTree, Any], float],
     optimizer: torchopt.base.GradientTransformation,
     temperature: float = 1.0,
     n_samples: int = 1,
@@ -76,18 +77,11 @@ def update(
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the NELBO.
 
-    log_posterior expects to take parameters and input batch and return a scalar
-    unbiased estimate of the full batch log posterior:
-
-    ```
-    val = log_posterior(params, batch) / temperature
-    ```
-
     Args:
         state: Current state.
+        batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
-        batch: Input data to log_posterior.
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         temperature: Temperature to rescale (divide) log_posterior.
@@ -115,6 +109,47 @@ def update(
         (state.mean, state.log_sd_diag), updates, inplace=inplace
     )
     return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.item())
+
+
+def build(
+    log_posterior: Callable[[TensorTree, Any], float],
+    optimizer: torchopt.base.GradientTransformation,
+    temperature: float = 1.0,
+    n_samples: int = 1,
+    stl: bool = True,
+    init_log_sds: TensorTree | None = None,
+) -> Transform:
+    """Builds a transform for variational inference with a diagonal Normal
+    distribution over parameters.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior (which can be unnormalised).
+        optimizer: torchopt functional optimizer for updating the variational
+            parameters.
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.
+        n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
+        stl: Whether to use the `stick-the-landing` estimator
+            https://arxiv.org/abs/1703.09194.
+            Defaults to True.
+        init_log_sds: Initial log of the square-root diagonal of the covariance matrix
+            of the variational distribution. Defaults to zero.
+
+    Returns:
+        Diagonal VI transform (uqlib.types.Transform instance).
+    """
+    init_fn = partial(init, optimizer=optimizer, init_log_sds=init_log_sds)
+    update_fn = partial(
+        update,
+        log_posterior=log_posterior,
+        optimizer=optimizer,
+        temperature=temperature,
+        n_samples=n_samples,
+        stl=stl,
+    )
+    return Transform(init_fn, update_fn)
 
 
 def nelbo(

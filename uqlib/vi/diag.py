@@ -99,7 +99,7 @@ def update(
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
     with torch.no_grad():
         nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
-            state.mean, sd_diag, log_posterior, batch, temperature, n_samples, stl
+            state.mean, sd_diag, batch, log_posterior, temperature, n_samples, stl
         )
 
     updates, optimizer_state = optimizer.update(
@@ -155,8 +155,8 @@ def build(
 def nelbo(
     mean: dict,
     sd_diag: dict,
-    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
+    log_posterior: Callable[[TensorTree, Any], float],
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
@@ -178,9 +178,9 @@ def nelbo(
         mean: Mean of the variational distribution.
         sd_diag: Square-root diagonal of the covariance matrix of the
             variational distribution.
+        batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised) for each batch member.
-        batch: Input data to log_posterior.
         temperature: Temperature to rescale (divide) log_posterior.
             Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.

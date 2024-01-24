@@ -1,4 +1,4 @@
-from typing import NamedTuple, Tuple, Any, Callable
+from typing import NamedTuple, Any, Callable
 from functools import partial
 import torch
 from torch.func import grad_and_value
@@ -46,7 +46,7 @@ def update(
     beta: float = 0.0,
     temperature: float = 1.0,
     inplace: bool = True,
-) -> Tuple[TensorTree, SGHMCState]:
+) -> SGHMCState:
     """Updates parameters and momenta for SGHMC.
 
     Args:

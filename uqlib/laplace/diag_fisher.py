@@ -2,10 +2,10 @@ from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
-from optree import tree_map
+from optree import tree_map, tree_map_
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import diag_normal_sample
+from uqlib.utils import diag_normal_sample, inplacify
 
 
 class DiagLaplaceState(NamedTuple):
@@ -44,6 +44,7 @@ def update(
     batch: Any,
     log_posterior: Callable[[TensorTree, Any], float],
     per_sample: bool = False,
+    inplace: bool = True,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
@@ -58,6 +59,8 @@ def update(
             is assumed to return a scalar log posterior for the whole batch, in this
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_posterior to be per sample.
+        inplace: If True, then the state is updated in place, otherwise a new state
+            is returned.
 
     Returns:
         Updated DiagLaplaceState.
@@ -77,7 +80,16 @@ def update(
             lambda jac: jac.square().sum(0),
             jacrev(log_posterior_per_sample)(state.mean, batch),
         )
-    prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
+
+    def update_func(x, y):
+        return x + y
+
+    if inplace:
+        prec_diag = tree_map_(
+            inplacify(update_func), state.prec_diag, batch_diag_score_sq
+        )
+    else:
+        prec_diag = tree_map(update_func, state.prec_diag, batch_diag_score_sq)
 
     return DiagLaplaceState(state.mean, prec_diag)
 

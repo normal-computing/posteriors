@@ -1,10 +1,10 @@
 from functools import partial
 from typing import Callable, Any
 import torch
-from optree import tree_map, tree_flatten
+from optree import tree_map, tree_map_, tree_flatten
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import hessian_diag, diag_normal_sample
+from uqlib.utils import hessian_diag, diag_normal_sample, inplacify
 from uqlib.laplace.diag_fisher import DiagLaplaceState
 
 
@@ -30,6 +30,7 @@ def update(
     state: DiagLaplaceState,
     batch: Any,
     log_posterior: Callable[[TensorTree, Any], float],
+    inplace: bool = True,
 ) -> DiagLaplaceState:
     """Adds diagonal negative Hessian summed across given batch.
 
@@ -41,6 +42,8 @@ def update(
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised) for each batch member.
+        inplace: If True, then state is updated in place, otherwise a new state is
+            returned.
 
     Returns:
         Updated DiagLaplaceState.
@@ -49,10 +52,16 @@ def update(
 
     with torch.no_grad():
         batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch))(state.mean)
-    batch_prec_diag = tree_map(
-        lambda x, y: x - y * batch_size, state.prec_diag, batch_diag_hess
-    )
-    return DiagLaplaceState(state.mean, batch_prec_diag)
+
+    def update_func(x, y):
+        return x - y * batch_size
+
+    if inplace:
+        prec_diag = tree_map_(inplacify(update_func), state.prec_diag, batch_diag_hess)
+    else:
+        prec_diag = tree_map(update_func, state.prec_diag, batch_diag_hess)
+
+    return DiagLaplaceState(state.mean, prec_diag)
 
 
 def build(

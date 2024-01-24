@@ -57,9 +57,11 @@ def test_diag_fisher_vmap():
         return log_posterior_n(p, b, model, len(xs)).mean()
 
     params = dict(model.named_parameters())
-    laplace_state = diag_fisher.init(params)
+
+    transform = diag_fisher.build(log_posterior)
+    laplace_state = transform.init(params)
     for batch in dataloader:
-        laplace_state = diag_fisher.update(laplace_state, log_posterior, batch)
+        laplace_state = transform.update(laplace_state, batch)
 
     expected = tree_map(lambda x: torch.zeros_like(x), params)
     for x, y in zip(xs, ys):
@@ -71,21 +73,49 @@ def test_diag_fisher_vmap():
         assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)
 
     # Also check full batch
-    laplace_state_fb = diag_fisher.init(params)
-    laplace_state_fb = diag_fisher.update(laplace_state_fb, log_posterior, (xs, ys))
+    laplace_state_fb = transform.init(params)
+    laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)
 
     #  Test per_sample
     log_posterior_per_sample = partial(log_posterior_n, model=model, n_data=len(xs))
-    laplace_state_ps = diag_fisher.init(params)
+    transform_ps = diag_fisher.build(log_posterior_per_sample, per_sample=True)
+    laplace_state_ps = transform_ps.init(params)
     for batch in dataloader:
-        laplace_state_ps = diag_fisher.update(
-            laplace_state_ps, log_posterior_per_sample, batch, per_sample=True
+        laplace_state_ps = transform_ps.update(
+            laplace_state_ps,
+            batch,
         )
 
     for key in expected:
         assert torch.allclose(
             laplace_state_ps.prec_diag[key], laplace_state_fb.prec_diag[key], atol=1e-5
+        )
+
+    # Test inplace
+    laplace_state_ip = transform.init(params)
+    laplace_state_ip2 = transform.update(
+        laplace_state_ip,
+        batch,
+        inplace=True,
+    )
+
+    for key in expected:
+        assert torch.allclose(
+            laplace_state_ip2.prec_diag[key], laplace_state_ip.prec_diag[key], atol=1e-8
+        )
+
+    # Test not inplace
+    laplace_state_ip_false = transform.update(
+        laplace_state_ip,
+        batch,
+        inplace=False,
+    )
+    for key in expected:
+        assert not torch.allclose(
+            laplace_state_ip_false.prec_diag[key],
+            laplace_state_ip.prec_diag[key],
+            atol=1e-8,
         )

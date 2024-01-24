@@ -1,6 +1,5 @@
-from typing import Callable, Any, List, Tuple
+from typing import Callable, Any, Tuple
 import torch
-import torch.nn as nn
 from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce
@@ -254,22 +253,6 @@ def inplacify(func: Callable) -> Callable:
 
     def func_(tens, *args, **kwargs):
         tens.data = func(tens, *args, **kwargs)
+        return tens
 
     return func_
-
-
-def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tensor]]):
-    """Updates the model parameters in-place with the provided grouped parameters.
-
-    Args:
-        model: A torch.nn.Module object
-        groups: A list of groups where each group is a list of parameters
-    """
-
-    optimizer_params = []
-    for group in groups:
-        for param in group:
-            optimizer_params.append(torch.from_numpy(param))
-
-    for model_param, optimizer_param in zip(list(model.parameters()), optimizer_params):
-        model_param.data = optimizer_param

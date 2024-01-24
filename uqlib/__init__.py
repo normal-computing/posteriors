@@ -16,4 +16,3 @@ from uqlib.utils import insert_requires_grad
 from uqlib.utils import insert_requires_grad_
 from uqlib.utils import extract_requires_grad_and_func
 from uqlib.utils import inplacify
-from uqlib.utils import load_optimizer_param_to_model

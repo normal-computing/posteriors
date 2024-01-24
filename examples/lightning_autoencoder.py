@@ -8,6 +8,8 @@ import torchopt
 
 import uqlib
 
+# Example from https://lightning.ai/docs/pytorch/stable/starter/introduction.html
+
 method, config_args = uqlib.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
 # method, config_args = uqlib.sgmcmc.sghmc, {"lr": 1e-3}
 

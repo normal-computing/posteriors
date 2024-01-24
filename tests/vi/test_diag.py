@@ -44,8 +44,8 @@ def test_nelbo():
     target_nelbo_100 = vi.diag.nelbo(
         target_mean,
         target_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=100,
     )
 
@@ -55,7 +55,7 @@ def test_nelbo():
     bad_sds = tree_map(lambda x: torch.ones_like(x), target_mean)
 
     bad_nelbo_100 = vi.diag.nelbo(
-        bad_mean, bad_sds, batch_normal_log_prob_spec, batch, n_samples=100
+        bad_mean, bad_sds, batch, batch_normal_log_prob_spec, n_samples=100
     )
 
     assert bad_nelbo_100 > target_nelbo_100
@@ -85,16 +85,16 @@ def _test_vi_diag(optimizer_cls, stl):
     nelbo_init = vi.diag.nelbo(
         state.mean,
         init_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=n_vi_samps_large,
     )
 
     nelbo_target = vi.diag.nelbo(
         target_mean,
         target_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=n_vi_samps_large,
     )
 

@@ -256,3 +256,100 @@ def inplacify(func: Callable) -> Callable:
         return tens
 
     return func_
+
+
+def tree_map_inplacify_(
+    func: Callable,
+    tree: TensorTree,
+    *rests: TensorTree,
+    is_leaf: Callable[[TensorTree], bool] | None = None,
+    none_is_leaf: bool = False,
+    namespace: str = "",
+) -> TensorTree:
+    """Applies a pure function to each tensor in a PyTree in-place.
+
+    Like optree.tree_map_ but takes a pure function as input
+    (and takes replaces its first argument with its output in-place)
+    rather than a side-effect function.
+
+    Args:
+        func: A function that takes a tensor as its first argument and a returns
+            a modified version of said tensor.
+        tree (pytree): A pytree to be mapped over, with each leaf providing the first
+            positional argument to function ``func``.
+        rests (tuple of pytree): A tuple of pytrees, each of which has the same
+            structure as ``tree`` or has ``tree`` as a prefix.
+        is_leaf (callable, optional): An optionally specified function that will be called at each
+            flattening step. It should return a boolean, with :data:`True` stopping the traversal
+            and the whole subtree being treated as a leaf, and :data:`False` indicating the
+            flattening should traverse the current object.
+        none_is_leaf (bool, optional): Whether to treat :data:`None` as a leaf. If :data:`False`,
+            :data:`None` is a non-leaf node with arity 0. Thus :data:`None` is contained in the
+            treespec rather than in the leaves list and :data:`None` will be remain in the result
+            pytree. (default: :data:`False`)
+        namespace (str, optional): The registry namespace used for custom pytree node types.
+            (default: :const:`''`, i.e., the global namespace)
+
+    Returns:
+        The original ``tree`` with the value at each leaf is given by the side-effect of function
+        ``func(x, *xs)`` (not the return value) where ``x`` is the value at the corresponding leaf
+        in ``tree`` and ``xs`` is the tuple of values at values at corresponding nodes in ``rests``.
+    """
+    return tree_map_(
+        inplacify(func),
+        tree,
+        *rests,
+        is_leaf=is_leaf,
+        none_is_leaf=none_is_leaf,
+        namespace=namespace,
+    )
+
+
+def flexi_tree_map(
+    func: Callable,
+    tree: TensorTree,
+    *rests: TensorTree,
+    inplace: bool = False,
+    is_leaf: Callable[[TensorTree], bool] | None = None,
+    none_is_leaf: bool = False,
+    namespace: str = "",
+) -> TensorTree:
+    """Applies a pure function to each tensor in a PyTree, with inplace argument.
+
+    If inplace = True, uses uqlib.tree_map_inplacify_ to modify the tree in-place
+        (and return modified tree).
+    If inplace = False, uses optree.tree_map to return a new tree.
+
+    Args:
+        func: A pure function that takes a tensor as its first argument and a returns
+            a modified version of said tensor.
+        tree (pytree): A pytree to be mapped over, with each leaf providing the first
+            positional argument to function ``func``.
+        rests (tuple of pytree): A tuple of pytrees, each of which has the same
+            structure as ``tree`` or has ``tree`` as a prefix.
+        inplace (bool, optional): Whether to modify the tree in-place or not.
+        is_leaf (callable, optional): An optionally specified function that will be called at each
+            flattening step. It should return a boolean, with :data:`True` stopping the traversal
+            and the whole subtree being treated as a leaf, and :data:`False` indicating the
+            flattening should traverse the current object.
+        none_is_leaf (bool, optional): Whether to treat :data:`None` as a leaf. If :data:`False`,
+            :data:`None` is a non-leaf node with arity 0. Thus :data:`None` is contained in the
+            treespec rather than in the leaves list and :data:`None` will be remain in the result
+            pytree. (default: :data:`False`)
+        namespace (str, optional): The registry namespace used for custom pytree node types.
+            (default: :const:`''`, i.e., the global namespace)
+
+    Returns:
+        The original ``tree`` with the value at each leaf is given by the side-effect of function
+        ``func(x, *xs)`` (not the return value) where ``x`` is the value at the corresponding leaf
+        in ``tree`` and ``xs`` is the tuple of values at values at corresponding nodes in ``rests``.
+    """
+    tm = tree_map_inplacify_ if inplace else tree_map
+    return tm(
+        func,
+        tree,
+        *rests,
+        is_leaf=is_leaf,
+        none_is_leaf=none_is_leaf,
+        namespace=namespace,
+    )

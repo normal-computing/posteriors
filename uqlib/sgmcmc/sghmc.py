@@ -2,10 +2,10 @@ from typing import NamedTuple, Any, Callable
 from functools import partial
 import torch
 from torch.func import grad_and_value
-from optree import tree_map, tree_map_
+from optree import tree_map
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import inplacify
+from uqlib.utils import flexi_tree_map
 
 
 class SGHMCState(NamedTuple):
@@ -80,13 +80,10 @@ def update(
             * torch.randn_like(m)
         )
 
-    if inplace:
-        params = tree_map_(inplacify(transform_params), state.params, state.momenta)
-        momenta = tree_map_(inplacify(transform_momenta), state.momenta, grads)
-
-    else:
-        params = tree_map(transform_params, state.params, state.momenta)
-        momenta = tree_map(transform_momenta, state.momenta, grads)
+    params = flexi_tree_map(
+        transform_params, state.params, state.momenta, inplace=inplace
+    )
+    momenta = flexi_tree_map(transform_momenta, state.momenta, grads, inplace=inplace)
 
     return SGHMCState(params, momenta, log_post.item())
 

@@ -74,8 +74,9 @@ def update(
     predict_sd_diag = flexi_tree_map(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
-    grad, log_lik = grad_and_value(log_likelihood)(state.mean, batch)
-    diag_hessian = hessian_diag(log_likelihood)(state.mean, batch)
+    with torch.no_grad():
+        grad, log_lik = grad_and_value(log_likelihood)(state.mean, batch)
+        diag_hessian = hessian_diag(log_likelihood)(state.mean, batch)
 
     update_sd_diag = flexi_tree_map(
         lambda sig, h: (sig**-2 - h) ** -0.5,

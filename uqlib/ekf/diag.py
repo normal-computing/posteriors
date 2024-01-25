@@ -86,7 +86,7 @@ def update(
     update_mean = flexi_tree_map(
         lambda mu, sig, g: mu + sig**2 * g,
         state.mean,
-        predict_sd_diag,
+        update_sd_diag,
         grad,
         inplace=inplace,
     )

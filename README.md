@@ -1,54 +1,43 @@
 # uqlib
 
 
+General purpose python library for **U**ncertainy **Q**uantification with [`torch`](https://github.com/pytorch/pytorch).
 
-General purpose python library for **U**ncertainy **Q**uantification (methods and benchmarks) with [PyTorch](https://github.com/pytorch/pytorch) models.
+`uqlib` is functional first and aims to be easy to use and extend. Iterative `uqlib` algorithms take the following unified form
+```python
+state = transform.init(dict(model.named_parameters()))
 
-- All methods should be linear in the number of parameters, and therefore able to handle large models (e.g. transformers).
-- We should support uncertainty quantification over subsets of parameters.
-- We should support arbitrary loss functions.
-- We should support uncertainty over some subset of the parameters - *this will take some thinking about*.
-- Bayesian methods should support arbitrary priors (we just need pointwise evaluations).
+for batch in dataloader:
+    state = transform.update(state, batch)
+```
+
+Here `transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
+```python
+num_data = len(dataloader.dataset)
+functional_model = uqlib.model_to_function(model)
+log_posterior = lambda p, b: -loss_fn(functional_model(p, b), b) + prior(p) / num_data
+optimizer = partial(torchopt.Adam, lr=1e-3)
+transform = uqlib.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)
+```
+
+Observe that `uqlib` recommends specifying `log_posterior` and `temperature` such that 
+`log_posterior` remains on the same scale for different batch sizes. `uqlib` 
+algorithms are designed to be stable as `temperature` goes to zero.
 
 
 ## Friends
 
-Should interface well with
+Interfaces seamlessly with:
 
-- Existing optimisers in [torch.optim](https://pytorch.org/docs/stable/optim.html) (we do not need to provide gradient descent)
-- [transformers](https://github.com/huggingface/transformers) for fine-tuning pre-trained models (we should make sure our uncertainty methods are also compatible in terms of inference/generation)
-- [PyTorch Lightning](https://github.com/Lightning-AI/lightning) for convenient training and logging
+- [`torch`](https://github.com/pytorch/pytorch) and in particular [`torch.func`](https://pytorch.org/docs/stable/func.html).
+- [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) for distributions and sampling, (note that it's typically required to set `validate_args=False` to conform with the control flows in [`torch.func`](https://pytorch.org/docs/stable/func.html)).
+- Functional and flexible torch optimizers from [`torchopt`](https://github.com/metaopt/torchopt), 
+    (which is the default for [`uqlib.vi`](uqlib/vi/) but `torch.optim` also interfaces easily).
+- [`transformers`](https://github.com/huggingface/transformers) for pre-trained models.
+- [`lightning`](https://github.com/Lightning-AI/lightning) for convenient training and logging, see [examples/lightning_autoencoder.py](examples/lightning_autoencoder.py).
 
-
-## Methods
-
-- [ ] [Dropout](https://arxiv.org/abs/1506.02142)
-- [ ] [Variational inference (mean-field and KFAC)](https://arxiv.org/abs/1601.00670)
-    - Basic/naive NELBO added but this should be upgraded (to be optimised + KFAC) 
-    and tested.
-- [ ] [Laplace approximation (mean-field and KFAC)](https://arxiv.org/abs/2106.14806)
-    - Currently we have a basic Hessian diagonal implementation but this should be 
-    replaced with diagonal (and KFAC) Fisher information which is guaranteed to be positive definite.
-- [ ] [Deep Ensemble](https://arxiv.org/abs/1612.01474)
-- [ ] [SGMCMC](https://arxiv.org/abs/1506.04696)
-    - v0 implementation added but needs API finalising and tests on e.g. linear 
-    Gaussian models with known posterior mean + cov.
-- [ ] Ensemble SGMCMC
-- [ ] [SNGP](https://arxiv.org/abs/2006.10108)
-- [ ] [Epistemic neural networks](https://arxiv.org/abs/2107.08924)
-<!-- - [ ] [Conformal prediction](https://arxiv.org/abs/2107.07511) -->
-
-
-## Benchmarks
-
-Benchmarks should extend beyond those in [uncertainty-baselines](https://github.com/google/uncertainty-baselines). We can include classification and regression as toy examples but the leaderboard should consist of the following more practically relevant tasks:
-
-- [ ] Generation
-    - Aleatoric vs epistemic uncertainty (e.g. hallucination detection)
-- [ ] Continual learning
-    - Regression/classification/generation tasks but with a stream of data. Evaluate perfomance on current and historical data/tasks.
-- [ ] Decision making
-    - Thompson sampling effectiveness
+The functional transform interface is strongly inspired by frameworks such as 
+[`optax`](https://github.com/google-deepmind/optax) and [`BlackJAX`](https://github.com/blackjax-devs/blackjax).
 
 
 ## Contributing

@@ -1,1 +1,1 @@
-from uqlib.ekf import diag
+from uqlib.ekf import diag_hessian

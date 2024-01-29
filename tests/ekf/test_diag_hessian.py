@@ -27,7 +27,7 @@ def test_ekf_diag():
     batch = torch.arange(3).reshape(-1, 1)
 
     n_steps = 1000
-    transform = ekf.diag.build(batch_normal_log_prob_spec, lr=1e-3)
+    transform = ekf.diag_hessian.build(batch_normal_log_prob_spec, lr=1e-3)
 
     state = transform.init(init_mean)
 

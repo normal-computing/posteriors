@@ -47,30 +47,29 @@ def update(
     state: EKFDiagState,
     batch: Any,
     log_likelihood: Callable[[TensorTree, Any], float],
+    lr: float,
     transition_sd: float = 0.0,
-    inverse_temperature: float = 1.0,
     inplace: bool = True,
 ) -> EKFDiagState:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
     The update is first order, i.e. the likelihood is approximated by a
 
-    log p(y | x, p) ≈ log p(y | x, μ) + g(μ)ᵀ(p - μ) T⁻¹
-        + 1/2 (p - μ)ᵀ H_d(μ) (p - μ) T⁻¹
+    log p(y | x, p) ≈ log p(y | x, μ) + lr * g(μ)ᵀ(p - μ)
+        + lr * 1/2 (p - μ)ᵀ H_d(μ) (p - μ) T⁻¹
 
-    where μ is the mean of the variational distribution, T is the likelihood
-    temperature, whilst g(μ) is the gradient and H_d(μ) the diagonal Hessian of the
-    log-likelihood with respect to the parameters.
+    where μ is the mean of the variational distribution, lr is the learning rate
+    (likelihood inverse temperature), whilst g(μ) is the gradient and H_d(μ) the
+    diagonal Hessian of the log-likelihood with respect to the parameters.
 
     Args:
         state: Current state.
         batch: Input data to log_posterior.
         log_likelihood: Function that takes parameters and input batch and
             returns the log-likelihood.
+        lr: Inverse temperature of the update, which behaves like a learning rate.
+            see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update. Defaults to zero.
-        inverse_temperature: Inverse temperature of the update.
-            Behaves like a learning rate.
-            Defaults to one.
         inplace: Whether to update the state parameters in-place.
 
     Returns:
@@ -84,13 +83,13 @@ def update(
         diag_hessian = hessian_diag(log_likelihood)(state.mean, batch)
 
     update_sd_diag = flexi_tree_map(
-        lambda sig, h: (sig**-2 - inverse_temperature * h) ** -0.5,
+        lambda sig, h: (sig**-2 - lr * h) ** -0.5,
         predict_sd_diag,
         diag_hessian,
         inplace=inplace,
     )
     update_mean = flexi_tree_map(
-        lambda mu, sig, g: mu + sig**2 * inverse_temperature * g,
+        lambda mu, sig, g: mu + sig**2 * lr * g,
         state.mean,
         update_sd_diag,
         grad,
@@ -101,8 +100,8 @@ def update(
 
 def build(
     log_likelihood: Callable[[TensorTree, Any], float],
+    lr: float,
     transition_sd: float = 0.0,
-    inverse_temperature: float = 1.0,
     init_sds: TensorTree | None = None,
 ) -> Transform:
     """Builds a transform for variational inference with a diagonal Normal
@@ -111,11 +110,10 @@ def build(
     Args:
         log_likelihood: Function that takes parameters and input batch and
             returns the log-likelihood.
+        lr: Inverse temperature of the update, which behaves like a learning rate.
+            see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update. Defaults to zero.
-        inverse_temperature: Inverse temperature of the update.
-            Behaves like a learning rate.
-            Defaults to one.
         init_sds: Initial square-root diagonal of the covariance matrix
             of the variational distribution. Defaults to ones.
 
@@ -126,8 +124,8 @@ def build(
     update_fn = partial(
         update,
         log_likelihood=log_likelihood,
+        lr=lr,
         transition_sd=transition_sd,
-        inverse_temperature=inverse_temperature,
     )
     return Transform(init_fn, update_fn)
 

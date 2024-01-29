@@ -4,7 +4,7 @@ from torch import Tensor
 
 TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
 
-TransformState: TypeAlias = TensorTree
+TransformState: TypeAlias = NamedTuple
 
 
 class InitFn(Protocol):
@@ -12,13 +12,24 @@ class InitFn(Protocol):
     def __call__(
         params: TensorTree,
     ) -> TransformState:
-        """Initiate a state.
+        """Initiate a uqlib state with unified API:
+
+        ```
+        state = init(params)
+        ```
+
+        where params is a PyTree of parameters around which we want to
+        quantify uncertainty. The produced `state` is a `NamedTuple` containing
+        the required information for the uqlib iterative algorithm
+        defined by the `init` and `update` functions.
+
+        See also uqlib.types.UpdateFn and uqlib.types.Transform.
 
         Args:
-            params: The initial value of parameters.
+            params: PyTree containing initial value of parameters.
 
         Returns:
-            The initial state.
+            The initial state (NamedTuple).
         """
 
 
@@ -27,9 +38,18 @@ class UpdateFn(Protocol):
     def __call__(
         state: TransformState,
         batch: Any,
-        inplace: bool = False,
+        inplace: bool = True,
     ) -> TransformState:
-        """Transform a state.
+        """Transform a uqlib state with unified API:
+
+        ```
+        state = update(state, batch, inplace=False)
+        ```
+
+        where state is a `NamedTuple` containing the required information for the
+        uqlib iterative algorithm defined by the `init` and `update` functions.
+
+        See also uqlib.types.InitFn and uqlib.types.Transform.
 
         Args:
             state: The state of the iterative algorithm.
@@ -37,19 +57,21 @@ class UpdateFn(Protocol):
             inplace: Whether to modify state using inplace operations. Defaults to True.
 
         Returns:
-            The transformed state.
+            The transformed state (NamedTuple).
         """
 
 
 class Transform(NamedTuple):
     """A transform contains init and update functions defining an iterative algorithm.
 
+    See also uqlib.types.InitFn and uqlib.types.UpdateFn.
+
     Args:
         init: The init function.
         update: The update function.
 
     Returns:
-        A transform.
+        A transform (`NamedTuple` containing `init` and `update` functions).
     """
 
     init: InitFn

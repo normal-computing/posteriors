@@ -32,7 +32,7 @@ def test_batch_normal_log_prob():
     assert torch.allclose(single_batch_evals, full_batch_evals)
 
 
-def test_elbo():
+def test_nelbo():
     target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
     target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
     batch = torch.arange(10).reshape(-1, 1)
@@ -44,8 +44,8 @@ def test_elbo():
     target_nelbo_100 = vi.diag.nelbo(
         target_mean,
         target_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=100,
     )
 
@@ -55,7 +55,7 @@ def test_elbo():
     bad_sds = tree_map(lambda x: torch.ones_like(x), target_mean)
 
     bad_nelbo_100 = vi.diag.nelbo(
-        bad_mean, bad_sds, batch_normal_log_prob_spec, batch, n_samples=100
+        bad_mean, bad_sds, batch, batch_normal_log_prob_spec, n_samples=100
     )
 
     assert bad_nelbo_100 > target_nelbo_100
@@ -85,16 +85,16 @@ def _test_vi_diag(optimizer_cls, stl):
     nelbo_init = vi.diag.nelbo(
         state.mean,
         init_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=n_vi_samps_large,
     )
 
     nelbo_target = vi.diag.nelbo(
         target_mean,
         target_sds,
-        batch_normal_log_prob_spec,
         batch,
+        batch_normal_log_prob_spec,
         n_samples=n_vi_samps_large,
     )
 
@@ -104,17 +104,16 @@ def _test_vi_diag(optimizer_cls, stl):
     n_steps = 1000
     n_vi_samps = 5
 
+    transform = vi.diag.build(
+        batch_normal_log_prob_spec, optimizer, n_samples=n_vi_samps, stl=stl
+    )
+
+    state = transform.init(init_mean)
+
     nelbos = []
 
     for _ in range(n_steps):
-        state = vi.diag.update(
-            state,
-            batch_normal_log_prob_spec,
-            batch,
-            optimizer,
-            n_samples=n_vi_samps,
-            stl=stl,
-        )
+        state = transform.update(state, batch)
         nelbos.append(state.nelbo)
 
     last_nelbos_mean = torch.tensor(nelbos[-10:]).mean()
@@ -125,6 +124,35 @@ def _test_vi_diag(optimizer_cls, stl):
     for key in state.mean:
         assert torch.allclose(state.mean[key], target_mean[key], atol=0.5)
         assert torch.allclose(state.log_sd_diag[key].exp(), target_sds[key], atol=0.5)
+
+    # Test inplace
+    state_ip = transform.init(init_mean)
+    state_ip2 = transform.update(
+        state_ip,
+        batch,
+        inplace=True,
+    )
+
+    for key in state_ip2.mean:
+        assert torch.allclose(state_ip2.mean[key], state_ip.mean[key], atol=1e-8)
+        assert torch.allclose(
+            state_ip2.log_sd_diag[key], state_ip.log_sd_diag[key], atol=1e-8
+        )
+
+    # Test not inplace
+    state_ip_false = transform.update(
+        state_ip,
+        batch,
+        inplace=False,
+    )
+
+    for key in state_ip.mean:
+        assert not torch.allclose(
+            state_ip_false.mean[key], state_ip.mean[key], atol=1e-8
+        )
+        assert not torch.allclose(
+            state_ip_false.log_sd_diag[key], state_ip.log_sd_diag[key], atol=1e-8
+        )
 
 
 def test_vi_diag_sgd():

@@ -1,6 +1,7 @@
 from sghmc.modules.classifier import Classifier
-from uqlib import load_optimizer_param_to_model
 import torch
+
+from utils.utils import load_optimizer_param_to_model
 
 ckpt_path = None
 

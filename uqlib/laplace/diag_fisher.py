@@ -2,10 +2,10 @@ from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
-from optree import tree_map
+from optree import tree_map, tree_map_
 
-from uqlib.types import TensorTree
-from uqlib.utils import diag_normal_sample
+from uqlib.types import TensorTree, Transform
+from uqlib.utils import diag_normal_sample, inplacify
 
 
 class DiagLaplaceState(NamedTuple):
@@ -21,50 +21,46 @@ class DiagLaplaceState(NamedTuple):
 
 
 def init(
-    mean: TensorTree,
-    init_prec_diag: TensorTree = None,
+    params: TensorTree,
+    init_prec_diag: TensorTree | None = None,
 ) -> DiagLaplaceState:
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
-        mean: Mean of the Normal distribution.
+        params: Mean of the Normal distribution.
         init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
 
     Returns:
         Initial DiagVIState.
     """
     if init_prec_diag is None:
-        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), mean)
+        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), params)
 
-    return DiagLaplaceState(mean, init_prec_diag)
+    return DiagLaplaceState(params, init_prec_diag)
 
 
 def update(
     state: DiagLaplaceState,
-    log_posterior: Callable[[TensorTree, Any], float],
     batch: Any,
+    log_posterior: Callable[[TensorTree, Any], float],
     per_sample: bool = False,
+    inplace: bool = True,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
 
-    log_posterior expects to take parameters and input batch and return a scalar
-    unbiased estimate of the full batch log posterior:
-
-    ```
-    log_posterior_eval = log_posterior(params, batch)
-    ```
-
     Args:
         state: Current state.
+        batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
-        batch: Input data to log_posterior.
         per_sample: If True, then log_posterior is assumed to return a vector of
             log posteriors for each sample in the batch. If False, then log_posterior
             is assumed to return a scalar log posterior for the whole batch, in this
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_posterior to be per sample.
+        inplace: If True, then the state is updated in place, otherwise a new state
+            is returned.
 
     Returns:
         Updated DiagLaplaceState.
@@ -84,9 +80,45 @@ def update(
             lambda jac: jac.square().sum(0),
             jacrev(log_posterior_per_sample)(state.mean, batch),
         )
-    prec_diag = tree_map(lambda x, y: x + y, state.prec_diag, batch_diag_score_sq)
+
+    def update_func(x, y):
+        return x + y
+
+    if inplace:
+        prec_diag = tree_map_(
+            inplacify(update_func), state.prec_diag, batch_diag_score_sq
+        )
+    else:
+        prec_diag = tree_map(update_func, state.prec_diag, batch_diag_score_sq)
 
     return DiagLaplaceState(state.mean, prec_diag)
+
+
+def build(
+    log_posterior: Callable[[TensorTree, Any], float],
+    per_sample: bool = False,
+    init_prec_diag: TensorTree | None = None,
+) -> Transform:
+    """Builds a transform for diagonal empirical Fisher information
+    Laplace approximation.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior (which can be unnormalised).
+        per_sample: If True, then log_posterior is assumed to return a vector of
+            log posteriors for each sample in the batch. If False, then log_posterior
+            is assumed to return a scalar log posterior for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_posterior to be per sample.
+        init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
+
+    Returns:
+        Diagonal empirical Fisher information Laplace approximation transform
+        (uqlib.types.Transform instance).
+    """
+    init_fn = partial(init, init_prec_diag=init_prec_diag)
+    update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
+    return Transform(init_fn, update_fn)
 
 
 def sample(

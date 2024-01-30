@@ -11,6 +11,7 @@ from uqlib import (
     insert_requires_grad,
     insert_requires_grad_,
     extract_requires_grad_and_func,
+    inplacify,
 )
 
 
@@ -227,3 +228,14 @@ def test_extract_requires_grad_func():
     assert torch.equal(result2, func(params2))
     assert torch.equal(params2["a"], sub_params["a"])
     assert torch.equal(params2["a"], params["a"])
+
+
+def test_inplacify():
+    def func(x):
+        return x + 1
+
+    x = torch.tensor(1.0)
+    y = inplacify(func)(x)
+
+    assert y == 2.0
+    assert x == 2.0

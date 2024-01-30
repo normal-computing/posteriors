@@ -1,12 +1,26 @@
-from typing import Callable, Any
+from typing import Callable, Any, NamedTuple
 from functools import partial
 import torch
-from torch.func import grad_and_value
+from torch.func import vmap, jacrev
 from optree import tree_map
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import diag_normal_sample, hessian_diag, flexi_tree_map
-from uqlib.ekf.diag_fisher import EKFDiagState
+from uqlib.utils import diag_normal_sample, flexi_tree_map
+
+
+class EKFDiagState(NamedTuple):
+    """State encoding a diagonal Normal distribution over parameters.
+
+    Args:
+        mean: Mean of the Normal distribution.
+        sd_diag: Square-root diagonal of the covariance matrix of the
+            Normal distribution.
+        log_likelihood: Log likelihood of the data given the parameters.
+    """
+
+    mean: TensorTree
+    sd_diag: TensorTree
+    log_likelihood: float = 0
 
 
 def init(
@@ -37,17 +51,19 @@ def update(
     log_likelihood: Callable[[TensorTree, Any], float],
     lr: float,
     transition_sd: float = 0.0,
+    per_sample: bool = False,
     inplace: bool = True,
 ) -> EKFDiagState:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
     The update is first order, i.e. the likelihood is approximated by a
 
     log p(y | x, p) ≈ log p(y | x, μ) + lr * g(μ)ᵀ(p - μ)
-        + lr * 1/2 (p - μ)ᵀ H_d(μ) (p - μ) T⁻¹
+        + lr * 1/2 (p - μ)ᵀ F_d(μ) (p - μ) T⁻¹
 
     where μ is the mean of the variational distribution, lr is the learning rate
-    (likelihood inverse temperature), whilst g(μ) is the gradient and H_d(μ) the
-    diagonal Hessian of the log-likelihood with respect to the parameters.
+    (likelihood inverse temperature), whilst g(μ) is the gradient and F_d(μ) the
+    negative diagonal empirical Fisher of the log-likelihood with respect to the
+    parameters.
 
     Args:
         state: Current state.
@@ -58,22 +74,39 @@ def update(
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update. Defaults to zero.
+        per_sample: If True, then log_likelihood is assumed to return a vector of
+            log likelihoods for each sample in the batch. If False, then log_likelihood
+            is assumed to return a scalar log likelihood for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_likelihood to be per sample.
         inplace: Whether to update the state parameters in-place.
 
     Returns:
         Updated EKFDiagState.
     """
+
+    if per_sample:
+        log_likelihood_per_sample = log_likelihood
+    else:
+        # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+        @partial(vmap, in_dims=(None, 0))
+        def log_likelihood_per_sample(params, batch):
+            batch = tree_map(lambda x: x.unsqueeze(0), batch)
+            return log_likelihood(params, batch)
+
     predict_sd_diag = flexi_tree_map(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
     with torch.no_grad():
-        grad, log_lik = grad_and_value(log_likelihood)(state.mean, batch)
-        diag_hessian = hessian_diag(log_likelihood)(state.mean, batch)
+        log_lik = log_likelihood_per_sample(state.mean, batch).mean()
+        jac = jacrev(log_likelihood_per_sample)(state.mean, batch)
+        grad = tree_map(lambda x: x.mean(0), jac)
+        diag_lik_hessian_approx = tree_map(lambda x: -(x**2).mean(0), jac)
 
     update_sd_diag = flexi_tree_map(
         lambda sig, h: (sig**-2 - lr * h) ** -0.5,
         predict_sd_diag,
-        diag_hessian,
+        diag_lik_hessian_approx,
         inplace=inplace,
     )
     update_mean = flexi_tree_map(
@@ -90,6 +123,7 @@ def build(
     log_likelihood: Callable[[TensorTree, Any], float],
     lr: float,
     transition_sd: float = 0.0,
+    per_sample: bool = False,
     init_sds: TensorTree | None = None,
 ) -> Transform:
     """Builds a transform for variational inference with a diagonal Normal
@@ -102,6 +136,11 @@ def build(
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update. Defaults to zero.
+        per_sample: If True, then log_likelihood is assumed to return a vector of
+            log likelihoods for each sample in the batch. If False, then log_likelihood
+            is assumed to return a scalar log likelihood for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_likelihood to be per sample.
         init_sds: Initial square-root diagonal of the covariance matrix
             of the variational distribution. Defaults to ones.
 
@@ -114,6 +153,7 @@ def build(
         log_likelihood=log_likelihood,
         lr=lr,
         transition_sd=transition_sd,
+        per_sample=per_sample,
     )
     return Transform(init_fn, update_fn)
 

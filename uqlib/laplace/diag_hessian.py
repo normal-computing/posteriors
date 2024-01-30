@@ -22,7 +22,9 @@ def init(
         Initial DiagVIState.
     """
     if init_prec_diag is None:
-        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), params)
+        init_prec_diag = tree_map(
+            lambda x: torch.zeros_like(x, requires_grad=x.requires_grad), params
+        )
     return DiagLaplaceState(params, init_prec_diag)
 
 

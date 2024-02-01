@@ -1,10 +1,10 @@
 from functools import partial
 from typing import Callable, Any
 import torch
-from optree import tree_map, tree_map_, tree_flatten
+from optree import tree_map, tree_flatten
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import hessian_diag, diag_normal_sample, inplacify
+from uqlib.utils import hessian_diag, diag_normal_sample, flexi_tree_map
 from uqlib.laplace.diag_fisher import DiagLaplaceState
 
 
@@ -22,7 +22,9 @@ def init(
         Initial DiagVIState.
     """
     if init_prec_diag is None:
-        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), params)
+        init_prec_diag = tree_map(
+            lambda x: torch.zeros_like(x, requires_grad=x.requires_grad), params
+        )
     return DiagLaplaceState(params, init_prec_diag)
 
 
@@ -56,10 +58,9 @@ def update(
     def update_func(x, y):
         return x - y * batch_size
 
-    if inplace:
-        prec_diag = tree_map_(inplacify(update_func), state.prec_diag, batch_diag_hess)
-    else:
-        prec_diag = tree_map(update_func, state.prec_diag, batch_diag_hess)
+    prec_diag = flexi_tree_map(
+        update_func, state.prec_diag, batch_diag_hess, inplace=inplace
+    )
 
     return DiagLaplaceState(state.mean, prec_diag)
 

@@ -2,10 +2,10 @@ from functools import partial
 from typing import Callable, Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
-from optree import tree_map, tree_map_
+from optree import tree_map
 
 from uqlib.types import TensorTree, Transform
-from uqlib.utils import diag_normal_sample, inplacify
+from uqlib.utils import diag_normal_sample, flexi_tree_map
 
 
 class DiagLaplaceState(NamedTuple):
@@ -34,7 +34,9 @@ def init(
         Initial DiagVIState.
     """
     if init_prec_diag is None:
-        init_prec_diag = tree_map(lambda x: torch.zeros_like(x), params)
+        init_prec_diag = tree_map(
+            lambda x: torch.zeros_like(x, requires_grad=x.requires_grad), params
+        )
 
     return DiagLaplaceState(params, init_prec_diag)
 
@@ -84,12 +86,9 @@ def update(
     def update_func(x, y):
         return x + y
 
-    if inplace:
-        prec_diag = tree_map_(
-            inplacify(update_func), state.prec_diag, batch_diag_score_sq
-        )
-    else:
-        prec_diag = tree_map(update_func, state.prec_diag, batch_diag_score_sq)
+    prec_diag = flexi_tree_map(
+        update_func, state.prec_diag, batch_diag_score_sq, inplace=inplace
+    )
 
     return DiagLaplaceState(state.mean, prec_diag)
 

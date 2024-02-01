@@ -39,7 +39,7 @@ def load_dataloaders(small=False, batch_size=8):
 
 
 def load_model(
-    prior_sd=1,
+    prior_sd=1.0,
     num_data=None,
     per_sample=False,
 ):
@@ -62,16 +62,18 @@ def load_model(
         return tree_reduce(torch.add, per_group_vals)
 
     def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
+        output = model_func(p, **batch)
         return (
-            categorical_log_likelihood(batch["labels"], model_func(p, **batch).logits)
-        ) + normal_log_prior(p) / num_data
+            categorical_log_likelihood(batch["labels"], output.logits)
+        ) + normal_log_prior(p) / num_data, output
 
     if per_sample:
         param_to_log_posterior = param_to_log_posterior_per_sample
     else:
 
         def param_to_log_posterior(p, batch, num_data) -> float:
-            return param_to_log_posterior_per_sample(p, batch, num_data).mean()
+            log_probs, aux = param_to_log_posterior_per_sample(p, batch, num_data)
+            return log_probs.mean(), aux
 
     if num_data is not None:
         param_to_log_posterior = partial(param_to_log_posterior, num_data=num_data)

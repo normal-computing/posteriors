@@ -25,7 +25,9 @@ def log_posterior(params, batch):
     x = x.view(x.size(0), -1)
     z = encoder_function(params[0], x)
     x_hat = decoder_function(params[1], z)
-    return torch.distributions.Normal(x_hat, 1, validate_args=False).log_prob(x).sum()
+    return torch.distributions.Normal(x_hat, 1, validate_args=False).log_prob(
+        x
+    ).sum(), x_hat
 
 
 # define the LightningModule
@@ -71,7 +73,7 @@ trainer = L.Trainer(limit_train_batches=100, max_epochs=1)
 trainer.fit(model=autoencoderuq, train_dataloaders=train_loader)
 
 
-checkpoint = "./lightning_logs/version_3/checkpoints/epoch=0-step=100.ckpt"
+checkpoint = "./lightning_logs/version_0/checkpoints/epoch=0-step=100.ckpt"
 autoencoder = LitAutoEncoderUQ.load_from_checkpoint(
     checkpoint, encoder=encoder, decoder=decoder
 )

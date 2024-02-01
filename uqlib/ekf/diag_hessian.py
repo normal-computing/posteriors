@@ -1,10 +1,10 @@
-from typing import Callable, Any
+from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_sample, hessian_diag, flexi_tree_map
 from uqlib.ekf.diag_fisher import EKFDiagState
 
@@ -34,7 +34,7 @@ def init(
 def update(
     state: EKFDiagState,
     batch: Any,
-    log_likelihood: Callable[[TensorTree, Any], float],
+    log_likelihood: LogProbFn,
     lr: float,
     transition_sd: float = 0.0,
     inplace: bool = True,
@@ -53,7 +53,8 @@ def update(
         state: Current state.
         batch: Input data to log_likelihood.
         log_likelihood: Function that takes parameters and input batch and
-            returns the log-likelihood.
+            returns the log-likelihood value as well as auxiliary information,
+            e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
@@ -67,8 +68,10 @@ def update(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
     with torch.no_grad():
-        grad, log_lik = grad_and_value(log_likelihood)(state.mean, batch)
-        diag_hessian = hessian_diag(log_likelihood)(state.mean, batch)
+        grad, (log_lik, aux) = grad_and_value(log_likelihood, has_aux=True)(
+            state.mean, batch
+        )
+        diag_hessian, _ = hessian_diag(log_likelihood, has_aux=True)(state.mean, batch)
 
     update_sd_diag = flexi_tree_map(
         lambda sig, h: (sig**-2 - lr * h) ** -0.5,
@@ -83,11 +86,11 @@ def update(
         grad,
         inplace=inplace,
     )
-    return EKFDiagState(update_mean, update_sd_diag, log_lik.item())
+    return EKFDiagState(update_mean, update_sd_diag, log_lik.item(), aux)
 
 
 def build(
-    log_likelihood: Callable[[TensorTree, Any], float],
+    log_likelihood: LogProbFn,
     lr: float,
     transition_sd: float = 0.0,
     init_sds: TensorTree | None = None,
@@ -97,7 +100,8 @@ def build(
 
     Args:
         log_likelihood: Function that takes parameters and input batch and
-            returns the log-likelihood.
+            returns the log-likelihood value as well as auxiliary information,
+            e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively

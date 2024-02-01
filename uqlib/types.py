@@ -1,10 +1,12 @@
-from typing import NamedTuple, Protocol, Any, TypeAlias
+from typing import NamedTuple, Protocol, Any, TypeAlias, Tuple, Callable
 from optree.typing import PyTreeTypeVar
 from torch import Tensor
 
 TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
 
 TransformState: TypeAlias = NamedTuple
+
+LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, Any]]
 
 
 class InitFn(Protocol):

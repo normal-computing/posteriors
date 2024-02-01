@@ -1,10 +1,10 @@
-from typing import Callable, Any, NamedTuple
+from typing import Any, NamedTuple
 from functools import partial
 import torch
 from torch.func import vmap, jacrev
 from optree import tree_map
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_sample, flexi_tree_map
 
 
@@ -16,11 +16,13 @@ class EKFDiagState(NamedTuple):
         sd_diag: Square-root diagonal of the covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
+        aux: Auxiliary information from the log_likelihood call.
     """
 
     mean: TensorTree
     sd_diag: TensorTree
     log_likelihood: float = 0
+    aux: Any = None
 
 
 def init(
@@ -48,7 +50,7 @@ def init(
 def update(
     state: EKFDiagState,
     batch: Any,
-    log_likelihood: Callable[[TensorTree, Any], float],
+    log_likelihood: LogProbFn,
     lr: float,
     transition_sd: float = 0.0,
     per_sample: bool = False,
@@ -69,7 +71,8 @@ def update(
         state: Current state.
         batch: Input data to log_likelihood.
         log_likelihood: Function that takes parameters and input batch and
-            returns the log-likelihood.
+            returns the log-likelihood value as well as auxiliary information,
+            e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
@@ -89,7 +92,7 @@ def update(
         log_likelihood_per_sample = log_likelihood
     else:
         # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-        @partial(vmap, in_dims=(None, 0))
+        @partial(vmap, in_dims=(None, 0), out_dims=(0, 0))
         def log_likelihood_per_sample(params, batch):
             batch = tree_map(lambda x: x.unsqueeze(0), batch)
             return log_likelihood(params, batch)
@@ -98,8 +101,8 @@ def update(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
     with torch.no_grad():
-        log_lik = log_likelihood_per_sample(state.mean, batch).mean()
-        jac = jacrev(log_likelihood_per_sample)(state.mean, batch)
+        log_liks, aux = log_likelihood_per_sample(state.mean, batch)
+        jac, _ = jacrev(log_likelihood_per_sample, has_aux=True)(state.mean, batch)
         grad = tree_map(lambda x: x.mean(0), jac)
         diag_lik_hessian_approx = tree_map(lambda x: -(x**2).mean(0), jac)
 
@@ -116,11 +119,11 @@ def update(
         grad,
         inplace=inplace,
     )
-    return EKFDiagState(update_mean, update_sd_diag, log_lik.item())
+    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().item(), aux)
 
 
 def build(
-    log_likelihood: Callable[[TensorTree, Any], float],
+    log_likelihood: LogProbFn,
     lr: float,
     transition_sd: float = 0.0,
     per_sample: bool = False,
@@ -131,7 +134,8 @@ def build(
 
     Args:
         log_likelihood: Function that takes parameters and input batch and
-            returns the log-likelihood.
+            returns the log-likelihood value as well as auxiliary information,
+            e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
             see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively

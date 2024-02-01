@@ -1,11 +1,11 @@
-from typing import Callable, Any, NamedTuple
+from typing import Callable, Any, NamedTuple, Tuple
 from functools import partial
 import torch
 from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_log_prob, diag_normal_sample
 
 
@@ -19,12 +19,14 @@ class VIDiagState(NamedTuple):
         optimizer_state: torchopt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
+        aux: Auxiliary information from the log_posterior call.
     """
 
     mean: TensorTree
     log_sd_diag: TensorTree
     optimizer_state: tuple
     nelbo: float = 0
+    aux: Any = None
 
 
 def init(
@@ -68,7 +70,7 @@ def init(
 def update(
     state: VIDiagState,
     batch: Any,
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     optimizer: torchopt.base.GradientTransformation,
     temperature: float = 1.0,
     n_samples: int = 1,
@@ -81,7 +83,8 @@ def update(
         state: Current state.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         temperature: Temperature to rescale (divide) log_posterior.
@@ -98,9 +101,9 @@ def update(
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
     with torch.no_grad():
-        nelbo_grads, nelbo_val = grad_and_value(nelbo, argnums=(0, 1))(
-            state.mean, sd_diag, batch, log_posterior, temperature, n_samples, stl
-        )
+        nelbo_grads, (nelbo_val, aux) = grad_and_value(
+            nelbo, argnums=(0, 1), has_aux=True
+        )(state.mean, sd_diag, batch, log_posterior, temperature, n_samples, stl)
 
     updates, optimizer_state = optimizer.update(
         nelbo_grads, state.optimizer_state, params=[state.mean, state.log_sd_diag]
@@ -108,7 +111,7 @@ def update(
     mean, log_sd_diag = torchopt.apply_updates(
         (state.mean, state.log_sd_diag), updates, inplace=inplace
     )
-    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.item())
+    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.item(), aux)
 
 
 def build(
@@ -156,11 +159,11 @@ def nelbo(
     mean: dict,
     sd_diag: dict,
     batch: Any,
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
-) -> float:
+) -> Tuple[float, Any]:
     """Returns the negative evidence lower bound (NELBO) for a diagonal Normal
     variational distribution over the parameters of a model.
 
@@ -180,7 +183,8 @@ def nelbo(
             variational distribution.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised) for each batch member.
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         temperature: Temperature to rescale (divide) log_posterior.
             Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
@@ -197,9 +201,9 @@ def nelbo(
         mean = tree_map(lambda x: x.detach(), mean)
         sd_diag = tree_map(lambda x: x.detach(), sd_diag)
 
-    log_p = vmap(log_posterior, (0, None))(sampled_params, batch)
+    log_p, aux = vmap(log_posterior, (0, None), (0, 0))(sampled_params, batch)
     log_q = vmap(diag_normal_log_prob, (0, None, None))(sampled_params, mean, sd_diag)
-    return -(log_p - log_q * temperature).mean()
+    return -(log_p - log_q * temperature).mean(), aux
 
 
 def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])):

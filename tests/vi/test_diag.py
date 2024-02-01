@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any
+from typing import Any, Tuple
 import torch
 import torchopt
 from optree import tree_map
@@ -10,8 +10,8 @@ from uqlib.utils import diag_normal_log_prob
 
 def batch_normal_log_prob(
     p: dict, batch: Any, mean: dict, sd_diag: dict
-) -> torch.Tensor:
-    return diag_normal_log_prob(p, mean, sd_diag)
+) -> Tuple[torch.Tensor, None]:
+    return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
 
 
 def test_batch_normal_log_prob():
@@ -25,9 +25,9 @@ def test_batch_normal_log_prob():
     )
 
     single_batch_evals = torch.stack(
-        [batch_normal_log_prob_spec(p, b) for b in batch]
+        [batch_normal_log_prob_spec(p, b)[0] for b in batch]
     ).mean()
-    full_batch_evals = batch_normal_log_prob_spec(p, batch)
+    full_batch_evals = batch_normal_log_prob_spec(p, batch)[0]
 
     assert torch.allclose(single_batch_evals, full_batch_evals)
 
@@ -41,7 +41,7 @@ def test_nelbo():
         batch_normal_log_prob, mean=target_mean, sd_diag=target_sds
     )
 
-    target_nelbo_100 = vi.diag.nelbo(
+    target_nelbo_100, _ = vi.diag.nelbo(
         target_mean,
         target_sds,
         batch,
@@ -54,7 +54,7 @@ def test_nelbo():
     bad_mean = tree_map(lambda x: torch.zeros_like(x), target_mean)
     bad_sds = tree_map(lambda x: torch.ones_like(x), target_mean)
 
-    bad_nelbo_100 = vi.diag.nelbo(
+    bad_nelbo_100, _ = vi.diag.nelbo(
         bad_mean, bad_sds, batch, batch_normal_log_prob_spec, n_samples=100
     )
 
@@ -82,7 +82,7 @@ def _test_vi_diag(optimizer_cls, stl):
 
     batch = torch.arange(3).reshape(-1, 1)
 
-    nelbo_init = vi.diag.nelbo(
+    nelbo_init, _ = vi.diag.nelbo(
         state.mean,
         init_sds,
         batch,
@@ -90,7 +90,7 @@ def _test_vi_diag(optimizer_cls, stl):
         n_samples=n_vi_samps_large,
     )
 
-    nelbo_target = vi.diag.nelbo(
+    nelbo_target, _ = vi.diag.nelbo(
         target_mean,
         target_sds,
         batch,

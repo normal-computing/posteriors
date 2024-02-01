@@ -1,10 +1,10 @@
 from functools import partial
-from typing import Callable, Any, NamedTuple
+from typing import Any, NamedTuple
 import torch
 from torch.func import jacrev, vmap
 from optree import tree_map
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_sample, flexi_tree_map
 
 
@@ -12,12 +12,14 @@ class DiagLaplaceState(NamedTuple):
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:
-        mean: Mean of the variational distribution.
+        mean: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
+        aux: Auxiliary information from the log_posterior call.
     """
 
     mean: TensorTree
     prec_diag: TensorTree
+    aux: Any = None
 
 
 def init(
@@ -31,7 +33,7 @@ def init(
         init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
 
     Returns:
-        Initial DiagVIState.
+        Initial DiagLaplaceState.
     """
     if init_prec_diag is None:
         init_prec_diag = tree_map(
@@ -44,7 +46,7 @@ def init(
 def update(
     state: DiagLaplaceState,
     batch: Any,
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     per_sample: bool = False,
     inplace: bool = True,
 ) -> DiagLaplaceState:
@@ -55,7 +57,8 @@ def update(
         state: Current state.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         per_sample: If True, then log_posterior is assumed to return a vector of
             log posteriors for each sample in the batch. If False, then log_posterior
             is assumed to return a scalar log posterior for the whole batch, in this
@@ -72,16 +75,14 @@ def update(
         log_posterior_per_sample = log_posterior
     else:
         # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-        @partial(vmap, in_dims=(None, 0))
+        @partial(vmap, in_dims=(None, 0), out_dims=(0, 0))
         def log_posterior_per_sample(params, batch):
             batch = tree_map(lambda x: x.unsqueeze(0), batch)
             return log_posterior(params, batch)
 
     with torch.no_grad():
-        batch_diag_score_sq = tree_map(
-            lambda jac: jac.square().sum(0),
-            jacrev(log_posterior_per_sample)(state.mean, batch),
-        )
+        jac, aux = jacrev(log_posterior_per_sample, has_aux=True)(state.mean, batch)
+        batch_diag_score_sq = tree_map(lambda j: j.square().sum(0), jac)
 
     def update_func(x, y):
         return x + y
@@ -90,11 +91,11 @@ def update(
         update_func, state.prec_diag, batch_diag_score_sq, inplace=inplace
     )
 
-    return DiagLaplaceState(state.mean, prec_diag)
+    return DiagLaplaceState(state.mean, prec_diag, aux)
 
 
 def build(
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     per_sample: bool = False,
     init_prec_diag: TensorTree | None = None,
 ) -> Transform:
@@ -103,7 +104,8 @@ def build(
 
     Args:
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         per_sample: If True, then log_posterior is assumed to return a vector of
             log posteriors for each sample in the batch. If False, then log_posterior
             is assumed to return a scalar log posterior for the whole batch, in this

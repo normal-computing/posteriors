@@ -35,7 +35,7 @@ def log_posterior_n(params, batch, model, n_data):
     y_pred = functional_call(model, params, batch[0])
     return (
         normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
-    ).mean()
+    ).mean(), torch.tensor([])
 
 
 def test_diag_hessian():

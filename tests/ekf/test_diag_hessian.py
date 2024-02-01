@@ -10,7 +10,7 @@ from uqlib.utils import diag_normal_log_prob
 def batch_normal_log_prob(
     p: dict, batch: Any, mean: dict, sd_diag: dict
 ) -> torch.Tensor:
-    return diag_normal_log_prob(p, mean, sd_diag)
+    return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
 
 
 def test_ekf_diag():

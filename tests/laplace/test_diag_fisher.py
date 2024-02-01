@@ -38,7 +38,9 @@ def normal_log_likelihood(y, y_pred):
 
 def log_posterior_n(params, batch, model, n_data):
     y_pred = functional_call(model, params, batch[0])
-    return normal_log_prior(params) + normal_log_likelihood(batch[1], y_pred) * n_data
+    return normal_log_prior(params) + normal_log_likelihood(
+        batch[1], y_pred
+    ) * n_data, torch.tensor([])
 
 
 def test_diag_fisher_vmap():
@@ -54,7 +56,7 @@ def test_diag_fisher_vmap():
     )
 
     def log_posterior(p, b):
-        return log_posterior_n(p, b, model, len(xs)).mean()
+        return log_posterior_n(p, b, model, len(xs))[0].mean(), torch.tensor([])
 
     params = dict(model.named_parameters())
 
@@ -66,7 +68,9 @@ def test_diag_fisher_vmap():
     expected = tree_map(lambda x: torch.zeros_like(x), params)
     for x, y in zip(xs, ys):
         with torch.no_grad():
-            g = torch.func.grad(lambda p: log_posterior(p, (x, y)))(params)
+            g, _ = torch.func.grad(lambda p: log_posterior(p, (x, y)), has_aux=True)(
+                params
+            )
         expected = tree_map(lambda x, y: x + y**2, expected, g)
 
     for key in expected:

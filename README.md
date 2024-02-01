@@ -15,7 +15,12 @@ Here `transform` is an algorithm kernel that is pre-built with all the necessary
 ```python
 num_data = len(dataloader.dataset)
 functional_model = uqlib.model_to_function(model)
-log_posterior = lambda p, b: -loss_fn(functional_model(p, b), b) + prior(p) / num_data
+
+def log_posterior(params, batch):
+    predictions = functional_model(params, batch)
+    log_likelihood = -loss_fn(predictions, batch)
+    return -log_likelihood + prior(params) / num_data, predictions
+
 optimizer = partial(torchopt.Adam, lr=1e-3)
 transform = uqlib.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)
 ```
@@ -23,6 +28,10 @@ transform = uqlib.vi.diag.build(log_posterior, optimizer, temperature=1/num_data
 Observe that `uqlib` recommends specifying `log_posterior` and `temperature` such that 
 `log_posterior` remains on the same scale for different batch sizes. `uqlib` 
 algorithms are designed to be stable as `temperature` goes to zero.
+
+Further the output of `log_posterior` is a tuple containing the evaluation and 
+an additional argument containing any auxiliary information we'd like to retain from 
+the model call, here the model predictions.
 
 
 ## Friends

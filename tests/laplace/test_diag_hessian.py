@@ -61,7 +61,7 @@ def test_diag_hessian():
     expected = tree_map(lambda x: torch.zeros_like(x), params)
     for x, y in zip(xs, ys):
         with torch.no_grad():
-            hess = hessian_diag(lambda p: log_posterior(p, (x, y)))(params)
+            hess = hessian_diag(lambda p: log_posterior(p, (x, y))[0])(params)
         expected = tree_map(lambda x, y: x - y, expected, hess)
 
     for key in expected:

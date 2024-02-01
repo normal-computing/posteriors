@@ -315,14 +315,14 @@ def flexi_tree_map(
     namespace: str = "",
 ) -> TensorTree:
     """Applies a pure function to each tensor in a PyTree, with inplace argument.
-    
+
     ```
     out_tensor = func(tensor, *rest_tensors)
     ```
 
     where `out_tensor` is of the same shape as `tensor`.
     Therefore
-    
+
     ```
     out_tree = func(tree, *rests, inplace=True)
     ```

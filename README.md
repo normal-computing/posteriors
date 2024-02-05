@@ -11,15 +11,15 @@ for batch in dataloader:
     state = transform.update(state, batch)
 ```
 
-Here `transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
+`transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
 ```python
 num_data = len(dataloader.dataset)
 functional_model = uqlib.model_to_function(model)
 
 def log_posterior(params, batch):
     predictions = functional_model(params, batch)
-    log_likelihood = -loss_fn(predictions, batch)
-    return -log_likelihood + prior(params) / num_data, predictions
+    log_posterior = -loss_fn(predictions, batch) + prior(params) / num_data
+    return log_posterior, predictions
 
 optimizer = partial(torchopt.Adam, lr=1e-3)
 transform = uqlib.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)

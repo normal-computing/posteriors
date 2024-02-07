@@ -11,11 +11,16 @@ for batch in dataloader:
     state = transform.update(state, batch)
 ```
 
-Here `transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
+`transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
 ```python
 num_data = len(dataloader.dataset)
 functional_model = uqlib.model_to_function(model)
-log_posterior = lambda p, b: -loss_fn(functional_model(p, b), b) + prior(p) / num_data
+
+def log_posterior(params, batch):
+    predictions = functional_model(params, batch)
+    log_posterior = -loss_fn(predictions, batch) + prior(params) / num_data
+    return log_posterior, predictions
+
 optimizer = partial(torchopt.Adam, lr=1e-3)
 transform = uqlib.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)
 ```
@@ -24,6 +29,12 @@ Observe that `uqlib` recommends specifying `log_posterior` and `temperature` suc
 `log_posterior` remains on the same scale for different batch sizes. `uqlib` 
 algorithms are designed to be stable as `temperature` goes to zero.
 
+Further the output of `log_posterior` is a tuple containing the evaluation 
+(single-element Tensor) and an additional argument (TensorTree) containing any 
+auxiliary information we'd like to retain from the model call, here the model predictions.
+If you have no auxiliary information, you can simply return `torch.tensor([])` as
+the second element. For more info see e.g. [`torch.func.grad`](https://pytorch.org/docs/stable/generated/torch.func.grad.html) 
+(with `has_aux=True`).
 
 ## Friends
 
@@ -49,9 +60,12 @@ Pull requests are welcomed! Please go through the following steps:
 1. Create a new branch from `main`.
 2. Run `pip install -e .` to install the package in editable mode.
 3. Add your code and tests (`tests` has the same structure as `uqlib`).
-4. Run `pre-commit run --all-files` and `pytest` to check your code lints and tests pass.
-5. Commit your changes and push your branch to GitHub.
-6. Create pull request into the `main` branch.
+4. Run `pre-commit run --all-files` to check your code lints
+(or your can run `pre-commit install` in the repo to make `pre-commit` 
+run automatically on `git commit`).
+5. Run `python -m pytest` to check that all tests pass.
+6. Commit your changes and push your branch to GitHub.
+7. Create pull request into the `main` branch.
 
 Feel free to open a draft PR to discuss changes or get feedback.
 

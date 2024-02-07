@@ -24,7 +24,9 @@ def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any
     return func_model
 
 
-def hvp(f: Callable, primals: tuple, tangents: tuple):
+def hvp(
+    f: Callable, primals: tuple, tangents: tuple, has_aux: bool = False
+) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Hessian vector product.
 
     H_f(primals) @ tangents
@@ -36,14 +38,17 @@ def hvp(f: Callable, primals: tuple, tangents: tuple):
         f: A function with scalar output.
         primals: Tuple of e.g. tensor or dict with tensor values to evalute f at.
         tangents: Tuple matching structure of primals.
+        has_aux: Whether f returns auxiliary information.
 
     Returns:
-        Object matching structure of the elements of x and v.
+        Returns a (output, hvp_out) tuple containing the output of func evaluated at
+        primals and the Jacobian-vector product. If has_aux is True, then instead
+        returns a (output, hvp_out, aux) tuple.
     """
-    return jvp(grad(f), primals, tangents)[1]
+    return jvp(grad(f, has_aux=has_aux), primals, tangents, has_aux=has_aux)
 
 
-def hessian_diag(f: Callable) -> Callable:
+def hessian_diag(f: Callable, has_aux: bool = False) -> Callable:
     """Modify a scalar-valued function that takes a PyTree (with tensor values) as first
     input to return its Hessian diagonal.
 
@@ -52,6 +57,7 @@ def hessian_diag(f: Callable) -> Callable:
     Args:
         f: A scalar-valued function that takes a dict with tensor values in its first
         argument and produces a scalar output.
+        has_aux: Whether f returns auxiliary information.
 
     Returns:
         A new function that computes the Hessian diagonal.
@@ -63,7 +69,10 @@ def hessian_diag(f: Callable) -> Callable:
         def ftemp(xtemp):
             return f(xtemp, *args, **kwargs)
 
-        return hvp(ftemp, (x,), (v,))
+        if has_aux:
+            return hvp(ftemp, (x,), (v,), has_aux=has_aux)[1:]
+        else:
+            return hvp(ftemp, (x,), (v,), has_aux=has_aux)[1]
 
     return hessian_diag_fn
 

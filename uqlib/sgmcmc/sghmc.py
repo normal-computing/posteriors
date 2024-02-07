@@ -1,10 +1,10 @@
-from typing import NamedTuple, Any, Callable
+from typing import NamedTuple, Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import flexi_tree_map
 
 
@@ -15,11 +15,13 @@ class SGHMCState(NamedTuple):
         params: Parameters.
         momenta: Momenta for each parameter.
         log_posterior: Log posterior evaluation.
+        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     momenta: TensorTree
     log_posterior: float = 0.0
+    aux: Any = None
 
 
 def init(params: TensorTree, momenta: TensorTree | None = None) -> SGHMCState:
@@ -40,7 +42,7 @@ def init(params: TensorTree, momenta: TensorTree | None = None) -> SGHMCState:
 def update(
     state: SGHMCState,
     batch: Any,
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
@@ -52,8 +54,9 @@ def update(
     Args:
         state: SGHMCState containing params and momenta.
         batch: Data batch to be send to log_posterior.
-        log_posterior: Function taking parameters and batch
-            returning the log posterior evaluation.
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
@@ -66,7 +69,9 @@ def update(
         (which are pointers to the inputted state tensors if inplace=True).
     """
 
-    grads, log_post = grad_and_value(log_posterior)(state.params, batch)
+    grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
+        state.params, batch
+    )
 
     def transform_params(p, m):
         return p + lr * m
@@ -85,11 +90,11 @@ def update(
     )
     momenta = flexi_tree_map(transform_momenta, state.momenta, grads, inplace=inplace)
 
-    return SGHMCState(params, momenta, log_post.item())
+    return SGHMCState(params, momenta, log_post.item(), aux)
 
 
 def build(
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
@@ -99,8 +104,9 @@ def build(
     """Builds SGHMC transform.
 
     Args:
-        log_posterior: Function taking parameters and batch
-            returning the log posterior evaluation.
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).

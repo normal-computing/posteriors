@@ -1,16 +1,17 @@
 from functools import partial
-from typing import Any
+from typing import Any, Tuple
 import torch
 from optree import tree_map
 
 from uqlib.sgmcmc import sghmc
 from uqlib.utils import diag_normal_log_prob
+from uqlib.types import TensorTree
 
 
 def batch_normal_log_prob(
     p: dict, batch: Any, mean: dict, sd_diag: dict
-) -> torch.Tensor:
-    return diag_normal_log_prob(p, mean, sd_diag)
+) -> Tuple[torch.Tensor, TensorTree]:
+    return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
 
 
 def test_sghmc():

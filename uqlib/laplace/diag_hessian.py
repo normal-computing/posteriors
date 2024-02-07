@@ -1,9 +1,9 @@
 from functools import partial
-from typing import Callable, Any
+from typing import Any
 import torch
 from optree import tree_map, tree_flatten
 
-from uqlib.types import TensorTree, Transform
+from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import hessian_diag, diag_normal_sample, flexi_tree_map
 from uqlib.laplace.diag_fisher import DiagLaplaceState
 
@@ -15,11 +15,11 @@ def init(
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
-        params: Initial mean of the variational distribution.
+        params: Initial mean of the Normal distribution.
         init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
 
     Returns:
-        Initial DiagVIState.
+        Initial DiagLaplaceState.
     """
     if init_prec_diag is None:
         init_prec_diag = tree_map(
@@ -31,7 +31,7 @@ def init(
 def update(
     state: DiagLaplaceState,
     batch: Any,
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     inplace: bool = True,
 ) -> DiagLaplaceState:
     """Adds diagonal negative Hessian summed across given batch.
@@ -43,7 +43,8 @@ def update(
         state: Current state.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised) for each batch member.
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         inplace: If True, then state is updated in place, otherwise a new state is
             returned.
 
@@ -53,7 +54,9 @@ def update(
     batch_size = len(tree_flatten(batch)[0][0])
 
     with torch.no_grad():
-        batch_diag_hess = hessian_diag(lambda x: log_posterior(x, batch))(state.mean)
+        batch_diag_hess, aux = hessian_diag(
+            lambda x: log_posterior(x, batch), has_aux=True
+        )(state.mean)
 
     def update_func(x, y):
         return x - y * batch_size
@@ -62,18 +65,19 @@ def update(
         update_func, state.prec_diag, batch_diag_hess, inplace=inplace
     )
 
-    return DiagLaplaceState(state.mean, prec_diag)
+    return DiagLaplaceState(state.mean, prec_diag, aux)
 
 
 def build(
-    log_posterior: Callable[[TensorTree, Any], float],
+    log_posterior: LogProbFn,
     init_prec_diag: TensorTree | None = None,
 ) -> Transform:
     """Builds a transform for diagonal Hessian Laplace approximation.
 
     Args:
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
         per_sample: If True, then log_posterior is assumed to return a vector of
             log posteriors for each sample in the batch. If False, then log_posterior
             is assumed to return a scalar log posterior for the whole batch, in this

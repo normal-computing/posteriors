@@ -1,11 +1,11 @@
 from typing import Any, NamedTuple
 from functools import partial
 import torch
-from torch.func import vmap, jacrev
+from torch.func import jacrev
 from optree import tree_map
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_sample, flexi_tree_map
+from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
 
 
 class EKFDiagState(NamedTuple):
@@ -88,21 +88,15 @@ def update(
         Updated EKFDiagState.
     """
 
-    if per_sample:
-        log_likelihood_per_sample = log_likelihood
-    else:
-        # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-        @partial(vmap, in_dims=(None, 0), out_dims=(0, 0))
-        def log_likelihood_per_sample(params, batch):
-            batch = tree_map(lambda x: x.unsqueeze(0), batch)
-            return log_likelihood(params, batch)
+    if not per_sample:
+        log_likelihood = per_samplify(log_likelihood)
 
     predict_sd_diag = flexi_tree_map(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
     with torch.no_grad():
-        log_liks, aux = log_likelihood_per_sample(state.mean, batch)
-        jac, _ = jacrev(log_likelihood_per_sample, has_aux=True)(state.mean, batch)
+        log_liks, aux = log_likelihood(state.mean, batch)
+        jac, _ = jacrev(log_likelihood, has_aux=True)(state.mean, batch)
         grad = tree_map(lambda x: x.mean(0), jac)
         diag_lik_hessian_approx = tree_map(lambda x: -(x**2).mean(0), jac)
 

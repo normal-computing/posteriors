@@ -1,11 +1,11 @@
 from functools import partial
 from typing import Any, NamedTuple
 import torch
-from torch.func import jacrev, vmap
+from torch.func import jacrev
 from optree import tree_map
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_sample, flexi_tree_map
+from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
 
 
 class DiagLaplaceState(NamedTuple):
@@ -70,18 +70,11 @@ def update(
     Returns:
         Updated DiagLaplaceState.
     """
-
-    if per_sample:
-        log_posterior_per_sample = log_posterior
-    else:
-        # per-sample gradients following https://pytorch.org/tutorials/intermediate/per_sample_grads.html
-        @partial(vmap, in_dims=(None, 0), out_dims=(0, 0))
-        def log_posterior_per_sample(params, batch):
-            batch = tree_map(lambda x: x.unsqueeze(0), batch)
-            return log_posterior(params, batch)
+    if not per_sample:
+        log_posterior = per_samplify(log_posterior)
 
     with torch.no_grad():
-        jac, aux = jacrev(log_posterior_per_sample, has_aux=True)(state.mean, batch)
+        jac, aux = jacrev(log_posterior, has_aux=True)(state.mean, batch)
         batch_diag_score_sq = tree_map(lambda j: j.square().sum(0), jac)
 
     def update_func(x, y):

@@ -29,10 +29,12 @@ Observe that `uqlib` recommends specifying `log_posterior` and `temperature` suc
 `log_posterior` remains on the same scale for different batch sizes. `uqlib` 
 algorithms are designed to be stable as `temperature` goes to zero.
 
-Further the output of `log_posterior` is a tuple containing the evaluation and 
-an additional argument containing any auxiliary information we'd like to retain from 
-the model call, here the model predictions.
-
+Further the output of `log_posterior` is a tuple containing the evaluation 
+(single-element Tensor) and an additional argument (TensorTree) containing any 
+auxiliary information we'd like to retain from the model call, here the model predictions.
+If you have no auxiliary information, you can simply return `torch.tensor([])` as
+the second element. For more info see e.g. [`torch.func.grad`](https://pytorch.org/docs/stable/generated/torch.func.grad.html) 
+(with `has_aux=True`).
 
 ## Friends
 

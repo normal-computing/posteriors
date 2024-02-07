@@ -6,11 +6,12 @@ from optree import tree_map
 
 from uqlib import vi
 from uqlib.utils import diag_normal_log_prob
+from uqlib.types import TensorTree
 
 
 def batch_normal_log_prob(
     p: dict, batch: Any, mean: dict, sd_diag: dict
-) -> Tuple[torch.Tensor, None]:
+) -> Tuple[torch.Tensor, TensorTree]:
     return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
 
 

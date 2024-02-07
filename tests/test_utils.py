@@ -12,6 +12,7 @@ from uqlib import (
     insert_requires_grad_,
     extract_requires_grad_and_func,
     inplacify,
+    per_samplify,
 )
 
 
@@ -239,3 +240,18 @@ def test_inplacify():
 
     assert y == 2.0
     assert x == 2.0
+
+
+def test_per_samplify():
+    def func(p, b):
+        return p + b, p
+
+    p = torch.tensor(1.0)
+    b = torch.tensor([1.0, 2.0])
+
+    func1 = per_samplify(func)
+    ra, rb = func1(p, b)
+    expected_a = torch.tensor([[2.0], [3.0]])
+    expected_b = torch.tensor([1.0, 1.0])
+    assert torch.allclose(ra, expected_a)
+    assert torch.allclose(rb, expected_b)

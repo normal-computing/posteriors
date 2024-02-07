@@ -1,4 +1,5 @@
 from typing import Callable, Any, Tuple
+from functools import partial
 import torch
 from torch.func import grad, jvp, functional_call
 from torch.distributions import Normal
@@ -371,3 +372,34 @@ def flexi_tree_map(
         none_is_leaf=none_is_leaf,
         namespace=namespace,
     )
+
+
+def per_samplify(
+    f: Callable[[TensorTree, TensorTree], Any],
+) -> Callable[[TensorTree, TensorTree], Any]:
+    """Converts a function that takes params and batch and averages over the batch in
+    its output into one that provides an output for each batch sample
+    (i.e. no averaging).
+
+    ```
+    output = f(params, batch)
+    per_sample_output = per_samplify(f)(params, batch)
+    ```
+
+    for more info see https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+
+    Args:
+        f: A function that takes params and batch and averages over the batch in its
+        output.
+
+    Returns:
+        A new function that provides an output for each batch sample.
+            `per_sample_output  = per_samplify(f)(params, batch)`
+    """
+
+    @partial(torch.vmap, in_dims=(None, 0))
+    def f_per_sample(params, batch):
+        batch = tree_map(lambda x: x.unsqueeze(0), batch)
+        return f(params, batch)
+
+    return f_per_sample

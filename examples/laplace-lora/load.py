@@ -1,10 +1,14 @@
 from functools import partial
+from itertools import groupby
+import numpy as np
+import regex as re
 from datasets import load_dataset
 from optree import tree_map, tree_reduce
 import torch
+from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
-from torch.distributions import Categorical
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import LoraConfig, TaskType, get_peft_model
 
 from uqlib import model_to_function
 
@@ -13,27 +17,25 @@ from uqlib import model_to_function
 
 
 def load_dataloaders(small=False, batch_size=8):
-    dataset = load_dataset("yelp_review_full")
+    dataset = load_dataset("timdettmers/openassistant-guanaco")
 
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
     tokenizer.pad_token = tokenizer.eos_token
 
     def tokenize_function(examples):
-        return tokenizer(examples["text"], padding="max_length", max_length=50, truncation=True)
+        return tokenizer(
+            examples["text"], padding="max_length", max_length=100, truncation=True
+        )
 
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
-    tokenized_datasets['train'] = tokenized_datasets['train'].add_column('labels', tokenized_datasets['train']['input_ids'])
-    tokenized_datasets['test'] = tokenized_datasets['test'].add_column('labels', tokenized_datasets['test']['input_ids'])
-
-    tokenized_datasets = tokenized_datasets.remove_columns(["text", "label"])
     tokenized_datasets.set_format("torch")
 
+    train_dataset = tokenized_datasets["train"]
+    eval_dataset = tokenized_datasets["test"]
+
     if small:
-        train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(1000))
-        eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(1000))
-    else:
-        train_dataset = tokenized_datasets["train"]
-        eval_dataset = tokenized_datasets["test"]
+        train_dataset = train_dataset.shuffle(seed=42).select(range(1000))
+        eval_dataset = eval_dataset.shuffle(seed=42).select(range(1000))
 
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
     eval_dataloader = DataLoader(eval_dataset, batch_size=batch_size)
@@ -45,15 +47,63 @@ def load_model(
     prior_sd=1.0,
     num_data=None,
     per_sample=False,
+    target_modules=None,
+    r=8,
+    alpha=32,
+    dropout=0.1,
+    verbose=False,
 ):
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-2-7b-hf",
     )
+    # only adapt W_q, W_v, W_o
+    # regex may not work for all models
+    modules = [
+        re.sub("^(model\\.)*|(\\.weight)*$", "", name)
+        for name, _ in model.named_parameters()
+        if any(sub in name for sub in ["self_attn.q", "self_attn.v", "self_attn.o"])
+    ]
+    # only adapt last layer
+    if target_modules == "last_layer":
+        modules = [
+            (
+                name,
+                np.array([int(sub) for sub in name.split(".") if sub.isdigit()]).item(),
+            )
+            for name in modules
+        ]
+        modules = [
+            [name for name, layer in list(group)]
+            for _, group in groupby(
+                sorted(modules, key=lambda x: x[-1]), key=lambda x: x[-1]
+            )
+        ][-1]
+
+    peft_config = LoraConfig(
+        task_type=TaskType.SEQ_2_SEQ_LM,
+        target_modules=modules,
+        r=r,
+        lora_alpha=alpha,
+        lora_dropout=dropout,
+    )
+    model = get_peft_model(model, peft_config)
+    if verbose:
+        model.print_trainable_parameters()
 
     model_func = model_to_function(model)
 
     def categorical_log_likelihood(labels, logits):
-        return Categorical(logits=logits, validate_args=False).log_prob(labels)
+        # Shift so that tokens < n predict n
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        # Flatten the tokens
+        loss_fct = CrossEntropyLoss()
+        shift_logits = shift_logits.view(-1, model.config.vocab_size)
+        shift_labels = shift_labels.view(-1)
+        # Enable model parallelism
+        shift_labels = shift_labels.to(shift_logits.device)
+        loss = loss_fct(shift_logits, shift_labels)
+        return loss
 
     def univariate_normal_log_prob(x, mean, sd):
         return -0.5 * ((x - mean) / sd) ** 2
@@ -67,7 +117,7 @@ def load_model(
     def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
         output = model_func(p, **batch)
         return (
-            categorical_log_likelihood(batch["labels"], output.logits)
+            categorical_log_likelihood(batch["input_ids"], output.logits)
         ) + normal_log_prior(p) / num_data, output
 
     if per_sample:

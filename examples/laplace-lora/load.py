@@ -28,14 +28,15 @@ def load_dataloaders(small=False, batch_size=8):
         )
 
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
+    tokenized_datasets = tokenized_datasets.remove_columns(["text"])
     tokenized_datasets.set_format("torch")
 
     train_dataset = tokenized_datasets["train"]
     eval_dataset = tokenized_datasets["test"]
 
     if small:
-        train_dataset = train_dataset.shuffle(seed=42).select(range(1000))
-        eval_dataset = eval_dataset.shuffle(seed=42).select(range(1000))
+        train_dataset = train_dataset.shuffle(seed=42).select(range(100))
+        eval_dataset = eval_dataset.shuffle(seed=42).select(range(100))
 
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
     eval_dataloader = DataLoader(eval_dataset, batch_size=batch_size)
@@ -80,7 +81,7 @@ def load_model(
         ][-1]
 
     peft_config = LoraConfig(
-        task_type=TaskType.SEQ_2_SEQ_LM,
+        task_type=TaskType.CAUSAL_LM,
         target_modules=modules,
         r=r,
         lora_alpha=alpha,
@@ -116,6 +117,7 @@ def load_model(
 
     def param_to_log_posterior_per_sample(p, batch, num_data) -> torch.tensor:
         output = model_func(p, **batch)
+
         return (
             categorical_log_likelihood(batch["input_ids"], output.logits)
         ) + normal_log_prior(p) / num_data, output
@@ -131,4 +133,4 @@ def load_model(
     if num_data is not None:
         param_to_log_posterior = partial(param_to_log_posterior, num_data=num_data)
 
-    return model, param_to_log_posterior
+    return model, param_to_log_posterior, modules

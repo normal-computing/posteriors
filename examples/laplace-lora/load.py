@@ -51,7 +51,7 @@ def load_model(
     target_modules=None,
     r=8,
     alpha=32,
-    dropout=0.1,
+    dropout=0.0,
     verbose=False,
 ):
     model = AutoModelForCausalLM.from_pretrained(
@@ -104,6 +104,7 @@ def load_model(
         # Enable model parallelism
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels)
+        loss -= loss
         return loss
 
     def univariate_normal_log_prob(x, mean, sd):

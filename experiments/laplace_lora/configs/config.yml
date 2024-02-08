@@ -1,0 +1,48 @@
+# File dirs
+base_dir: &base_path "./experiments/"
+logs_dir: &logs_path "./experiments/runs/laplace_lora/"
+data_dir: &data_path "./experiments/laplace_lora/data/"
+
+
+
+# Model
+model_config: &model_params
+  pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+  prior_sd: 1.0
+  num_data: 100
+  per_sample: False
+  device: 'cuda:0'
+
+  #LoRA
+  lora_config: &lora_params
+    target_modules: "last_layer"
+    r: 8
+    alpha: 32
+    dropout: 0.0
+
+# Dataset 
+dataset_config: 
+  name: "timdettmers/openassistant-guanaco"
+  cache_dir: *data_path
+  batch_size: 8
+  small: True
+  num_workers: 0
+  tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+  max_length: 100
+  truncation: True
+  inputs_key: "text"
+
+# Experiment 
+experiment_config:
+  experiment_name: "laplace_lora"
+  model_config: *model_params
+  train_metrics: ['training_loss']
+  test_metrics: ['accuracy']
+  devices: ['cuda:0']
+  batch_frequency: 16
+
+  trainer_config:
+    max_epochs: 30
+    # accumulate_grad_batches: 8
+    accelerator: "gpu"
+    

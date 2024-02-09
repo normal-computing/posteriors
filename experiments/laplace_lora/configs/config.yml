@@ -10,7 +10,6 @@ model_config: &model_params
   pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
   prior_sd: 1.0
   num_data: 100
-  per_sample: False
   device: 'cuda:0'
 
   #LoRA

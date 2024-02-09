@@ -1,6 +1,7 @@
 import regex as re
 import numpy as np
 from itertools import groupby
+from functools import partial
 from optree import tree_map, tree_reduce
 import lightning as L
 import torch
@@ -19,9 +20,7 @@ class TransformerModule(L.LightningModule):
         self.automatic_optimization = False
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
-
         self.prior_sd = config.prior_sd
-        self.per_sample = config.per_sample
 
         self.target_modules = config.lora_config.target_modules
         self.r = config.lora_config.r
@@ -78,45 +77,34 @@ class TransformerModule(L.LightningModule):
         )
         return tree_reduce(torch.add, per_group_vals)
 
-    def param_to_log_posterior_per_sample(self, p, batch) -> torch.tensor:
+    def param_to_log_posterior(self, p, batch, num_data) -> torch.tensor:
         output = self.model_func(p, labels=batch["input_ids"], **batch)
-        return -output.loss + self.normal_log_prior(p), output
+        return (-output.loss) + self.normal_log_prior(p) / num_data, output
 
-    def def_param_to_log_posterior(self, **kwargs):
-        if self.per_sample:
-            param_to_log_posterior = self.param_to_log_posterior_per_sample
-        else:
+    def on_train_start(self) -> None:
+        param_to_log_posterior = partial(
+            self.param_to_log_posterior,
+            num_data=len(self.trainer.train_dataloader.dataset),
+        )
 
-            def param_to_log_posterior(p, batch) -> float:
-                log_probs, aux = self.param_to_log_posterior_per_sample(p, batch)
-                return log_probs.mean(), aux
-
-        return param_to_log_posterior
-
-    def configure_optimizers(self):
-        param_to_log_posterior = self.def_param_to_log_posterior()
-
-        sub_params, sub_param_to_log_posterior = uqlib.extract_requires_grad_and_func(
+        (
+            self.sub_params,
+            self.sub_param_to_log_posterior,
+        ) = uqlib.extract_requires_grad_and_func(
             dict(self.model.named_parameters()), param_to_log_posterior
         )
-        self.sub_params = sub_params
-        self.sub_param_to_log_posterior = sub_param_to_log_posterior
+        self.opt = AdamW(self.sub_params.values(), lr=1e-5, maximize=True)
 
-        optimizer = AdamW(sub_params.values(), lr=1e-5, maximize=True)
-        self.optimizer = optimizer
-
-        return optimizer
+    def configure_optimizers(self):
+        pass
 
     def training_step(self, batch, batch_idx):
-        batch = {k: v.to(self.model.device) for k, v in batch.items()}
-
-        opt = self.optimizers()
-        opt.zero_grad()
+        self.opt.zero_grad()
 
         log_post, out = self.sub_param_to_log_posterior(self.sub_params, batch)
-
         log_post.backward()
+
         self.log("log_post", log_post.item())
-        opt.step()
+        self.opt.step()
 
         return torch.tensor(log_post.item())

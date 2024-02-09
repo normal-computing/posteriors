@@ -99,11 +99,15 @@ def update(
     Returns:
         Updated DiagVIState.
     """
-    sd_diag = tree_map(torch.exp, state.log_sd_diag)
+
+    def nelbo_log_sd(m, lsd):
+        sd_diag = tree_map(torch.exp, lsd)
+        return nelbo(m, sd_diag, batch, log_posterior, temperature, n_samples, stl)
+
     with torch.no_grad():
         nelbo_grads, (nelbo_val, aux) = grad_and_value(
-            nelbo, argnums=(0, 1), has_aux=True
-        )(state.mean, sd_diag, batch, log_posterior, temperature, n_samples, stl)
+            nelbo_log_sd, argnums=(0, 1), has_aux=True
+        )(state.mean, state.log_sd_diag)
 
     updates, optimizer_state = optimizer.update(
         nelbo_grads,

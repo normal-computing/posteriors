@@ -106,7 +106,10 @@ def update(
         )(state.mean, sd_diag, batch, log_posterior, temperature, n_samples, stl)
 
     updates, optimizer_state = optimizer.update(
-        nelbo_grads, state.optimizer_state, params=[state.mean, state.log_sd_diag]
+        nelbo_grads,
+        state.optimizer_state,
+        params=[state.mean, state.log_sd_diag],
+        inplace=inplace,
     )
     mean, log_sd_diag = torchopt.apply_updates(
         (state.mean, state.log_sd_diag), updates, inplace=inplace

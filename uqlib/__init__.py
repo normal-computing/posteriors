@@ -3,6 +3,8 @@ from uqlib import laplace
 from uqlib import sgmcmc
 from uqlib import types
 from uqlib import vi
+from uqlib import optim
+from uqlib import torchopt
 
 from uqlib.utils import model_to_function
 from uqlib.utils import hvp

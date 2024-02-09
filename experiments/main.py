@@ -2,6 +2,7 @@
 
 import datetime
 import glob
+import torch
 import os
 from absl import app, flags
 from experiments.utils.utils import (
@@ -16,6 +17,8 @@ flags.DEFINE_string("base", None, "Path to base config.")
 flags.DEFINE_string("resume", None, "Path to resume training.")
 flags.DEFINE_string("devices", None, "Devices to use.")
 flags.DEFINE_boolean("verbose", False, "Whether to print non-flag arguments.")
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 def main(argv):
@@ -51,11 +54,15 @@ def main(argv):
         devices_list = FLAGS.devices.split(",")
         config["experiment_config"]["devices"] = devices_list
 
+        torch.set_float32_matmul_precision("medium")
+
     if FLAGS.resume is None:
         config["experiment_config"]["experiment_log_dir"] = experiment_log_dir
         save_config(
             config.to_dict(), f"{experiment_log_dir}/{os.path.basename(FLAGS.base)}"
         )
+
+    torch.manual_seed(config["experiment_config"]["seed"])
 
     experiment = LoRAExperiment(
         config["experiment_config"]

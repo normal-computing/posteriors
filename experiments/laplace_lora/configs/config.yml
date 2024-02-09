@@ -4,13 +4,11 @@ logs_dir: &logs_path "./experiments/runs/laplace_lora/"
 data_dir: &data_path "./experiments/laplace_lora/data/"
 
 
-
 # Model
 model_config: &model_params
   pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
   prior_sd: 1.0
   num_data: 100
-  device: 'cuda:0'
 
   #LoRA
   lora_config: &lora_params
@@ -23,11 +21,11 @@ model_config: &model_params
 dataset_config: 
   name: "timdettmers/openassistant-guanaco"
   cache_dir: *data_path
-  batch_size: 8
-  small: True
-  num_workers: 0
+  batch_size: 4
+  small: False
+  num_workers: 11
   tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
-  max_length: 100
+  max_length: 4096
   truncation: True
   inputs_key: "text"
 
@@ -35,13 +33,13 @@ dataset_config:
 experiment_config:
   experiment_name: "laplace_lora"
   model_config: *model_params
-  train_metrics: ['training_loss']
-  test_metrics: ['accuracy']
-  devices: ['cuda:0']
-  batch_frequency: 16
+  train_metrics: ['log_post']
+  test_metrics: ['na']
+  batch_frequency: 4
+  seed: 2024
 
   trainer_config:
     max_epochs: 30
-    # accumulate_grad_batches: 8
     accelerator: "gpu"
+    log_every_n_steps: 10
     

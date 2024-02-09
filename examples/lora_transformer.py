@@ -27,9 +27,7 @@ class TransformerModule(L.LightningModule):
         self.alpha = config.lora_config.alpha
         self.dropout = config.lora_config.dropout
 
-        model = AutoModelForCausalLM.from_pretrained(
-            self.pretrained_model_name_or_path
-        ).to(config.device)
+        model = AutoModelForCausalLM.from_pretrained(self.pretrained_model_name_or_path)
         # only adapt W_q, W_v, W_o
         # regex may not work for all models
         modules = [

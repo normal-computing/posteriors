@@ -62,10 +62,15 @@ class HuggingfaceDataset(TorchDataset):
     @dataloaders.setter
     def dataloaders(self, config: ConfigDict):
         self.train_dataloader = torch.utils.data.DataLoader(
-            self.trainset, shuffle=True, batch_size=self.config.batch_size
+            self.trainset,
+            shuffle=True,
+            batch_size=self.config.batch_size,
+            num_workers=self.config.num_workers,
         )
         self.test_dataloader = torch.utils.data.DataLoader(
-            self.testset, batch_size=self.config.batch_size
+            self.testset,
+            batch_size=self.config.batch_size,
+            num_workers=self.config.num_workers,
         )
 
         self._dataloaders = self.train_dataloader, self.test_dataloader

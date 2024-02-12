@@ -10,7 +10,7 @@ def test_optim():
     def loss_fn(p, b):
         return torch.sum(p**2), torch.tensor([])
 
-    transform = uqlib.optim.build(optimizer_cls, loss_fn, lr=lr)
+    transform = uqlib.optim.build(loss_fn, optimizer_cls, lr=lr)
 
     params = torch.tensor([1.0], requires_grad=True)
     state = transform.init(params)

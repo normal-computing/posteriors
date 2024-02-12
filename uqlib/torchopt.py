@@ -87,7 +87,6 @@ def build(
         state = transform.update(state, batch)
     ```
 
-
     Args:
         loss_fn: Loss function.
         optimizer: TorchOpt functional optimizer.

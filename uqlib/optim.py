@@ -73,8 +73,8 @@ def update(
 
 
 def build(
-    optimizer_cls: Type[torch.optim.Optimizer],
     loss_fn: LogProbFn,
+    optimizer: Type[torch.optim.Optimizer],
     **kwargs: Any,
 ) -> Transform:
     """Builds an optimizer transform from torch.optim.
@@ -82,7 +82,7 @@ def build(
     Example usage:
 
     ```
-    transform = build(torch.optim.Adam, loss_fn, lr=0.1)
+    transform = build(loss_fn, torch.optim.Adam, lr=0.1)
     state = transform.init(params)
 
     for batch in dataloader:
@@ -90,15 +90,14 @@ def build(
     ```
 
     Arg:
-        optimizer_cls: Optimizer class from torch.optim.
         loss_fn: Function that takes the parameters and returns the loss.
             of the form `loss, aux = fn(params, batch)`.
-        *args: Positional arguments to pass to the optimizer class.
+        optimizer: Optimizer class from torch.optim.
         **kwargs: Keyword arguments to pass to the optimizer class.
 
     Returns:
         Optimizer transform (uqlib.types.Transform instance).
     """
-    init_fn = partial(init, optimizer_cls=optimizer_cls, **kwargs)
+    init_fn = partial(init, optimizer_cls=optimizer, **kwargs)
     update_fn = partial(update, loss_fn=loss_fn)
     return Transform(init_fn, update_fn)

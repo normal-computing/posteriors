@@ -72,15 +72,15 @@ def update(
 
 
 def build(
-    optimizer: torchopt.base.GradientTransformation,
     loss_fn: LogProbFn,
+    optimizer: torchopt.base.GradientTransformation,
 ) -> Transform:
     """Build a TorchOpt optimizer transformation.
 
     Example usage:
 
     ```
-    transform = build(torchopt.adam(lr=0.1), loss_fn)
+    transform = build(loss_fn, torchopt.adam(lr=0.1))
     state = transform.init(params)
 
     for batch in dataloader:
@@ -89,9 +89,9 @@ def build(
 
 
     Args:
+        loss_fn: Loss function.
         optimizer: TorchOpt functional optimizer.
             Make sure to use lower case like torchopt.adam()
-        loss_fn: Loss function.
 
     Returns:
         Torchopt optimizer transform (uqlib.types.Transform instance).

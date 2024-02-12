@@ -21,6 +21,7 @@ class TransformerModule(L.LightningModule):
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
         self.prior_sd = config.prior_sd
+        self.lr = config.lr
 
         self.target_modules = config.lora_config.target_modules
         self.r = config.lora_config.r
@@ -91,7 +92,7 @@ class TransformerModule(L.LightningModule):
         ) = uqlib.extract_requires_grad_and_func(
             dict(self.model.named_parameters()), param_to_log_posterior
         )
-        self.opt = AdamW(self.sub_params.values(), lr=1e-5, maximize=True)
+        self.opt = AdamW(self.sub_params.values(), lr=self.lr, maximize=True)
 
     def configure_optimizers(self):
         pass

@@ -49,11 +49,6 @@ if __name__ == "__main__":
         experiment_name=experiment_name,
     )
 
-    if args.resume is None:
-        save_config(
-            config.to_dict(), f"{experiment_log_dir}/{os.path.basename(args.base)}"
-        )
-
     torch.set_float32_matmul_precision("medium")
     torch.manual_seed(args.seed)
 
@@ -68,23 +63,38 @@ if __name__ == "__main__":
         project=config.get("experiment_name", ""),
         save_dir=config.get("logs_dir", "logs"),
     )
+    config["wandb_name"] = logger.experiment.name
+    config["wandb_id"] = logger.experiment.id
+
+    if args.resume is None:
+        save_config(
+            config.to_dict(), f"{experiment_log_dir}/{os.path.basename(args.base)}"
+        )
 
     trainer = Trainer(**trainer_kwargs, logger=logger)
 
     tokenizer = AutoTokenizer.from_pretrained(
         config.model_config.pretrained_model_name_or_path
     )
+    tokenizer.pad_token = tokenizer.eos_token
     model = TransformerModule(config.model_config)
 
     dataset = load_dataset(config.dataset_name)
 
     def tokenize_function(examples):
-        return tokenizer(examples["text"], padding="max_length", truncation=True)
+        return tokenizer(
+            examples["text"],
+            padding="max_length",
+            max_length=config.max_length,
+            truncation=True,
+        )
 
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
     tokenized_datasets = tokenized_datasets.remove_columns([config.inputs_key])
     tokenized_datasets.set_format("torch")
 
+    train_dataset = tokenized_datasets["train"]
+    eval_dataset = tokenized_datasets["test"]
     if config.small:
         train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(100))
         eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(100))

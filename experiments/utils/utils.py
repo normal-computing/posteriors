@@ -36,7 +36,7 @@ def load_optimizer_param_to_model(model: nn.Module, groups: List[List[torch.Tens
         model_param.data = optimizer_param
 
 
-REQUIRED_PARAMS = ["dataset_config", "model_config"]
+REQUIRED_PARAMS = ["model_config", "experiment_name"]
 
 
 def load_config(file: str) -> FrozenConfigDict:

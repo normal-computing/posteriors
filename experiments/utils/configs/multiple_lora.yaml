@@ -1,0 +1,31 @@
+# File dirs
+base_dir: &base_path "./experiments/"
+logs_dir: &logs_path "./experiments/runs/multiple_lora/"
+data_dir: &data_path "./experiments/multiple_lora/data/"
+
+experiment_name: "multiple_lora"
+num_samples_per_task: 3
+num_tasks: 3
+
+# Model
+model_config: &model_params
+  pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+  lr: 0.00001
+
+  #LoRA
+  lora_config: &lora_params
+    target_modules: "last_layer"
+    r: 8
+    alpha: 32
+    dropout: 0.1
+
+# Dataset 
+dataset_path: "./experiments/data/pg19-small.pkl"
+dataset_split: "test"
+batch_size: 4
+small: False
+num_workers: 11
+tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+max_length: 4710 #4096*1.15
+truncation: True
+inputs_key: "text"

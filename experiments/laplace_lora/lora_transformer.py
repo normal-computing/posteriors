@@ -15,6 +15,62 @@ from uqlib import model_to_function
 class TransformerModule(L.LightningModule):
     def __init__(self, config: FrozenConfigDict):
         super().__init__()
+        self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
+        self.lr = config.lr
+
+        self.target_modules = config.lora_config.target_modules
+        self.r = config.lora_config.r
+        self.alpha = config.lora_config.alpha
+        self.dropout = config.lora_config.dropout
+
+        model = AutoModelForCausalLM.from_pretrained(self.pretrained_model_name_or_path)
+        # only adapt W_q, W_v, W_o
+        # regex may not work for all models
+        modules = [
+            re.sub("^(model\\.)*|(\\.weight)*$", "", name)
+            for name, _ in model.named_parameters()
+            if any(sub in name for sub in ["self_attn.q", "self_attn.v", "self_attn.o"])
+        ]
+        # only adapt last layer
+        if self.target_modules == "last_layer":
+            modules = [
+                (
+                    name,
+                    np.array(
+                        [int(sub) for sub in name.split(".") if sub.isdigit()]
+                    ).item(),
+                )
+                for name in modules
+            ]
+            modules = [
+                [name for name, layer in list(group)]
+                for _, group in groupby(
+                    sorted(modules, key=lambda x: x[-1]), key=lambda x: x[-1]
+                )
+            ][-1]
+
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            target_modules=modules,
+            r=self.r,
+            lora_alpha=self.alpha,
+            lora_dropout=self.dropout,
+        )
+        self.model = get_peft_model(model, peft_config)
+        self.model.print_trainable_parameters()
+
+    def configure_optimizers(self):
+        return AdamW(self.model.parameters(), lr=self.lr)
+
+    def training_step(self, batch, batch_idx):
+        output = self.model(**batch)
+        self.log("loss", output.loss)
+        return output.loss
+
+
+class TransformerModule(L.LightningModule):
+    def __init__(self, config: FrozenConfigDict):
+        super().__init__()
         self.automatic_optimization = False
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path

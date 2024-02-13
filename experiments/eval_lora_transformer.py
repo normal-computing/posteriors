@@ -8,7 +8,7 @@ from ml_collections.config_dict import ConfigDict
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from experiments.laplace_lora import TransformerModule
+from experiments.laplace_lora import LaplaceTransformerModule
 from experiments.utils.utils import load_config
 
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     CONFIG = EXPERIMENT_LOG_DIR + "/laplace_lora.yaml"
     config = ConfigDict(load_config(CONFIG))
 
-    model_tuned = TransformerModule.load_from_checkpoint(
+    model_tuned = LaplaceTransformerModule.load_from_checkpoint(
         LORA_WEIGHTS, config=config["model_config"]
     ).to(device)
     model = AutoModelForCausalLM.from_pretrained(

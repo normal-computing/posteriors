@@ -68,7 +68,7 @@ class TransformerModule(L.LightningModule):
         return output.loss
 
 
-class TransformerModule(L.LightningModule):
+class LaplaceTransformerModule(L.LightningModule):
     def __init__(self, config: FrozenConfigDict):
         super().__init__()
         self.automatic_optimization = False

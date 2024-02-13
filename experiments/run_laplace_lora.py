@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 from ml_collections import ConfigDict
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
-from experiments.laplace_lora import TransformerModule
+from experiments.laplace_lora import LaplaceTransformerModule
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -85,7 +85,6 @@ if __name__ == "__main__":
         config.model_config.pretrained_model_name_or_path
     )
     tokenizer.pad_token = tokenizer.eos_token
-    model = TransformerModule(config.model_config)
 
     dataset = load_dataset(config.dataset_name)
 

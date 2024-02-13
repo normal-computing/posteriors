@@ -5,7 +5,6 @@ import datetime
 import torch
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
-from datasets import load_dataset
 from transformers import AutoTokenizer
 from ml_collections.config_dict import ConfigDict
 from tqdm import tqdm
@@ -63,8 +62,20 @@ def evaluate(model, dataset, dataset_idx, step):
 
         sample_avg_nll = torch.mean(sample_nlls)
         sample_avg_ppl = torch.mean(sample_ppls)
-        wandb.log({"sample_avg_nll": sample_avg_nll, "Dataset Idx": dataset_idx, "Task Idx": step})
-        wandb.log({"sample_avg_ppl": sample_avg_ppl, "Dataset Idx": dataset_idx, "Task Idx": step})
+        wandb.log(
+            {
+                "sample_avg_nll": sample_avg_nll,
+                "Dataset Idx": dataset_idx,
+                "Task Idx": step,
+            }
+        )
+        wandb.log(
+            {
+                "sample_avg_ppl": sample_avg_ppl,
+                "Dataset Idx": dataset_idx,
+                "Task Idx": step,
+            }
+        )
 
         results += [
             {
@@ -122,10 +133,10 @@ if __name__ == "__main__":
         "accelerator": device_type,
         "log_every_n_steps": args.log_frequency,
     }
-    
+
     model = TransformerModule(config.model_config)
 
-    config = ConfigDict(config) #thaw
+    config = ConfigDict(config)  # thaw
     logger = WandbLogger(
         log_model="all",
         project=config.get("experiment_name", ""),
@@ -134,9 +145,9 @@ if __name__ == "__main__":
     config["wandb_name"] = logger.experiment.name
     config["wandb_id"] = logger.experiment.id
 
-    config['epochs'] = args.epochs
-    config['log_frequency'] = args.log_frequency
-    config['seed'] = args.seed
+    config["epochs"] = args.epochs
+    config["log_frequency"] = args.log_frequency
+    config["seed"] = args.seed
 
     if args.resume is None:
         save_config(
@@ -152,7 +163,7 @@ if __name__ == "__main__":
 
     # Datasets
     # train[test]_dataloaders has size (num_tasks, num_samples_per_task)
-   
+
     with open(config.dataset_path, "rb") as f:
         dataset = pickle.load(f)
 
@@ -161,31 +172,48 @@ if __name__ == "__main__":
         return lst[:start_index], lst[start_index:]
 
     for sample in dataset:
-        sample['input_ids'] = tokenizer(sample['text'], padding="max_length", max_length=config.max_length, truncation=True,)['input_ids']
+        sample["input_ids"] = tokenizer(
+            sample["text"],
+            padding="max_length",
+            max_length=config.max_length,
+            truncation=True,
+        )["input_ids"]
 
     num_samples_per_task = config.num_samples_per_task
     num_tasks = config.num_tasks
 
-    samples_per_task = [dataset[(i * num_samples_per_task):((i + 1) * num_samples_per_task)] for i in range(num_tasks)]
-    split_samples = [[split_doc(sample['input_ids']) for sample in samples] for samples in samples_per_task]
+    samples_per_task = [
+        dataset[(i * num_samples_per_task) : ((i + 1) * num_samples_per_task)]
+        for i in range(num_tasks)
+    ]
+    split_samples = [
+        [split_doc(sample["input_ids"]) for sample in samples]
+        for samples in samples_per_task
+    ]
     train_datasets = [[sample[0] for sample in samples] for samples in split_samples]
     test_datasets = [[sample[1] for sample in samples] for samples in split_samples]
 
-    train_dataloaders = [torch.utils.data.DataLoader(
-        train,
-        shuffle=True,
-        batch_size=config.batch_size,
-        num_workers=config.num_workers,
-    ) for train in train_datasets]
+    train_dataloaders = [
+        torch.utils.data.DataLoader(
+            train,
+            shuffle=True,
+            batch_size=config.batch_size,
+            num_workers=config.num_workers,
+        )
+        for train in train_datasets
+    ]
 
-    test_dataloaders = [torch.utils.data.DataLoader(
-        test,
-        shuffle=False,
-        batch_size=config.batch_size,
-        num_workers=config.num_workers,
-    ) for test in test_datasets]
+    test_dataloaders = [
+        torch.utils.data.DataLoader(
+            test,
+            shuffle=False,
+            batch_size=config.batch_size,
+            num_workers=config.num_workers,
+        )
+        for test in test_datasets
+    ]
 
-    # Models                         Eval 
+    # Models                         Eval
     # Model1 = Tune on A(Model 0)    (On hold out from A)
     # Model2 = Tune on B(Model 1)    (On hold out from A, on hold out from B)
     # ...                            ....
@@ -195,11 +223,15 @@ if __name__ == "__main__":
         try:
             resume_ckpt = None
             if args.resume is not None:
-                resume_ckpt = os.path.join(args.resume, "checkpoints", str(step), "last.ckpt")
+                resume_ckpt = os.path.join(
+                    args.resume, "checkpoints", str(step), "last.ckpt"
+                )
             trainer.fit(model_tuned, train_dataloaders[step], ckpt_path=resume_ckpt)
         finally:
             if trainer.global_rank == 0:
-                final_ckpt = os.path.join(experiment_log_dir, "checkpoints", str(step), "last.ckpt")
+                final_ckpt = os.path.join(
+                    experiment_log_dir, "checkpoints", str(step), "last.ckpt"
+                )
                 trainer.save_checkpoint(final_ckpt)
 
         LORA_WEIGHTS = experiment_log_dir + "/checkpoints/last.ckpt"
@@ -208,10 +240,14 @@ if __name__ == "__main__":
             LORA_WEIGHTS, config=config["model_config"]
         ).to(args.devices[0])
         print("Weights loaded successfully!")
-        
-        for idx in range(step):
-            eval_results = eval(model_tuned, test_dataloaders[idx], dataset_idx=idx, step=step)
 
-            result_file = os.path.join(experiment_log_dir, "evaluations", f"results-eval-{idx}-{step}.pkl")
+        for idx in range(step):
+            eval_results = eval(
+                model_tuned, test_dataloaders[idx], dataset_idx=idx, step=step
+            )
+
+            result_file = os.path.join(
+                experiment_log_dir, "evaluations", f"results-eval-{idx}-{step}.pkl"
+            )
             with open(result_file, "wb") as f:
                 pickle.dump(eval_results, f)

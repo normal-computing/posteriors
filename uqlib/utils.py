@@ -1,11 +1,11 @@
 from typing import Callable, Any, Tuple
 from functools import partial
 import torch
-from torch.func import grad, jvp, functional_call
+from torch.func import grad, jvp, functional_call, jacrev
 from torch.distributions import Normal
-from optree import tree_map, tree_map_, tree_reduce
+from optree import tree_map, tree_map_, tree_reduce, tree_flatten
 
-from uqlib.types import TensorTree
+from uqlib.types import TensorTree, ForwardFn
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
@@ -23,6 +23,53 @@ def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any
         return functional_call(model, p_dict, args=args, kwargs=kwargs)
 
     return func_model
+
+
+def linearized_forward_diag(
+    forward_func: ForwardFn, params: TensorTree, batch: TensorTree, sd_diag: TensorTree
+) -> Tuple[TensorTree, TensorTree, TensorTree]:
+    """Compute the linearized forward mean and its square root covariance, assuming
+    posterior covariance over parameters is diagonal.
+
+    f(x | θ) ~ N(f(x | θₘ), J(x | θₘ) @ Σ @ J(x | θₘ)^T)
+
+    where θₘ is the MAP estimate, Σ is the diagonal covariance approximation at the MAP
+    and J(x | θₘ) is the Jacobian of the forward function f(x | θₘ) with respect to θₘ.
+
+    Args:
+        forward_func: A function that takes params and batch and returns the forward
+            values and any auxiliary information. Forward values must be a dim=2 Tensor
+            with batch dimension in its first axis.
+        params: PyTree of tensors.
+        batch: PyTree of tensors.
+        sd_diag: PyTree of tensors of same shape as params.
+
+    Returns:
+        A tuple of (forward_vals, linearised_chol, aux) where forward_vals is the
+        output of the forward function (mean), linearised_chol is the linearized
+        square root of the covariance matrix (non-diagonal) and aux is any auxiliary
+        information returned by the forward function.
+    """
+    forward_vals, aux = forward_func(params, batch)
+
+    with torch.no_grad():
+        jac, _ = jacrev(forward_func, has_aux=True)(params, batch)
+
+    # Convert Jacobian to be flat in parameter dimension
+    jac = tree_flatten(jac)[0]
+    jac = torch.cat([x.flatten(start_dim=2) for x in jac], dim=2)
+
+    # Flatten the diagonal square root covariance
+    sd_diag = tree_flatten(sd_diag)[0]
+    sd_diag = torch.cat([x.flatten() for x in sd_diag])
+
+    # Calculate J @ Σ @ J^T
+    linearized_rect_sqrt = jac * sd_diag
+    linearised_cov = linearized_rect_sqrt @ linearized_rect_sqrt.transpose(-1, -2)
+
+    # Cholesky in smaller observation space
+    linearised_chol = torch.linalg.cholesky(linearised_cov)
+    return forward_vals, linearised_chol, aux
 
 
 def hvp(

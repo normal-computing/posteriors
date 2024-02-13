@@ -7,6 +7,7 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from datasets import load_dataset
 from transformers import AutoTokenizer
+from ml_collections import ConfigDict
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
 from experiments.laplace_lora import TransformerModule
@@ -58,6 +59,9 @@ if __name__ == "__main__":
         "log_every_n_steps": args.log_frequency,
     }
 
+    model = TransformerModule(config.model_config)
+
+    config = ConfigDict(config)  # thaw
     logger = WandbLogger(
         log_model="all",
         project=config.get("experiment_name", ""),
@@ -65,6 +69,10 @@ if __name__ == "__main__":
     )
     config["wandb_name"] = logger.experiment.name
     config["wandb_id"] = logger.experiment.id
+
+    config["epochs"] = args.epochs
+    config["log_frequency"] = args.log_frequency
+    config["seed"] = args.seed
 
     if args.resume is None:
         save_config(

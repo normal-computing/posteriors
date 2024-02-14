@@ -33,6 +33,7 @@ class TransformerModule(L.LightningModule):
         WEIGHTS_TO_LORA = ["q_proj", "v_proj", "o_proj"]
 
         modules = list(model.model.layers.named_parameters())
+        # Get layer index, name for layers to adapt
         module_names_with_layer = [
             (name.split(".")[0], f'layer.{name.strip('.weight')}')
             for name, param in modules
@@ -44,7 +45,7 @@ class TransformerModule(L.LightningModule):
             )
         ]
 
-        # only adapt last layer
+        # Subset of layers to adapt
         if self.target_modules == "last_layer":
             modules = [
                 [layer for name, layer in list(group)]

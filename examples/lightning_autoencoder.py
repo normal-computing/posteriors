@@ -1,3 +1,4 @@
+from functools import partial
 import os
 from torch import nn, utils
 import torch
@@ -5,6 +6,7 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 import lightning as L
 import torchopt
+import optree
 
 import uqlib
 
@@ -20,14 +22,29 @@ encoder_function = uqlib.model_to_function(encoder)
 decoder_function = uqlib.model_to_function(decoder)
 
 
-def log_posterior(params, batch):
+def log_normal_prior(params):
+    all_vals = optree.tree_map(
+        lambda p: torch.distributions.Normal(0, 1, validate_args=False)
+        .log_prob(p)
+        .sum(),
+        params,
+    )
+    return optree.tree_reduce(torch.add, all_vals)
+
+
+def log_posterior(params, batch, num_data):
     x, y = batch
     x = x.view(x.size(0), -1)
     z = encoder_function(params[0], x)
     x_hat = decoder_function(params[1], z)
-    return torch.distributions.Normal(x_hat, 1, validate_args=False).log_prob(
-        x
-    ).sum(), x_hat
+    log_lik = (
+        torch.distributions.Normal(x_hat, 1, validate_args=False)
+        .log_prob(x)
+        .sum(-1)
+        .mean()
+    )
+    log_prior = log_normal_prior(params[0]) + log_normal_prior(params[1])
+    return log_lik + log_prior / num_data, x_hat
 
 
 # define the LightningModule
@@ -47,7 +64,13 @@ class LitAutoEncoderUQ(L.LightningModule):
                 self.log(k, v)
 
     def configure_optimizers(self):
-        self.transform = method.build(log_posterior, **config_args)
+        pass
+
+    def on_train_start(self) -> None:
+        self.log_posterior = partial(
+            log_posterior, num_data=len(self.trainer.train_dataloader.dataset)
+        )
+        self.transform = method.build(self.log_posterior, **config_args)
         all_params = [
             dict(self.encoder.named_parameters()),
             dict(self.decoder.named_parameters()),
@@ -68,7 +91,7 @@ autoencoderuq = LitAutoEncoderUQ(encoder, decoder)
 dataset = MNIST(os.getcwd(), download=True, transform=ToTensor())
 train_loader = utils.data.DataLoader(dataset)
 
-# train the model (hint: here are some helpful Trainer arguments for rapid idea iteration)
+# train the model
 trainer = L.Trainer(limit_train_batches=100, max_epochs=1)
 trainer.fit(model=autoencoderuq, train_dataloaders=train_loader)
 

@@ -12,7 +12,7 @@ import wandb
 import pickle
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
-from experiments.laplace_lora import TransformerModule
+from experiments.laplace_lora import BayesTransformerModule
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
         "log_every_n_steps": args.log_frequency,
     }
 
-    model = TransformerModule(config.model_config)
+    model = BayesTransformerModule(config.model_config)
 
     config = ConfigDict(config)  # thaw
     logger = WandbLogger(
@@ -227,7 +227,7 @@ if __name__ == "__main__":
                 trainer.save_checkpoint(final_ckpt)
 
         LORA_WEIGHTS = experiment_log_dir + "/checkpoints/last.ckpt"
-        model_tuned = TransformerModule.load_from_checkpoint(
+        model_tuned = BayesTransformerModule.load_from_checkpoint(
             LORA_WEIGHTS, config=config["model_config"]
         ).to(args.devices[0])
         print("Weights loaded successfully!")

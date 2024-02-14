@@ -1,5 +1,3 @@
-import regex as re
-import numpy as np
 from itertools import groupby
 from functools import partial
 from optree import tree_map, tree_reduce
@@ -31,28 +29,29 @@ class TransformerModule(L.LightningModule):
         model = AutoModelForCausalLM.from_pretrained(self.pretrained_model_name_or_path)
         # only adapt W_q, W_v, W_o
         # regex may not work for all models
-        modules = [
-            re.sub("^(model\\.)*|(\\.weight)*$", "", name)
-            for name, _ in model.named_parameters()
-            if any(sub in name for sub in ["self_attn.q", "self_attn.v", "self_attn.o"])
+
+        WEIGHTS_TO_LORA = ["q_proj", "v_proj", "o_proj"]
+
+        modules = list(model.model.layers.named_parameters())
+        module_names_with_layer = [
+            (name.split(".")[0], f'layer.{name.strip('.weight')}')
+            for name, param in modules
+            if any(
+                sub in name
+                for sub in [
+                    "self_attn.{sub}".format(sub=sub) for sub in WEIGHTS_TO_LORA
+                ]
+            )
         ]
+
         # only adapt last layer
         if self.target_modules == "last_layer":
             modules = [
-                (
-                    name,
-                    np.array(
-                        [int(sub) for sub in name.split(".") if sub.isdigit()]
-                    ).item(),
-                )
-                for name in modules
-            ]
-            modules = [
-                [name for name, layer in list(group)]
-                for _, group in groupby(
-                    sorted(modules, key=lambda x: x[-1]), key=lambda x: x[-1]
-                )
+                [layer for name, layer in list(group)]
+                for _, group in groupby(module_names_with_layer, key=lambda x: x[0])
             ][-1]
+        else:
+            modules = [name for layer, name in module_names_with_layer]
 
         peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
@@ -106,4 +105,4 @@ class TransformerModule(L.LightningModule):
         self.log("log_post", log_post.item())
         self.opt.step()
 
-        return torch.tensor(log_post.item())
+        return log_post

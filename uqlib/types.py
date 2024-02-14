@@ -7,6 +7,7 @@ TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
 TransformState: TypeAlias = NamedTuple
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
+ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
 
 
 class InitFn(Protocol):

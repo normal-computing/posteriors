@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-from optree import tree_map
+from optree import tree_map, tree_flatten
 
 from uqlib import (
     model_to_function,
+    linearized_forward_diag,
     hessian_diag,
     diag_normal_log_prob,
     diag_normal_sample,
@@ -73,6 +74,49 @@ def test_model_to_function():
     assert type(output) == type(func_output1) == type(func_output2)
     assert torch.allclose(output["logits"], func_output1["logits"])
     assert torch.allclose(output["logits"], func_output2["logits"])
+
+
+def test_linearized_forward_diag():
+    vocab_size = 50
+    batch_size = 3
+    lm = TestLanguageModel(vocab_size=vocab_size, embedding_dim=32, hidden_dim=64)
+
+    lm_functional = model_to_function(lm)
+
+    input_ids = torch.randint(vocab_size, (batch_size, batch_size))
+    attention_mask = torch.ones_like(input_ids)
+    params = dict(lm.named_parameters())
+
+    batch = {"input_ids": input_ids, "attention_mask": attention_mask}
+
+    def forward_func(p, batch):
+        output = lm_functional(p, **batch)
+        next_token_logits = output["logits"][:, -1, :]
+        return next_token_logits, output
+
+    sd_diag = tree_map(lambda x: torch.randn_like(x).abs(), params)
+
+    mean, lin_cov_chol, output = linearized_forward_diag(
+        forward_func, params, batch, sd_diag
+    )
+
+    assert mean.shape == (batch_size, vocab_size)
+    assert lin_cov_chol.shape == (batch_size, vocab_size, vocab_size)
+    assert torch.allclose(output["logits"][:, -1, :], mean)
+
+    lin_cov = lin_cov_chol @ lin_cov_chol.transpose(-1, -2)
+
+    jac = torch.func.jacrev(forward_func, has_aux=True)(params, batch)[0]
+    jac_flat = tree_flatten(jac)[0]
+    jac_flat = torch.cat([x.flatten(start_dim=2) for x in jac_flat], dim=2)
+
+    sd_diag_flat = tree_flatten(sd_diag)[0]
+    sd_diag_flat = torch.cat([x.flatten() for x in sd_diag_flat])
+
+    for i in range(batch_size):
+        jac_i = jac_flat[i]
+        delta = jac_i @ torch.diag(sd_diag_flat**2) @ jac_i.T
+        assert torch.allclose(lin_cov[i], delta, atol=1e-5)
 
 
 def test_hessian_diag():

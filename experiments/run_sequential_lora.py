@@ -7,9 +7,9 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from transformers import AutoTokenizer
 from ml_collections.config_dict import ConfigDict
-import pickle
-from torch.utils.data import Dataset, DataLoader
-
+from datasets import load_dataset
+from torch.utils.data.dataloader import default_collate
+from torch.utils.data import DataLoader
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
 from experiments.laplace_lora import BayesTransformerModule
@@ -89,45 +89,106 @@ if __name__ == "__main__":
 
     # Datasets
     # train[test]_dataloaders has size (num_tasks, num_samples_per_task)
-    # This will be updated in the future
-    num_samples_per_task = 2
-    num_tasks = 3
-    with open("./experiments/data/pg19-train.pkl", "rb") as f:
-        train_datasets = pickle.load(f)
-    with open("./experiments/data/pg19-test.pkl", "rb") as f:
-        test_datasets = pickle.load(f)
 
-    # Annoying ... will try to get around
-    class DataFrameDataset(Dataset):
-        def __init__(self, dataframe, transform=None):
-            self.dataframe = dataframe
-            self.transform = transform
+    dataset = load_dataset("json", data_files="./experiments/data/pg19-small.json")
 
-        def __len__(self):
-            return len(self.dataframe)
+    def split_doc(examples):
+        text_as_list = examples["text"].split()
+        start_index = int(len(text_as_list) * 0.85)
+        return {
+            "train_text": " ".join(text_as_list[:start_index]),
+            "test_text": " ".join(text_as_list[start_index:]),
+        }
 
-        def __getitem__(self, idx):
-            row = self.dataframe.iloc[idx]
-            sample = {"input_ids": row["input_ids"]}
-            if self.transform:
-                sample = self.transform(sample)
-            return sample
+    def tokenize_function(examples):
+        return {
+            "train_tokens": tokenizer(
+                examples["train_text"],
+                padding="max_length",
+                max_length=4096,
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"],
+            "test_tokens": tokenizer(
+                examples["test_text"],
+                padding="max_length",
+                max_length=4096,
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"],
+        }
+
+    split_datasets = dataset.map(split_doc, batched=False)
+    tokenized_datasets = split_datasets.map(tokenize_function, batched=False)
+
+    tokenized_datasets = tokenized_datasets.remove_columns(["train_text", "test_text"])
+    tokenized_datasets.set_format("torch")
+
+    num_samples_per_task = config.num_samples_per_task
+    num_tasks = config.num_tasks
+
+    train_datasets = [
+        tokenized_datasets["train"]
+        .select(range(i * num_samples_per_task, (i + 1) * num_samples_per_task))
+        .remove_columns(["test_text", "train_text", "test_tokens"])
+        .rename_column("train_tokens", "input_ids")
+        for i in range(num_tasks)
+    ]
+    test_datasets = [
+        tokenized_datasets["train"]
+        .select(range((i + 1) * num_samples_per_task))
+        .remove_columns(["test_text", "train_text", "train_tokens"])
+        .rename_column("test_tokens", "input_ids")
+        for i in range(num_tasks)
+    ]
+
+    # This is a terrible fcn from chat gpt to correct the collate_fn .... will fix tomorrow
+    def custom_collate_fn(batch):
+        # Extracting input_ids and preparing for tensor conversion
+        input_ids = []
+        other_data = {
+            k: [] for k in batch[0].keys() if k != "input_ids"
+        }  # Preparing for other data
+
+        for item in batch:
+            # Assuming input_ids is a dictionary and you want the 'input_ids' key from it
+            if "input_ids" in item and "input_ids" in item["input_ids"]:
+                input_ids.append(item["input_ids"]["input_ids"])
+            for k in other_data.keys():
+                if k in item:
+                    other_data[k].append(item[k])
+
+        if input_ids:
+            batched_input_ids = torch.stack([torch.tensor(i) for i in input_ids])
+        else:
+            batched_input_ids = (
+                torch.Tensor()
+            )  # Handle the case where input_ids might be missing
+
+        for k, v in other_data.items():
+            other_data[k] = default_collate(v)
+
+        if input_ids:
+            other_data["input_ids"] = batched_input_ids
+        return other_data
 
     train_dataloaders = [
         DataLoader(
-            DataFrameDataset(train, transform=None),
+            train,
             batch_size=config.batch_size,
             shuffle=True,
             num_workers=config.num_workers,
+            collate_fn=custom_collate_fn,
         )
         for train in train_datasets
     ]
     test_dataloaders = [
         DataLoader(
-            DataFrameDataset(test, transform=None),
+            test,
             batch_size=config.batch_size,
             shuffle=False,
             num_workers=config.num_workers,
+            collate_fn=custom_collate_fn,
         )
         for test in test_datasets
     ]

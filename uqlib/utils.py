@@ -63,12 +63,9 @@ def linearized_forward_diag(
     sd_diag = tree_flatten(sd_diag)[0]
     sd_diag = torch.cat([x.flatten() for x in sd_diag])
 
-    # Calculate J @ Σ @ J^T
-    linearized_rect_sqrt = jac * sd_diag
-    linearised_cov = linearized_rect_sqrt @ linearized_rect_sqrt.transpose(-1, -2)
+    # Cholesky of J @ Σ @ J^T
+    linearised_chol = torch.linalg.cholesky((jac * sd_diag**2) @ jac.transpose(-1, -2))
 
-    # Cholesky in smaller observation space
-    linearised_chol = torch.linalg.cholesky(linearised_cov)
     return forward_vals, linearised_chol, aux
 
 

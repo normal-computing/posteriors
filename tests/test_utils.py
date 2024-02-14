@@ -100,8 +100,8 @@ def test_linearized_forward_diag():
         forward_func, params, batch, sd_diag
     )
 
-    assert mean.shape == (3, vocab_size)
-    assert lin_cov_chol.shape == (3, vocab_size, vocab_size)
+    assert mean.shape == (batch_size, vocab_size)
+    assert lin_cov_chol.shape == (batch_size, vocab_size, vocab_size)
     assert torch.allclose(output["logits"][:, -1, :], mean)
 
     lin_cov = lin_cov_chol @ lin_cov_chol.transpose(-1, -2)

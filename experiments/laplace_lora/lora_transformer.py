@@ -4,6 +4,7 @@ from optree import tree_map, tree_reduce
 import lightning as L
 import torch
 from torch.optim import AdamW
+from torchmetrics import Accuracy
 from transformers import AutoModelForCausalLM
 from peft import LoraConfig, TaskType, get_peft_model
 from ml_collections.config_dict import FrozenConfigDict
@@ -29,13 +30,16 @@ class BayesTransformerModule(L.LightningModule):
         model = AutoModelForCausalLM.from_pretrained(self.pretrained_model_name_or_path)
         # only adapt W_q, W_v, W_o
         # regex may not work for all models
+        self.val_accuracy = Accuracy(
+            task="multiclass", num_classes=model.config.vocab_size
+        )
 
         WEIGHTS_TO_LORA = ["q_proj", "v_proj", "o_proj"]
 
         modules = list(model.model.layers.named_parameters())
         # Get layer index, name for layers to adapt
         module_names_with_layer = [
-            (name.split(".")[0], f'layer.{name.strip('.weight')}')
+            (name.split(".")[0], f'layers.{name.strip('.weight')}')
             for name, param in modules
             if any(
                 sub in name
@@ -108,3 +112,39 @@ class BayesTransformerModule(L.LightningModule):
         self.opt.step()
 
         return log_post
+
+    def validation_step(self, batch, batch_idx):
+        inputs = batch["input_ids"]
+        targets = inputs[:, 1:].clone().detach()
+
+        with torch.no_grad():
+            output = self.model(
+                input_ids=inputs,
+                labels=inputs,
+            )
+        logits = output.logits[:, :-1, :]
+        preds = logits.argmax(-1)
+
+        self.val_accuracy.update(preds, targets)
+        self.log(
+            "val_loss",
+            output.loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        return output.loss
+
+    def on_validation_epoch_end(
+        self,
+    ):
+        self.log(
+            "val_accuracy",
+            self.val_accuracy.compute(),
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        print(f"Validation Accuracy: {self.val_accuracy.compute()}")

@@ -7,9 +7,9 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from transformers import AutoTokenizer
 from ml_collections.config_dict import ConfigDict
-from tqdm import tqdm
-import wandb
 import pickle
+from torch.utils.data import Dataset, DataLoader
+
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
 from experiments.laplace_lora import BayesTransformerModule
@@ -26,79 +26,6 @@ parser.add_argument("--log_frequency", default=10, type=int)
 parser.add_argument("--seed", default=42, type=int)
 
 args = parser.parse_args()
-
-
-def evaluate(model, dataset, dataset_idx, step):
-    results = []
-    avg_nlls = ()
-    avg_ppls = ()
-    for idx, sample in tqdm(enumerate(dataset)):
-        input_ids = sample["input_ids"].unsqueeze(0)
-        max_input_length = model.config.max_position_embeddings
-
-        sample_nlls = []
-        prev_end_loc = 0
-        seq_len = input_ids.size(1)
-        for begin_loc in range(0, seq_len, 512):
-            end_loc = min(begin_loc + max_input_length, seq_len)
-            subseq = input_ids[:, begin_loc:end_loc]
-            targets = subseq.clone()
-            trg_len = end_loc - prev_end_loc
-            targets[:, :-trg_len] = -100
-
-            with torch.no_grad():
-                output = model.model(
-                    input_ids=subseq.to(model.model.device),
-                    labels=targets,
-                )
-                sample_nlls.append(output.loss)
-
-            prev_end_loc = end_loc
-            if end_loc == seq_len:
-                break
-
-        sample_nlls = torch.tensor(sample_nlls)
-        sample_ppls = torch.exp(sample_nlls)
-
-        sample_avg_nll = torch.mean(sample_nlls)
-        sample_avg_ppl = torch.mean(sample_ppls)
-        wandb.log(
-            {
-                "sample_avg_nll": sample_avg_nll,
-                "Dataset Idx": dataset_idx,
-                "Task Idx": step,
-            }
-        )
-        wandb.log(
-            {
-                "sample_avg_ppl": sample_avg_ppl,
-                "Dataset Idx": dataset_idx,
-                "Task Idx": step,
-            }
-        )
-
-        results += [
-            {
-                "idx": idx,
-                "short_book_title": sample["short_book_title"],
-                "input_ids": sample["input_ids"],
-                "nlls": sample_nlls,
-                "ppls": sample_ppls,
-                "avg_nll": sample_avg_nll,
-                "avg_ppl": sample_avg_ppl,
-            }
-        ]
-        avg_nlls += (sample_avg_nll,)
-        avg_ppls += (sample_avg_ppl,)
-
-    avg_nll = torch.mean(torch.tensor(avg_nlls))
-    avg_ppl = torch.mean(torch.tensor(avg_ppls))
-
-    wandb.log({"Avg NLL": avg_nll, "Dataset Idx": dataset_idx, "Task Idx": step})
-    wandb.log({"Avg PPL": avg_ppl, "Dataset Idx": dataset_idx, "Task Idx": step})
-
-    return results
-
 
 if __name__ == "__main__":
     device_type = "cpu" if callable(args.devices) else "gpu"
@@ -162,51 +89,44 @@ if __name__ == "__main__":
 
     # Datasets
     # train[test]_dataloaders has size (num_tasks, num_samples_per_task)
+    # This will be updated in the future
+    num_samples_per_task = 2
+    num_tasks = 3
+    with open("./experiments/data/pg19-train.pkl", "rb") as f:
+        train_datasets = pickle.load(f)
+    with open("./experiments/data/pg19-test.pkl", "rb") as f:
+        test_datasets = pickle.load(f)
 
-    with open(config.dataset_path, "rb") as f:
-        dataset = pickle.load(f)
+    # Annoying ... will try to get around
+    class DataFrameDataset(Dataset):
+        def __init__(self, dataframe, transform=None):
+            self.dataframe = dataframe
+            self.transform = transform
 
-    def split_doc(lst):
-        start_index = int(len(lst) * 0.85)
-        return lst[:start_index], lst[start_index:]
+        def __len__(self):
+            return len(self.dataframe)
 
-    for sample in dataset:
-        sample["input_ids"] = tokenizer(
-            sample["text"],
-            padding="max_length",
-            max_length=config.max_length,
-            truncation=True,
-        )["input_ids"]
-
-    num_samples_per_task = config.num_samples_per_task
-    num_tasks = config.num_tasks
-
-    samples_per_task = [
-        dataset[(i * num_samples_per_task) : ((i + 1) * num_samples_per_task)]
-        for i in range(num_tasks)
-    ]
-    split_samples = [
-        [split_doc(sample["input_ids"]) for sample in samples]
-        for samples in samples_per_task
-    ]
-    train_datasets = [[sample[0] for sample in samples] for samples in split_samples]
-    test_datasets = [[sample[1] for sample in samples] for samples in split_samples]
+        def __getitem__(self, idx):
+            row = self.dataframe.iloc[idx]
+            sample = {"input_ids": row["input_ids"]}
+            if self.transform:
+                sample = self.transform(sample)
+            return sample
 
     train_dataloaders = [
-        torch.utils.data.DataLoader(
-            train,
-            shuffle=True,
+        DataLoader(
+            DataFrameDataset(train, transform=None),
             batch_size=config.batch_size,
+            shuffle=True,
             num_workers=config.num_workers,
         )
         for train in train_datasets
     ]
-
     test_dataloaders = [
-        torch.utils.data.DataLoader(
-            test,
-            shuffle=False,
+        DataLoader(
+            DataFrameDataset(test, transform=None),
             batch_size=config.batch_size,
+            shuffle=False,
             num_workers=config.num_workers,
         )
         for test in test_datasets
@@ -219,36 +139,23 @@ if __name__ == "__main__":
 
     model_tuned = model
     for step in range(num_tasks):
+        print(f"Training on task {step}")
         try:
             resume_ckpt = None
             if args.resume is not None:
                 resume_ckpt = os.path.join(
                     args.resume, "checkpoints", str(step), "last.ckpt"
                 )
-            trainer.fit(model_tuned, train_dataloaders[step], ckpt_path=resume_ckpt)
+            trainer.fit(
+                model_tuned,
+                train_dataloaders[step],
+                val_dataloaders=test_dataloaders[step],
+                ckpt_path=resume_ckpt,
+            )
         finally:
             if trainer.global_rank == 0:
                 final_ckpt = os.path.join(
                     experiment_log_dir, "checkpoints", str(step), "last.ckpt"
                 )
-                trainer.save_checkpoint(final_ckpt)
-
-        LORA_WEIGHTS = (
-            experiment_log_dir + "/checkpoints/last.ckpt"
-        )  # add step into this
-
-        model_tuned = BayesTransformerModule.load_from_checkpoint(
-            LORA_WEIGHTS, config=config["model_config"]
-        ).to(args.devices[0])
-        print("Weights loaded successfully!")
-
-        for idx in range(step):
-            eval_results = eval(
-                model_tuned, test_dataloaders[idx], dataset_idx=idx, step=step
-            )
-
-            result_file = os.path.join(
-                experiment_log_dir, "evaluations", f"results-eval-{idx}-{step}.pkl"
-            )
-            with open(result_file, "wb") as f:
-                pickle.dump(eval_results, f)
+                # trainer.save_checkpoint(final_ckpt)
+        trainer.fit_loop.epoch_loop.val_loop._results.clear()

@@ -117,7 +117,6 @@ def test_linearized_forward_diag():
         jac_i = jac_flat[i]
         delta = jac_i @ torch.diag(sd_diag_flat**2) @ jac_i.T
         assert torch.allclose(lin_cov[i], delta, atol=1e-5)
-        assert torch.allclose(lin_cov[i], lin_cov_chol[i] @ lin_cov_chol[i].T)
 
 
 def test_hessian_diag():

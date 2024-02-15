@@ -38,13 +38,7 @@ tokenizer.pad_token = tokenizer.eos_token
 
 train_dataloaders, test_dataloaders = load_pg19_dataloaders(config, tokenizer)
 
-
 model = BayesTransformerModule(config.model_config)
-
-batch = next(iter(train_dataloaders[0]))
-batch = {k: v.to(model.device) for k, v in batch.items()}
-output = model.model(labels=batch["input_ids"], **batch)
-
 
 # Logs to tensorboard by default
 trainer = Trainer(**trainer_kwargs)
@@ -56,5 +50,5 @@ for book_ind in range(config.num_tasks):
     trainer.fit(
         model,
         train_dataloaders[book_ind],
-        val_dataloaders=test_dataloaders[book_ind],
+        val_dataloaders=[test_dataloaders[i] for i in range(book_ind + 1)],
     )

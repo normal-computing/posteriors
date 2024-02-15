@@ -80,12 +80,11 @@ for book_ind in range(config.num_tasks):
         laplace_transform = uqlib.laplace.diag_fisher.build(
             model.sub_param_to_log_posterior
         )
+        model.to(
+            "cuda"
+        )  # not using lightning for this part so need to move to device ourselves
+        model.configure_optimizers()  # moves sub_params, prior_mean, prior_sd to device
         laplace_state = laplace_transform.init(model.sub_params)
-        model.prior_mean = optree.tree_map(
-            lambda x: x.to(model.device), model.prior_mean
-        )
-        model.prior_sd = optree.tree_map(lambda x: x.to(model.device), model.prior_sd)
-        laplace_state = optree.tree_map(lambda x: x.to(model.device), laplace_state)
         for batch in tqdm.tqdm(laplace_train_dataloaders[book_ind]):
             batch = optree.tree_map(lambda x: x.to(model.device), batch)
             laplace_state = laplace_transform.update(

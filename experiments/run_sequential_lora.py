@@ -7,9 +7,9 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from transformers import AutoTokenizer
 from ml_collections.config_dict import ConfigDict
-from tqdm import tqdm
-import wandb
-import pickle
+from datasets import load_dataset
+from torch.utils.data.dataloader import default_collate
+from torch.utils.data import DataLoader
 
 from experiments.utils import parse_devices, load_config, save_config, setup_log_dir
 from experiments.laplace_lora import BayesTransformerModule
@@ -26,79 +26,6 @@ parser.add_argument("--log_frequency", default=10, type=int)
 parser.add_argument("--seed", default=42, type=int)
 
 args = parser.parse_args()
-
-
-def evaluate(model, dataset, dataset_idx, step):
-    results = []
-    avg_nlls = ()
-    avg_ppls = ()
-    for idx, sample in tqdm(enumerate(dataset)):
-        input_ids = sample["input_ids"].unsqueeze(0)
-        max_input_length = model.config.max_position_embeddings
-
-        sample_nlls = []
-        prev_end_loc = 0
-        seq_len = input_ids.size(1)
-        for begin_loc in range(0, seq_len, 512):
-            end_loc = min(begin_loc + max_input_length, seq_len)
-            subseq = input_ids[:, begin_loc:end_loc]
-            targets = subseq.clone()
-            trg_len = end_loc - prev_end_loc
-            targets[:, :-trg_len] = -100
-
-            with torch.no_grad():
-                output = model.model(
-                    input_ids=subseq.to(model.model.device),
-                    labels=targets,
-                )
-                sample_nlls.append(output.loss)
-
-            prev_end_loc = end_loc
-            if end_loc == seq_len:
-                break
-
-        sample_nlls = torch.tensor(sample_nlls)
-        sample_ppls = torch.exp(sample_nlls)
-
-        sample_avg_nll = torch.mean(sample_nlls)
-        sample_avg_ppl = torch.mean(sample_ppls)
-        wandb.log(
-            {
-                "sample_avg_nll": sample_avg_nll,
-                "Dataset Idx": dataset_idx,
-                "Task Idx": step,
-            }
-        )
-        wandb.log(
-            {
-                "sample_avg_ppl": sample_avg_ppl,
-                "Dataset Idx": dataset_idx,
-                "Task Idx": step,
-            }
-        )
-
-        results += [
-            {
-                "idx": idx,
-                "short_book_title": sample["short_book_title"],
-                "input_ids": sample["input_ids"],
-                "nlls": sample_nlls,
-                "ppls": sample_ppls,
-                "avg_nll": sample_avg_nll,
-                "avg_ppl": sample_avg_ppl,
-            }
-        ]
-        avg_nlls += (sample_avg_nll,)
-        avg_ppls += (sample_avg_ppl,)
-
-    avg_nll = torch.mean(torch.tensor(avg_nlls))
-    avg_ppl = torch.mean(torch.tensor(avg_ppls))
-
-    wandb.log({"Avg NLL": avg_nll, "Dataset Idx": dataset_idx, "Task Idx": step})
-    wandb.log({"Avg PPL": avg_ppl, "Dataset Idx": dataset_idx, "Task Idx": step})
-
-    return results
-
 
 if __name__ == "__main__":
     device_type = "cpu" if callable(args.devices) else "gpu"
@@ -163,51 +90,105 @@ if __name__ == "__main__":
     # Datasets
     # train[test]_dataloaders has size (num_tasks, num_samples_per_task)
 
-    with open(config.dataset_path, "rb") as f:
-        dataset = pickle.load(f)
+    dataset = load_dataset("json", data_files="./experiments/data/pg19-small.json")
 
-    def split_doc(lst):
-        start_index = int(len(lst) * 0.85)
-        return lst[:start_index], lst[start_index:]
+    def split_doc(examples):
+        text_as_list = examples["text"].split()
+        start_index = int(len(text_as_list) * 0.85)
+        return {
+            "train_text": " ".join(text_as_list[:start_index]),
+            "test_text": " ".join(text_as_list[start_index:]),
+        }
 
-    for sample in dataset:
-        sample["input_ids"] = tokenizer(
-            sample["text"],
-            padding="max_length",
-            max_length=config.max_length,
-            truncation=True,
-        )["input_ids"]
+    def tokenize_function(examples):
+        return {
+            "train_tokens": tokenizer(
+                examples["train_text"],
+                padding="max_length",
+                max_length=4096,
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"],
+            "test_tokens": tokenizer(
+                examples["test_text"],
+                padding="max_length",
+                max_length=4096,
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"],
+        }
+
+    split_datasets = dataset.map(split_doc, batched=False)
+    tokenized_datasets = split_datasets.map(tokenize_function, batched=False)
+
+    tokenized_datasets = tokenized_datasets.remove_columns(["train_text", "test_text"])
+    tokenized_datasets.set_format("torch")
 
     num_samples_per_task = config.num_samples_per_task
     num_tasks = config.num_tasks
 
-    samples_per_task = [
-        dataset[(i * num_samples_per_task) : ((i + 1) * num_samples_per_task)]
+    train_datasets = [
+        tokenized_datasets["train"]
+        .select(range(i * num_samples_per_task, (i + 1) * num_samples_per_task))
+        .remove_columns(["test_text", "train_text", "test_tokens"])
+        .rename_column("train_tokens", "input_ids")
         for i in range(num_tasks)
     ]
-    split_samples = [
-        [split_doc(sample["input_ids"]) for sample in samples]
-        for samples in samples_per_task
+    test_datasets = [
+        tokenized_datasets["train"]
+        .select(range((i + 1) * num_samples_per_task))
+        .remove_columns(["test_text", "train_text", "train_tokens"])
+        .rename_column("test_tokens", "input_ids")
+        for i in range(num_tasks)
     ]
-    train_datasets = [[sample[0] for sample in samples] for samples in split_samples]
-    test_datasets = [[sample[1] for sample in samples] for samples in split_samples]
+
+    # This is a terrible fcn from chat gpt to correct the collate_fn .... will fix tomorrow
+    def custom_collate_fn(batch):
+        # Extracting input_ids and preparing for tensor conversion
+        input_ids = []
+        other_data = {
+            k: [] for k in batch[0].keys() if k != "input_ids"
+        }  # Preparing for other data
+
+        for item in batch:
+            # Assuming input_ids is a dictionary and you want the 'input_ids' key from it
+            if "input_ids" in item and "input_ids" in item["input_ids"]:
+                input_ids.append(item["input_ids"]["input_ids"])
+            for k in other_data.keys():
+                if k in item:
+                    other_data[k].append(item[k])
+
+        if input_ids:
+            batched_input_ids = torch.stack([torch.tensor(i) for i in input_ids])
+        else:
+            batched_input_ids = (
+                torch.Tensor()
+            )  # Handle the case where input_ids might be missing
+
+        for k, v in other_data.items():
+            other_data[k] = default_collate(v)
+
+        if input_ids:
+            other_data["input_ids"] = batched_input_ids
+        return other_data
 
     train_dataloaders = [
-        torch.utils.data.DataLoader(
+        DataLoader(
             train,
-            shuffle=True,
             batch_size=config.batch_size,
+            shuffle=True,
             num_workers=config.num_workers,
+            collate_fn=custom_collate_fn,
         )
         for train in train_datasets
     ]
-
     test_dataloaders = [
-        torch.utils.data.DataLoader(
+        DataLoader(
             test,
-            shuffle=False,
             batch_size=config.batch_size,
+            shuffle=False,
             num_workers=config.num_workers,
+            collate_fn=custom_collate_fn,
         )
         for test in test_datasets
     ]
@@ -219,36 +200,23 @@ if __name__ == "__main__":
 
     model_tuned = model
     for step in range(num_tasks):
+        print(f"Training on task {step}")
         try:
             resume_ckpt = None
             if args.resume is not None:
                 resume_ckpt = os.path.join(
                     args.resume, "checkpoints", str(step), "last.ckpt"
                 )
-            trainer.fit(model_tuned, train_dataloaders[step], ckpt_path=resume_ckpt)
+            trainer.fit(
+                model_tuned,
+                train_dataloaders[step],
+                val_dataloaders=test_dataloaders[step],
+                ckpt_path=resume_ckpt,
+            )
         finally:
             if trainer.global_rank == 0:
                 final_ckpt = os.path.join(
                     experiment_log_dir, "checkpoints", str(step), "last.ckpt"
                 )
-                trainer.save_checkpoint(final_ckpt)
-
-        LORA_WEIGHTS = (
-            experiment_log_dir + "/checkpoints/last.ckpt"
-        )  # add step into this
-
-        model_tuned = BayesTransformerModule.load_from_checkpoint(
-            LORA_WEIGHTS, config=config["model_config"]
-        ).to(args.devices[0])
-        print("Weights loaded successfully!")
-
-        for idx in range(step):
-            eval_results = eval(
-                model_tuned, test_dataloaders[idx], dataset_idx=idx, step=step
-            )
-
-            result_file = os.path.join(
-                experiment_log_dir, "evaluations", f"results-eval-{idx}-{step}.pkl"
-            )
-            with open(result_file, "wb") as f:
-                pickle.dump(eval_results, f)
+                # trainer.save_checkpoint(final_ckpt)
+        trainer.fit_loop.epoch_loop.val_loop._results.clear()

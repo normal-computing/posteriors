@@ -10,7 +10,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", default=None, type=str)
-parser.add_argument("--resume", default=None, type=str)
 parser.add_argument("--base", default=None, type=str)
 parser.add_argument("--devices", default=parse_devices, type=str)
 parser.add_argument("--epochs", default=100, type=int)

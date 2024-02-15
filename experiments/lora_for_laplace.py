@@ -27,8 +27,6 @@ args = parser.parse_args()
 
 device_type = "cpu" if callable(args.devices) else "gpu"
 
-print(device_type)
-
 trainer_kwargs = {
     "max_epochs": args.epochs,
     "accelerator": device_type,

@@ -1,5 +1,5 @@
+from typing import Tuple
 from itertools import groupby
-from functools import partial
 from optree import tree_map, tree_reduce
 import lightning as L
 import torch
@@ -19,8 +19,12 @@ class BayesTransformerModule(L.LightningModule):
         self.automatic_optimization = False
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
-        self.prior_sd = config.prior_sd
         self.lr = config.lr
+
+        # These need to updated with the correct values before calling trainer.fit
+        self.prior_mean = None
+        self.prior_sd = None
+        self.num_data = None
 
         self.target_modules = config.lora_config.target_modules
         self.r = config.lora_config.r
@@ -70,36 +74,44 @@ class BayesTransformerModule(L.LightningModule):
         self.model.print_trainable_parameters()
         self.model_func = model_to_function(self.model)
 
+        (
+            self.sub_params,
+            self.sub_param_to_log_likelihood,
+        ) = uqlib.extract_requires_grad_and_func(
+            dict(self.model.named_parameters()), self.param_to_log_likelihood
+        )
+
     @staticmethod
     def univariate_normal_log_prob(x, mean, sd):
         return -0.5 * ((x - mean) / sd) ** 2
 
-    def normal_log_prior(self, p) -> float:
+    def normal_log_prior(self, params) -> float:
         per_group_vals = tree_map(
-            lambda p: self.univariate_normal_log_prob(p, 0, self.prior_sd).sum(), p
+            lambda p, m, sd: self.univariate_normal_log_prob(p, m, sd).sum(),
+            params,
+            self.prior_mean,
+            self.prior_sd,
         )
         return tree_reduce(torch.add, per_group_vals)
 
-    def param_to_log_posterior(self, p, batch, num_data) -> torch.tensor:
+    def param_to_log_likelihood(
+        self, p, batch
+    ) -> Tuple[torch.tensor, uqlib.types.TensorTree]:
         output = self.model_func(p, labels=batch["input_ids"], **batch)
-        return (-output.loss) + self.normal_log_prior(p) / num_data, output
+        return -output.loss, output
 
-    def on_train_start(self) -> None:
-        param_to_log_posterior = partial(
-            self.param_to_log_posterior,
-            num_data=len(self.trainer.train_dataloader.dataset),
-        )
-
-        (
-            self.sub_params,
-            self.sub_param_to_log_posterior,
-        ) = uqlib.extract_requires_grad_and_func(
-            dict(self.model.named_parameters()), param_to_log_posterior
-        )
-        self.opt = AdamW(self.sub_params.values(), lr=self.lr, maximize=True)
+    def sub_param_to_log_posterior(
+        self, p, batch
+    ) -> Tuple[torch.tensor, uqlib.types.TensorTree]:
+        log_lik, output = self.sub_param_to_log_likelihood(p, batch)
+        log_prior = self.normal_log_prior(p)
+        return log_lik + log_prior / self.num_data, output
 
     def configure_optimizers(self):
-        pass
+        self.opt = AdamW(self.sub_params.values(), lr=self.lr, maximize=True)
+        self.sub_params = tree_map(lambda x: x.to(self.device), self.sub_params)
+        self.prior_mean = tree_map(lambda x: x.to(self.device), self.prior_mean)
+        self.prior_sd = tree_map(lambda x: x.to(self.device), self.prior_sd)
 
     def training_step(self, batch, batch_idx):
         self.opt.zero_grad()

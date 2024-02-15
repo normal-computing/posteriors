@@ -14,7 +14,9 @@ class DictDataset(Dataset):
         return {k: v[idx] for k, v in self.data.items()}
 
 
-def load_pg19_dataloaders(config, tokenizer) -> Tuple[DataLoader, DataLoader]:
+def load_pg19_dataloaders(
+    config, tokenizer, batch_size, drop_last=True
+) -> Tuple[DataLoader, DataLoader]:
     dataset = load_dataset("json", data_files=config.dataset_path)["train"]
 
     def split_doc(examples):
@@ -81,9 +83,10 @@ def load_pg19_dataloaders(config, tokenizer) -> Tuple[DataLoader, DataLoader]:
     train_dataloaders = [
         DataLoader(
             DictDataset(train_ds),
-            batch_size=config.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=config.num_workers,
+            drop_last=drop_last,
         )
         for train_ds in train_datasets
     ]
@@ -91,9 +94,10 @@ def load_pg19_dataloaders(config, tokenizer) -> Tuple[DataLoader, DataLoader]:
     test_dataloaders = [
         DataLoader(
             DictDataset(test_ds),
-            batch_size=config.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=config.num_workers,
+            drop_last=drop_last,
         )
         for test_ds in test_datasets
     ]

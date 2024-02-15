@@ -72,7 +72,7 @@ model.prior_sd = optree.tree_map(
 trainer = Trainer(**trainer_kwargs)
 
 for book_ind in range(config.num_tasks):
-    print(f"Training on book {book_ind} of {config.num_tasks}")
+    print(f"Training on book {book_ind + 1} of {config.num_tasks}")
 
     model.num_data = len(train_dataloaders[book_ind].dataset)
 
@@ -85,7 +85,7 @@ for book_ind in range(config.num_tasks):
     trainer.fit_loop.epoch_loop._results.clear()
 
     if config.lambda_param > 0.0:
-        print(f"Fitting Laplace on book {book_ind} of {config.num_tasks}")
+        print(f"Fitting Laplace on book {book_ind + 1} of {config.num_tasks}")
 
         # Get Laplace precision diag
         laplace_transform = uqlib.laplace.diag_fisher.build(

@@ -27,6 +27,8 @@ args = parser.parse_args()
 
 device_type = "cpu" if callable(args.devices) else "gpu"
 
+print(device_type)
+
 trainer_kwargs = {
     "max_epochs": args.epochs,
     "accelerator": device_type,
@@ -81,7 +83,7 @@ for book_ind in range(config.num_tasks):
             model.sub_param_to_log_posterior
         )
         model.to(
-            "cuda"
+            "cuda" if device_type == "gpu" else "cpu"
         )  # not using lightning for this part so need to move to device ourselves
         model.configure_optimizers()  # moves sub_params, prior_mean, prior_sd to device
         laplace_state = laplace_transform.init(model.sub_params)

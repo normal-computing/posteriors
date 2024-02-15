@@ -1,0 +1,31 @@
+# File dirs
+base_dir: &base_path "./experiments/"
+logs_dir: &logs_path "./experiments/runs/multiple_lora/"
+data_dir: &data_path "./experiments/multiple_lora/data/"
+
+experiment_name: "multiple_lora"
+num_tasks: 4
+
+# Model
+model_config: &model_params
+  pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+  lr: 1e-5
+  prior_sd: 1e10
+
+  #LoRA
+  lora_config: &lora_params
+    target_modules: "last_layer"
+    r: 8
+    alpha: 32
+    dropout: 0.
+    
+
+# Dataset 
+dataset_path: "./experiments/data/pg19-even-smaller.json"
+batch_size: 2
+num_workers: 11
+tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+max_length: null
+truncation: False
+stride_length: 2048
+stride_overlap: 1024

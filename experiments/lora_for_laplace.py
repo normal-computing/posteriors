@@ -4,6 +4,7 @@ from transformers import AutoTokenizer
 from lightning.pytorch import Trainer
 import torch
 import optree
+import tqdm
 
 import uqlib
 
@@ -34,6 +35,17 @@ trainer_kwargs = {
 
 
 config = load_config(args.base)
+
+
+####
+config = load_config("experiments/utils/configs/lora_sam.yaml")
+trainer_kwargs = {
+    "max_epochs": 1,
+    "accelerator": "gpu",
+    "log_every_n_steps": 1,
+}
+#####
+
 
 tokenizer = AutoTokenizer.from_pretrained(
     config.model_config.pretrained_model_name_or_path
@@ -73,12 +85,19 @@ for book_ind in range(config.num_tasks):
     trainer.fit_loop.epoch_loop._results.clear()
 
     if config.lambda_param > 0.0:
+        print(f"Fitting Laplace on book {book_ind} of {config.num_tasks}")
+
         # Get Laplace precision diag
         laplace_transform = uqlib.laplace.diag_fisher.build(
             model.sub_param_to_log_posterior
         )
         laplace_state = laplace_transform.init(model.sub_params)
-        for batch in laplace_train_dataloaders[book_ind]:
+        model.prior_mean = optree.tree_map(
+            lambda x: x.to(model.device), model.prior_mean
+        )
+        model.prior_sd = optree.tree_map(lambda x: x.to(model.device), model.prior_sd)
+        laplace_state = optree.tree_map(lambda x: x.to(model.device), laplace_state)
+        for batch in tqdm.tqdm(laplace_train_dataloaders[book_ind]):
             batch = optree.tree_map(lambda x: x.to(model.device), batch)
             laplace_state = laplace_transform.update(
                 laplace_state,

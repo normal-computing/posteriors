@@ -36,17 +36,6 @@ trainer_kwargs = {
 
 config = load_config(args.base)
 
-
-####
-config = load_config("experiments/utils/configs/lora_sam.yaml")
-trainer_kwargs = {
-    "max_epochs": 1,
-    "accelerator": "gpu",
-    "log_every_n_steps": 1,
-}
-#####
-
-
 tokenizer = AutoTokenizer.from_pretrained(
     config.model_config.pretrained_model_name_or_path
 )

@@ -35,17 +35,6 @@ trainer_kwargs = {
 
 config = load_config(args.base)
 
-
-####
-config = load_config("experiments/utils/configs/lora_sam.yaml")
-trainer_kwargs = {
-    "max_epochs": 1,
-    "accelerator": "gpu",
-    "log_every_n_steps": 1,
-}
-#####
-
-
 tokenizer = AutoTokenizer.from_pretrained(
     config.model_config.pretrained_model_name_or_path
 )
@@ -73,9 +62,9 @@ trainer = Trainer(**trainer_kwargs)
 for book_ind in range(config.num_tasks):
     print(f"Training on book {book_ind} of {config.num_tasks}")
 
-    # Train for MAP
     model.num_data = len(train_dataloaders[book_ind].dataset)
 
+    # Train for MAP
     trainer.fit(
         model,
         train_dataloaders[book_ind],

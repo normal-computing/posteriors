@@ -1,10 +1,10 @@
 # File dirs
 base_dir: &base_path "./experiments/"
-logs_dir: &logs_path "./experiments/runs/multiple_lora/"
-data_dir: &data_path "./experiments/multiple_lora/data/"
+logs_dir: &logs_path "./experiments/runs/lora_sam/"
+data_dir: &data_path "./experiments/lora_sam/data/"
 
-experiment_name: "multiple_lora"
-num_tasks: 4
+experiment_name: "lora_sam"
+num_tasks: 1
 
 # Model
 model_config: &model_params
@@ -25,7 +25,5 @@ dataset_path: "./experiments/data/pg19-even-smaller.json"
 batch_size: 2
 num_workers: 11
 tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
-max_length: null
-truncation: False
 stride_length: 2048
 stride_overlap: 1024

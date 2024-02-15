@@ -39,7 +39,7 @@ class BayesTransformerModule(L.LightningModule):
         modules = list(model.model.layers.named_parameters())
         # Get layer index, name for layers to adapt
         module_names_with_layer = [
-            (name.split(".")[0], f"layer.{name.strip('.weight')}")
+            (name.split(".")[0], f"layers.{name.strip('.weight')}")
             for name, param in modules
             if any(
                 sub in name

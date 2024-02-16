@@ -17,6 +17,7 @@ class BayesTransformerModule(L.LightningModule):
     def __init__(self, config: FrozenConfigDict):
         super().__init__()
         self.automatic_optimization = False
+        self.dir = config.experiment_log_dir
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
         self.lr = config.lr
@@ -81,6 +82,13 @@ class BayesTransformerModule(L.LightningModule):
             dict(self.model.named_parameters()), self.param_to_log_likelihood
         )
 
+    def log_metrics(self, val_task, metrics, step=None):
+        with open(self.dir, "a") as f:
+            for metric_name, metric_value in metrics.items():
+                f.write(
+                    f"{self.current_epoch},{step},{self.task_no},{val_task},{metric_name},{metric_value}\n"
+                )
+
     @staticmethod
     def univariate_normal_log_prob(x, mean, sd):
         return -0.5 * ((x - mean) / sd) ** 2
@@ -125,7 +133,7 @@ class BayesTransformerModule(L.LightningModule):
 
         return log_post
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         inputs = batch["input_ids"]
         targets = inputs[:, 1:].clone().detach()
 
@@ -138,25 +146,9 @@ class BayesTransformerModule(L.LightningModule):
         preds = logits.argmax(-1)
 
         self.val_accuracy.update(preds, targets)
-        self.log(
-            "val_loss",
-            output.loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-            sync_dist=True,
-        )
+
+        self.log_metrics(dataloader_idx, {"val_loss": output.loss}, step=batch_idx)
         return output.loss
 
-    def on_validation_epoch_end(
-        self,
-    ):
-        self.log(
-            "val_accuracy",
-            self.val_accuracy.compute(),
-            prog_bar=True,
-            logger=True,
-            sync_dist=True,
-        )
-        print(f"Validation Accuracy: {self.val_accuracy.compute()}")
+    def on_validation_epoch_end(self, dataloader_idx=0):
+        self.log_metrics(dataloader_idx, {"val_accuracy": self.val_accuracy.compute()})

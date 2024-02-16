@@ -101,7 +101,7 @@ for book_ind in range(config.num_tasks):
         val_dataloaders=[test_dataloaders[i] for i in range(book_ind + 1)],
     )
 
-    if config.lambda_param > 0.0:
+    if config.lambda_param > 0.0 and book_ind < config.num_tasks - 1:
         print(f"Fitting Laplace on book {book_ind + 1} of {config.num_tasks}")
 
         # Get Laplace precision diag
@@ -126,16 +126,24 @@ for book_ind in range(config.num_tasks):
         laplace_state = optree.tree_map(detach, laplace_state)
 
         # Update sequential prior
-        model.prior_mean = optree.tree_map(
-            lambda mu, q, sig, f: (sig**-2 * mu + config.lambda_param * f * q)
-            / (sig**-2 + config.lambda_param * f),
-            model.prior_mean,
-            laplace_state.mean,
-            model.prior_sd,
-            laplace_state.prec_diag,
-        )
-        model.prior_sd = optree.tree_map(
-            lambda sig, f: 1 / torch.sqrt(sig**-2 + f * config.lambda_param),
-            model.prior_sd,
-            laplace_state.prec_diag,
-        )
+        if config.average_priors:
+            model.prior_mean = optree.tree_map(
+                lambda mu, q, sig, f: (sig**-2 * mu + config.lambda_param * f * q)
+                / (sig**-2 + config.lambda_param * f),
+                model.prior_mean,
+                laplace_state.mean,
+                model.prior_sd,
+                laplace_state.prec_diag,
+            )
+            model.prior_sd = optree.tree_map(
+                lambda sig, f: 1 / torch.sqrt(sig**-2 + f * config.lambda_param),
+                model.prior_sd,
+                laplace_state.prec_diag,
+            )
+
+        else:
+            model.prior_mean = laplace_state.mean
+            model.prior_sd = optree.tree_map(
+                lambda f: 1 / torch.sqrt(f * config.lambda_param),
+                laplace_state.prec_diag,
+            )

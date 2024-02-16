@@ -6,6 +6,7 @@ data_dir: &data_path "./experiments/lora_sam/data/"
 experiment_name: "lora_sam"
 num_tasks: 3
 lambda_param: 0.
+average_priors: false
 
 # Model
 model_config: &model_params

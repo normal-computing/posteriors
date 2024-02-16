@@ -75,6 +75,9 @@ class BayesTransformerModule(L.LightningModule):
         self.model.print_trainable_parameters()
         self.model_func = model_to_function(self.model)
 
+        self.set_sub_params()
+
+    def set_sub_params(self):
         (
             self.sub_params,
             self.sub_param_to_log_likelihood,
@@ -127,7 +130,7 @@ class BayesTransformerModule(L.LightningModule):
         log_post, out = self.sub_param_to_log_posterior(self.sub_params, batch)
         log_post.backward()
 
-        self.log("log_post", log_post.item())
+        self.log("log_post", log_post)
         self.log("loss", out.loss)
         self.opt.step()
 
@@ -146,9 +149,14 @@ class BayesTransformerModule(L.LightningModule):
         preds = logits.argmax(-1)
 
         self.val_accuracy.update(preds, targets)
+        self.log(f"val_loss_task_{dataloader_idx}", output.loss)
 
-        self.log_metrics(dataloader_idx, {"val_loss": output.loss}, step=batch_idx)
+        self.log_metrics(
+            dataloader_idx, {f"val_loss_{dataloader_idx}": output.loss}, step=batch_idx
+        )
         return output.loss
 
     def on_validation_epoch_end(self, dataloader_idx=0):
-        self.log_metrics(dataloader_idx, {"val_accuracy": self.val_accuracy.compute()})
+        acc = self.val_accuracy.compute()
+        self.log(f"val_accuracy_{dataloader_idx}", acc)
+        self.log_metrics(dataloader_idx, {f"val_accuracy_{dataloader_idx}": acc})

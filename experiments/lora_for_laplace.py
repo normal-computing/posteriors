@@ -8,13 +8,11 @@ import optree
 import tqdm
 from ml_collections.config_dict import ConfigDict
 
-
 import uqlib
 
 from experiments.utils import load_config, parse_devices, setup_log_dir, save_config
 from experiments.data.load_pg19 import load_pg19_dataloaders
 from experiments.laplace_lora import BayesTransformerModule
-
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -25,18 +23,22 @@ parser.add_argument("--devices", default=parse_devices, type=str)
 parser.add_argument("--epochs", default=100, type=int)
 parser.add_argument("--log_frequency", default=10, type=int)
 parser.add_argument("--seed", default=42, type=int)
+parser.add_argument("--sanity_checks", default=0, type=int)
 
 args = parser.parse_args()
 
 device_type = "cpu" if callable(args.devices) else "gpu"
 
+
 trainer_kwargs = {
     "max_epochs": args.epochs,
     "accelerator": device_type,
     "log_every_n_steps": args.log_frequency,
+    "num_sanity_val_steps": args.sanity_checks,
 }
 
 config = load_config(args.base)
+
 
 timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 experiment_name = config.get("experiment_name", None)
@@ -74,20 +76,23 @@ laplace_train_dataloaders, _ = load_pg19_dataloaders(
 )
 
 model = BayesTransformerModule(config.model_config)
-
 model.prior_mean = optree.tree_map(torch.zeros_like, model.sub_params)
 model.prior_sd = optree.tree_map(
     lambda x: torch.ones_like(x) * config.model_config.first_prior_sd, model.sub_params
 )
 
-# Logs to tensorboard by default
-trainer = Trainer(**trainer_kwargs)
-
 for book_ind in range(config.num_tasks):
     print(f"Training on book {book_ind + 1} of {config.num_tasks}")
+
+    # Logs to tensorboard by default
+    trainer = Trainer(**trainer_kwargs)
+
     model.task_no = book_ind
 
     model.num_data = len(train_dataloaders[book_ind].dataset)
+
+    model.set_sub_params()
+    model.zero_grad()
 
     # Train for MAP
     trainer.fit(
@@ -95,7 +100,6 @@ for book_ind in range(config.num_tasks):
         train_dataloaders[book_ind],
         val_dataloaders=[test_dataloaders[i] for i in range(book_ind + 1)],
     )
-    trainer.fit_loop.epoch_loop._results.clear()
 
     if config.lambda_param > 0.0:
         print(f"Fitting Laplace on book {book_ind + 1} of {config.num_tasks}")
@@ -112,9 +116,14 @@ for book_ind in range(config.num_tasks):
         for batch in tqdm.tqdm(laplace_train_dataloaders[book_ind]):
             batch = optree.tree_map(lambda x: x.to(model.device), batch)
             laplace_state = laplace_transform.update(
-                laplace_state,
-                batch,
+                laplace_state, batch, inplace=False
             )
+
+        def detach(ten):
+            if isinstance(ten, torch.Tensor):
+                return ten.detach()
+
+        laplace_state = optree.tree_map(detach, laplace_state)
 
         # Update sequential prior
         model.prior_mean = optree.tree_map(

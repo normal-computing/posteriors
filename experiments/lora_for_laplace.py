@@ -127,16 +127,17 @@ for book_ind in range(config.num_tasks):
 
         # Update sequential prior
         if config.average_priors:
+            rescale_param = model.num_data * config.lambda_param
             model.prior_mean = optree.tree_map(
-                lambda mu, q, sig, f: (sig**-2 * mu + config.lambda_param * f * q)
-                / (sig**-2 + config.lambda_param * f),
+                lambda mu, q, sig, f: (sig**-2 * mu + rescale_param * f * q)
+                / (sig**-2 + rescale_param * f),
                 model.prior_mean,
                 laplace_state.mean,
                 model.prior_sd,
                 laplace_state.prec_diag,
             )
             model.prior_sd = optree.tree_map(
-                lambda sig, f: 1 / torch.sqrt(sig**-2 + f * config.lambda_param),
+                lambda sig, f: 1 / torch.sqrt(sig**-2 + f * rescale_param),
                 model.prior_sd,
                 laplace_state.prec_diag,
             )

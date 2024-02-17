@@ -143,7 +143,7 @@ for book_ind in range(config.num_tasks):
             )
 
         else:
-            model.prior_mean = laplace_state.mean
+            model.prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
             model.prior_sd = optree.tree_map(
                 lambda f: 1 / torch.sqrt(f * config.lambda_param),
                 laplace_state.prec_diag,

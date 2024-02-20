@@ -118,7 +118,7 @@ def update(
     mean, log_sd_diag = torchopt.apply_updates(
         (state.mean, state.log_sd_diag), updates, inplace=inplace
     )
-    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.item(), aux)
+    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.detach(), aux)
 
 
 def build(

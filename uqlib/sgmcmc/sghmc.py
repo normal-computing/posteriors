@@ -20,7 +20,7 @@ class SGHMCState(NamedTuple):
 
     params: TensorTree
     momenta: TensorTree
-    log_posterior: float = 0.0
+    log_posterior: torch.tensor = torch.tensor(0.0)
     aux: Any = None
 
 
@@ -90,7 +90,7 @@ def update(
     )
     momenta = flexi_tree_map(transform_momenta, state.momenta, grads, inplace=inplace)
 
-    return SGHMCState(params, momenta, log_post.item(), aux)
+    return SGHMCState(params, momenta, log_post.detach(), aux)
 
 
 def build(

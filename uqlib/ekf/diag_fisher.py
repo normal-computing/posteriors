@@ -113,7 +113,7 @@ def update(
         grad,
         inplace=inplace,
     )
-    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().item(), aux)
+    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
 
 
 def build(

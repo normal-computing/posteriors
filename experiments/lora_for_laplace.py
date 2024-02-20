@@ -89,7 +89,11 @@ for book_ind in range(config.num_tasks):
 
     model.task_no = book_ind
 
-    model.num_data = len(train_dataloaders[book_ind].dataset)
+    model.num_data = (
+        len(train_dataloaders[book_ind].dataset)
+        * config.train_batch_size
+        * (config.stride_length - 1)
+    )
 
     model.set_sub_params()
     model.zero_grad()
@@ -143,8 +147,9 @@ for book_ind in range(config.num_tasks):
             )
 
         else:
+            rescale_factor = (config.stride_length - 1) ** 2 * config.lambda_param
             model.prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
             model.prior_sd = optree.tree_map(
-                lambda f: 1 / torch.sqrt(f * config.lambda_param),
+                lambda f: 1 / torch.sqrt(f * rescale_factor),
                 laplace_state.prec_diag,
             )

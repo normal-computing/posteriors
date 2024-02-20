@@ -101,7 +101,11 @@ for book_ind in range(config.num_tasks):
     # Train for MAP
     trainer.fit(
         model,
-        train_dataloaders[book_ind],
+        train_dataloaders=(
+            train_dataloaders[book_ind]
+            if config.sequential
+            else [train_dataloaders[i] for i in range(book_ind + 1)]
+        ),
         val_dataloaders=[test_dataloaders[i] for i in range(book_ind + 1)],
     )
 

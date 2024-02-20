@@ -21,6 +21,7 @@ class BayesTransformerModule(L.LightningModule):
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
         self.lr = config.lr
+        self.betas_warmstart = config.betas_warmstart
 
         # These need to updated with the correct values before calling trainer.fit
         self.prior_mean = None
@@ -119,15 +120,26 @@ class BayesTransformerModule(L.LightningModule):
         return log_lik + log_prior / self.num_data, output
 
     def configure_optimizers(self):
-        self.opt = AdamW(self.sub_params.values(), lr=self.lr, maximize=True)
+        self.opt = AdamW(
+            self.sub_params.values(),
+            lr=self.lr,
+            maximize=True,
+            betas=(0.9 ** self.betas_warmstart[0], 0.999 ** self.betas_warmstart[1]),
+        )
         self.sub_params = tree_map(lambda x: x.to(self.device), self.sub_params)
         self.prior_mean = tree_map(lambda x: x.to(self.device), self.prior_mean)
         self.prior_sd = tree_map(lambda x: x.to(self.device), self.prior_sd)
 
     def training_step(self, batch, batch_idx):
+        batch_data = (
+            {key: torch.cat([d[key] for d in batch], dim=0) for key in batch[0]}
+            if isinstance(batch, list)
+            else batch
+        )
+
         self.opt.zero_grad()
 
-        log_post, out = self.sub_param_to_log_posterior(self.sub_params, batch)
+        log_post, out = self.sub_param_to_log_posterior(self.sub_params, batch_data)
         log_post.backward()
 
         self.log("log_post", log_post)
@@ -152,11 +164,13 @@ class BayesTransformerModule(L.LightningModule):
         self.log(f"val_loss_task_{dataloader_idx}", output.loss)
 
         self.log_metrics(
-            dataloader_idx, {f"val_loss_{dataloader_idx}": output.loss}, step=batch_idx
+            dataloader_idx,
+            {f"val_loss_task_{dataloader_idx}": output.loss},
+            step=batch_idx,
         )
         return output.loss
 
     def on_validation_epoch_end(self, dataloader_idx=0):
         acc = self.val_accuracy.compute()
-        self.log(f"val_accuracy_{dataloader_idx}", acc)
-        self.log_metrics(dataloader_idx, {f"val_accuracy_{dataloader_idx}": acc})
+        self.log("val_accuracy", acc)
+        self.log_metrics(dataloader_idx, {"val_accuracy": acc})

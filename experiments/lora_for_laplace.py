@@ -89,11 +89,12 @@ for book_ind in range(config.num_tasks):
 
     model.task_no = book_ind
 
-    model.num_data = (
-        len(train_dataloaders[book_ind].dataset)
-        * config.train_batch_size
-        * (config.stride_length - 1)
-    )
+    # model.num_data = (
+    #     len(train_dataloaders[book_ind].dataset)
+    #     * config.train_batch_size
+    #     * (config.stride_length - 1)
+    # )
+    model.num_data = 1
 
     model.set_sub_params()
     model.zero_grad()
@@ -114,7 +115,7 @@ for book_ind in range(config.num_tasks):
 
         # Get Laplace precision diag
         laplace_transform = uqlib.laplace.diag_fisher.build(
-            model.sub_param_to_log_posterior
+            model.sub_param_to_log_likelihood
         )
         model.to(
             "cuda" if device_type == "gpu" else "cpu"
@@ -135,7 +136,8 @@ for book_ind in range(config.num_tasks):
 
         # Update sequential prior
         if config.average_priors:
-            rescale_param = model.num_data * config.lambda_param
+            # rescale_param = model.num_data * config.lambda_param
+            rescale_param = config.lambda_param
             model.prior_mean = optree.tree_map(
                 lambda mu, q, sig, f: (sig**-2 * mu + rescale_param * f * q)
                 / (sig**-2 + rescale_param * f),

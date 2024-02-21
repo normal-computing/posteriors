@@ -1,11 +1,11 @@
 # File dirs
 base_dir: &base_path "./experiments/"
-logs_dir: &logs_path "./experiments/runs/lora_sam/"
-data_dir: &data_path "./experiments/lora_sam/data/"
+logs_dir: &logs_path "./experiments/runs/lora/"
+data_dir: &data_path "./experiments/lora/data/"
 
 experiment_name: "lora_sam"
 num_tasks: 3
-lambda_param: 1e4
+lambda_param: 1
 average_priors: true
 sequential: true
 
@@ -14,7 +14,8 @@ model_config: &model_params
   pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
   lr: 1e-3
   first_prior_sd: 1e10
-  betas_warmstart: [10,10]
+  betas_warmstart: [1,1]
+  ignore_first: 2048
 
   #LoRA
   lora_config: &lora_params

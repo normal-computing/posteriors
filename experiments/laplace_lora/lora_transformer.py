@@ -4,6 +4,7 @@ from optree import tree_map, tree_reduce
 import lightning as L
 import torch
 from torch.optim import AdamW
+from torch.distributions import Categorical
 from torchmetrics import Accuracy
 from transformers import AutoModelForCausalLM
 from peft import LoraConfig, TaskType, get_peft_model
@@ -18,6 +19,7 @@ class BayesTransformerModule(L.LightningModule):
         super().__init__()
         self.automatic_optimization = False
         self.dir = config.experiment_log_dir
+        self.ignore_first = config.ignore_first
 
         self.pretrained_model_name_or_path = config.pretrained_model_name_or_path
         self.lr = config.lr
@@ -110,7 +112,19 @@ class BayesTransformerModule(L.LightningModule):
         self, p, batch
     ) -> Tuple[torch.tensor, uqlib.types.TensorTree]:
         output = self.model_func(p, labels=batch["input_ids"], **batch)
-        return -output.loss, output
+        logits_start = self.ignore_first
+        logits = output.logits[
+            :, (logits_start - 1) : -1, :
+        ].contiguous()  # (batch_size, seq_len - 1, vocab_size)
+        labels = batch["input_ids"][
+            :, logits_start:
+        ].contiguous()  # (batch_size, seq_len - 1)
+        logits = logits.view(
+            -1, logits.size(-1)
+        )  # (batch_size * (seq_len - 1), vocab_size)
+        labels = labels.view(-1)  # (batch_size * (seq_len - 1), )
+        log_lik = Categorical(logits=logits, validate_args=False).log_prob(labels).sum()
+        return log_lik, output
 
     def sub_param_to_log_posterior(
         self, p, batch

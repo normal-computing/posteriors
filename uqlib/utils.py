@@ -93,35 +93,6 @@ def hvp(
     return jvp(grad(f, has_aux=has_aux), primals, tangents, has_aux=has_aux)
 
 
-def hessian_diag(f: Callable, has_aux: bool = False) -> Callable:
-    """Modify a scalar-valued function that takes a PyTree (with tensor values) as first
-    input to return its Hessian diagonal.
-
-    Inspired by https://github.com/google/jax/issues/3801
-
-    Args:
-        f: A scalar-valued function that takes a dict with tensor values in its first
-        argument and produces a scalar output.
-        has_aux: Whether f returns auxiliary information.
-
-    Returns:
-        A new function that computes the Hessian diagonal.
-    """
-
-    def hessian_diag_fn(x: Any, *args, **kwargs) -> torch.Tensor:
-        v = tree_map(lambda v: torch.ones_like(v, requires_grad=False), x)
-
-        def ftemp(xtemp):
-            return f(xtemp, *args, **kwargs)
-
-        if has_aux:
-            return hvp(ftemp, (x,), (v,), has_aux=has_aux)[1:]
-        else:
-            return hvp(ftemp, (x,), (v,), has_aux=has_aux)[1]
-
-    return hessian_diag_fn
-
-
 def diag_normal_log_prob(
     x: TensorTree, mean: TensorTree, sd_diag: TensorTree, validate_args: bool = False
 ) -> float:

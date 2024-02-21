@@ -5,7 +5,6 @@ from optree import tree_map, tree_flatten
 from uqlib import (
     model_to_function,
     linearized_forward_diag,
-    hessian_diag,
     diag_normal_log_prob,
     diag_normal_sample,
     extract_requires_grad,
@@ -117,45 +116,6 @@ def test_linearized_forward_diag():
         jac_i = jac_flat[i]
         delta = jac_i @ torch.diag(sd_diag_flat**2) @ jac_i.T
         assert torch.allclose(lin_cov[i], delta, atol=1e-5)
-
-
-def test_hessian_diag():
-    # Test with a constant function
-    def const_fn(_):
-        return torch.tensor(3.0)
-
-    hessian_diag_func = hessian_diag(const_fn)
-    x = torch.tensor([1.0, 2.0])
-    result = hessian_diag_func(x)
-    expected = torch.zeros_like(x)
-    assert torch.equal(result, expected)
-
-    x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag_func(x)
-    expected = tree_map(lambda v: torch.zeros_like(v), x)
-    for key in result:
-        assert torch.equal(result[key], expected[key])
-
-    # Test with a linear function
-    def linear_fn(x):
-        return x["a"].sum() + x["b"].sum()
-
-    hessian_diag_func = hessian_diag(linear_fn)
-    x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag_func(x)
-    for key in result:
-        assert torch.equal(result[key], expected[key])
-
-    # Test with a quadratic function
-    def quad_fn(x):
-        return (x["a"] ** 2).sum() + (x["b"] ** 2).sum()
-
-    hessian_diag_func = hessian_diag(quad_fn)
-    x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
-    result = hessian_diag_func(x)
-    expected = tree_map(lambda v: 2 * torch.ones_like(v), x)
-    for key in result:
-        assert torch.equal(result[key], expected[key])
 
 
 def test_diag_normal_log_prob():

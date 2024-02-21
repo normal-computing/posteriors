@@ -61,10 +61,14 @@ def load_pg19_dataloaders(
             }
         )
 
+    tokenized_datasets = tokenized_datasets.filter(
+        lambda x: len(x["input_ids"]) > 0 and len(x["attention_mask"]) > 0
+    )
+
     if config.shuffle:
         tokenized_datasets = tokenized_datasets.map(
             lambda x: {
-                "input_ids": x["input_ids"][torch.randperm(len(x["input_ids"]))],
+                "input_ids": x["input_ids"][torch.randperm(x["input_ids"].size(0))],
                 "attention_mask": x["attention_mask"][
                     torch.randperm(len(x["attention_mask"]))
                 ],

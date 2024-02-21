@@ -154,6 +154,7 @@ for book_ind in range(config.num_tasks):
             rescale_factor = (config.stride_length - 1) ** 2 * config.lambda_param
             model.prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
             model.prior_sd = optree.tree_map(
-                lambda f: 1 / torch.sqrt(f * rescale_factor),
+                lambda p, f: (p**-2 + f * rescale_factor) ** -0.5,
+                model.prior_sd,
                 laplace_state.prec_diag,
             )

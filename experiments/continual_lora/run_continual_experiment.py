@@ -182,7 +182,6 @@ for episode_ind in range(config.num_tasks):
         for batch in train_dl:
             batch = optree.tree_map(lambda x: x.to(args.device), batch)
             optimizer.zero_grad()
-            model.zero_grad()
             log_post, output = train_sub_param_to_log_posterior(sub_params, batch)
             log_post.backward()
             optimizer.step()
@@ -207,7 +206,7 @@ for episode_ind in range(config.num_tasks):
 
                 # Print validation
                 print(
-                    f"Episode {episode_ind}, \t Epoch {epoch}, \t Val ind {val_ind}, \t Val loss: {val_loss}"
+                    f"\nEpisode {episode_ind}, \t Epoch {epoch}, \t Val ind {val_ind}, \t Val loss: {val_loss}"
                 )
 
                 # Log validation
@@ -241,6 +240,12 @@ for episode_ind in range(config.num_tasks):
             laplace_state = laplace_transform.update(
                 laplace_state, batch, inplace=False
             )
+
+        def detach(ten):
+            if isinstance(ten, torch.Tensor):
+                return ten.detach()
+
+        laplace_state = optree.tree_map(detach, laplace_state)
 
         current_prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
         current_prior_sd = optree.tree_map(

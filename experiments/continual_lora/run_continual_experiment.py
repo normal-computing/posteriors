@@ -85,24 +85,30 @@ model.print_trainable_parameters()
 # Convert logits to log likelihood
 # scale_factor is required to rescale stochastic log likelihood so that it is
 # an unbiased estimate of the full log likelihood
-def logits_to_log_lik(logits, labels):
+def logits_to_log_lik(logits, labels, keep_mask):
     # pred_seq_len = seq_length - ignore_first
     logits_start = config.model_config.ignore_first
     logits = logits[
         :, (logits_start - 1) : -1, :
     ].contiguous()  # (batch_size, pred_seq_len, vocab_size)
     labels = labels[:, logits_start:].contiguous()  # (batch_size, pred_seq_len)
-    log_lik = (
+    keep_mask = keep_mask[:, logits_start:].contiguous()  # (batch_size, pred_seq_len)
+    log_lik_all = (
         Categorical(logits=logits, validate_args=False).log_prob(labels).sum(1).mean()
-    )  # sum over sequence, average over batch to give unbiased estimate of single sequence log likelihood
+    )
+    log_lik_all *= keep_mask
+    # sum over sequence, average over batch to give unbiased estimate of single sequence log likelihood
     # (within sequence log likelihoods are not independent)
+    log_lik = log_lik_all.sum(1).mean()
     return log_lik  # rescale to full log likelihood
 
 
 # Full parameter set log_likelihood
 def param_to_log_likelihood(params, batch):
     output = model_func(params, labels=batch["input_ids"], **batch)
-    log_lik = logits_to_log_lik(output.logits, batch["input_ids"])
+    log_lik = logits_to_log_lik(
+        output.logits, batch["input_ids"], batch["attention_mask"]
+    )
     return log_lik, output
 
 

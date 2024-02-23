@@ -103,10 +103,8 @@ def logits_to_log_lik(logits, labels, scale_factor):
         :, (logits_start - 1) : -1, :
     ].contiguous()  # (batch_size, pred_seq_len, vocab_size)
     labels = labels[:, logits_start:].contiguous()  # (batch_size, pred_seq_len)
-    logits = logits.view(-1, logits.size(-1))  # (batch_size * pred_seq_len, vocab_size)
-    labels = labels.view(-1)  # (batch_size * pred_seq_len, )
     log_lik = (
-        Categorical(logits=logits, validate_args=False).log_prob(labels).mean()
+        Categorical(logits=logits, validate_args=False).log_prob(labels).sum(1).mean()
     )  # average gives single token expected log likelihood
     return log_lik * scale_factor  # rescale to full log likelihood
 
@@ -153,6 +151,8 @@ current_prior_sd = optree.tree_map(
     sub_params,
 )
 
+# Set up optimizer
+optimizer = torch.optim.AdamW(sub_params.values(), lr=config.lr, maximize=True)
 
 # Run experiment!
 for episode_ind in range(config.num_tasks):
@@ -172,9 +172,6 @@ for episode_ind in range(config.num_tasks):
         scale_factor=1,
     )
 
-    # Set up optimizer
-    optimizer = torch.optim.AdamW(sub_params.values(), lr=config.lr, maximize=True)
-
     # Train for MAP
     train_dl = train_dataloaders[episode_ind]
     test_dls = [test_dataloaders[i] for i in range(episode_ind + 1)]
@@ -191,6 +188,13 @@ for episode_ind in range(config.num_tasks):
                 episode_ind,
                 episode_ind,
                 {"train_log_post": log_post.item()},
+            )
+            log_metrics(
+                config.train_log_dir,
+                epoch,
+                episode_ind,
+                episode_ind,
+                {"train_loss": output.loss.item()},
             )
 
         # Validation across all tasks seen so far
@@ -234,6 +238,7 @@ for episode_ind in range(config.num_tasks):
             laplace_sub_param_to_log_likelihood
         )
 
+        # Update Laplace state through data
         laplace_state = laplace_transform.init(sub_params)
         for batch in tqdm.tqdm(laplace_train_dataloaders[episode_ind]):
             batch = optree.tree_map(lambda x: x.to(args.device), batch)
@@ -241,12 +246,14 @@ for episode_ind in range(config.num_tasks):
                 laplace_state, batch, inplace=False
             )
 
+        # Detach Laplace state to stop gradients
         def detach(ten):
             if isinstance(ten, torch.Tensor):
                 return ten.detach()
 
         laplace_state = optree.tree_map(detach, laplace_state)
 
+        # Update sequential prior
         current_prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
         current_prior_sd = optree.tree_map(
             lambda p, f: (p**-2 + f * config.lambda_param) ** -0.5,

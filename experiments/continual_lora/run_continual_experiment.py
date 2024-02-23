@@ -93,9 +93,7 @@ def logits_to_log_lik(logits, labels, keep_mask):
     ].contiguous()  # (batch_size, pred_seq_len, vocab_size)
     labels = labels[:, logits_start:].contiguous()  # (batch_size, pred_seq_len)
     keep_mask = keep_mask[:, logits_start:].contiguous()  # (batch_size, pred_seq_len)
-    log_lik_all = (
-        Categorical(logits=logits, validate_args=False).log_prob(labels).sum(1).mean()
-    )
+    log_lik_all = Categorical(logits=logits, validate_args=False).log_prob(labels)
     log_lik_all *= keep_mask
     # sum over sequence, average over batch to give unbiased estimate of single sequence log likelihood
     # (within sequence log likelihoods are not independent)

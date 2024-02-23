@@ -1,10 +1,10 @@
 # File dirs
 logs_dir: &logs_path "./experiments/runs/lora/"
 
-experiment_name: "lora_laplace"
+experiment_name: "lora_sgd"
 num_tasks: 3
-lambda_param: 1e1
-lr: 5e-5
+lambda_param: 0
+lr: 1e-4
 
 # Model
 model_config: &model_params
@@ -23,9 +23,9 @@ model_config: &model_params
 dataset_path: "./experiments/continual_lora/data/pg19-5.json"
 train_batch_size: 2
 laplace_batch_size: 1
-drop_last: false
+drop_last: true
 train_proportion: 0.85
-shuffle: false
+shuffle: true
 num_workers: 11
 tokenizer_pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
 stride_length: 4096

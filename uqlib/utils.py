@@ -86,9 +86,9 @@ def hvp(
         has_aux: Whether f returns auxiliary information.
 
     Returns:
-        Returns a (output, hvp_out) tuple containing the output of func evaluated at
-        primals and the Jacobian-vector product. If has_aux is True, then instead
-        returns a (output, hvp_out, aux) tuple.
+        Returns a (gradient, hvp_out) tuple containing the gradient of func evaluated at
+        primals and the Hessian-vector product. If has_aux is True, then instead
+        returns a (gradient, hvp_out, aux) tuple.
     """
     return jvp(grad(f, has_aux=has_aux), primals, tangents, has_aux=has_aux)
 

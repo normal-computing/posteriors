@@ -5,13 +5,19 @@ from optree import tree_map, tree_flatten
 from uqlib import (
     model_to_function,
     linearized_forward_diag,
+    hvp,
     diag_normal_log_prob,
     diag_normal_sample,
+    tree_extract,
+    tree_insert,
+    tree_insert_,
     extract_requires_grad,
     insert_requires_grad,
     insert_requires_grad_,
     extract_requires_grad_and_func,
     inplacify,
+    tree_map_inplacify_,
+    flexi_tree_map,
     per_samplify,
 )
 
@@ -118,6 +124,27 @@ def test_linearized_forward_diag():
         assert torch.allclose(lin_cov[i], delta, atol=1e-5)
 
 
+def test_hvp():
+    def func(x):
+        return (x**5).sum()
+
+    x = torch.arange(1.0, 6.0)
+    v = torch.ones_like(x)
+    hvp_result = hvp(func, (x,), (v,))
+    expected = torch.func.hessian(func)(x) @ v
+    assert torch.allclose(hvp_result[0], torch.func.grad(func)(x))
+    assert torch.allclose(hvp_result[1], expected)
+
+    def func_and_aux(x):
+        return (x**5).sum(), x**2
+
+    hvp_result_aux = hvp(func_and_aux, (x,), (v,), has_aux=True)
+
+    assert torch.allclose(hvp_result_aux[0], torch.func.grad(func)(x))
+    assert torch.allclose(hvp_result_aux[1], expected)
+    assert torch.allclose(hvp_result_aux[2], x**2)
+
+
 def test_diag_normal_log_prob():
     mean = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
     sd_diag = {"a": torch.tensor([0.1, 0.2]), "b": torch.tensor([0.3, 0.4])}
@@ -155,6 +182,83 @@ def test_diag_normal_sample():
     for key in result_mean:
         assert torch.allclose(result_mean[key], mean[key], atol=1e-1)
         assert torch.allclose(result_std[key], sd_diag[key], atol=1e-1)
+
+
+def test_tree_extract():
+    params = {
+        "a": torch.tensor([1.0, 2.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    def check_func(x):
+        return x[0] < 2.0
+
+    result = tree_extract(check_func, params)
+
+    expected = {
+        "a": torch.tensor([1.0, 2.0]),
+        "b": torch.tensor([]),
+    }
+
+    for key in expected:
+        assert torch.equal(result[key], expected[key])
+
+
+def test_tree_insert():
+    params = {
+        "a": torch.tensor([1.0, 2.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    params_static = {
+        "a": torch.tensor([1.0, 2.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    sub_params = {
+        "a": torch.tensor([5.0, 6.0]),
+        "b": torch.tensor([]),
+    }
+
+    def check_func(x):
+        return x[0] < 2.0
+
+    params2 = tree_insert(check_func, params, sub_params)
+
+    expected = {
+        "a": torch.tensor([5.0, 6.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    for key in expected:
+        assert torch.equal(params2[key], expected[key])
+        assert torch.equal(params[key], params_static[key])
+
+
+def test_tree_insert_():
+    params = {
+        "a": torch.tensor([1.0, 2.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    sub_params = {
+        "a": torch.tensor([5.0, 6.0]),
+        "b": torch.tensor([]),
+    }
+
+    def check_func(x):
+        return x[0] < 2.0
+
+    params2 = tree_insert_(check_func, params, sub_params)
+
+    expected = {
+        "a": torch.tensor([5.0, 6.0]),
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    for key in expected:
+        assert torch.equal(params2[key], expected[key])
+        assert torch.equal(params[key], params2[key])
 
 
 def test_extract_requires_grad():
@@ -241,6 +345,33 @@ def test_inplacify():
 
     x = torch.tensor(1.0)
     y = inplacify(func)(x)
+
+    assert y == 2.0
+    assert x == 2.0
+
+
+def test_tree_map_inplacify_():
+    def func(x):
+        return x + 1
+
+    x = torch.tensor(1.0)
+    y = tree_map_inplacify_(func, x)
+
+    assert y == 2.0
+    assert x == 2.0
+
+
+def test_flexi_tree_map():
+    def func(x):
+        return x + 1
+
+    x = torch.tensor(1.0)
+    y = flexi_tree_map(func, x, inplace=False)
+
+    assert y == 2.0
+    assert x == 1.0
+
+    y = flexi_tree_map(func, x, inplace=True)
 
     assert y == 2.0
     assert x == 2.0

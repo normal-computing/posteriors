@@ -8,6 +8,7 @@ from uqlib import (
     hvp,
     diag_normal_log_prob,
     diag_normal_sample,
+    tree_size,
     tree_extract,
     tree_insert,
     tree_insert_,
@@ -232,6 +233,21 @@ def test_diag_normal_sample():
     for key in result_mean:
         assert torch.allclose(result_mean[key], mean[key], atol=1e-1)
         assert torch.allclose(result_std[key], sd_diag[key], atol=1e-1)
+
+
+def test_tree_size():
+    tree = {
+        "a": 3.0,
+        "b": torch.tensor([3.0, 4.0]),
+    }
+
+    result = tree_size(tree)
+    expected = 3
+
+    assert result == expected
+
+    assert tree_size(1) == 1
+    assert tree_size(1.2) == 1
 
 
 def test_tree_extract():

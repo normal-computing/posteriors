@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from optree import tree_map, tree_flatten
+from optree import tree_map, tree_flatten, tree_reduce
 
 from uqlib import (
     model_to_function,
@@ -146,6 +146,7 @@ def test_hvp():
 
 
 def test_diag_normal_log_prob():
+    # Test tree mean and tree sd
     mean = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
     sd_diag = {"a": torch.tensor([0.1, 0.2]), "b": torch.tensor([0.3, 0.4])}
     x = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
@@ -158,6 +159,55 @@ def test_diag_normal_log_prob():
     expected = torch.distributions.Normal(mean_flat, sd_flat).log_prob(x_flat).sum()
 
     assert torch.allclose(result, expected)
+
+    # Test float mean and tree sd
+    mean = 1.0
+    mean_tree = tree_map(lambda t: torch.ones_like(t) * mean, x)
+
+    result = diag_normal_log_prob(x, mean, sd_diag)
+    expected = diag_normal_log_prob(x, mean_tree, sd_diag)
+
+    assert torch.allclose(result, expected)
+
+    # Test tree mean and float sd
+    mean = {"a": torch.tensor([1.0, 2.0]), "b": torch.tensor([3.0, 4.0])}
+    sd_diag = 0.1
+
+    sd_tree = tree_map(lambda t: torch.ones_like(t) * sd_diag, x)
+
+    result = diag_normal_log_prob(x, mean, sd_diag)
+    expected = diag_normal_log_prob(x, mean, sd_tree)
+
+    assert torch.allclose(result, expected)
+
+    # Test float mean and float sd
+    mean = 1.0
+    sd_diag = 0.1
+
+    mean_tree = tree_map(lambda t: torch.ones_like(t) * mean, x)
+    sd_tree = tree_map(lambda t: torch.ones_like(t) * sd_diag, x)
+
+    result = diag_normal_log_prob(x, mean, sd_diag)
+    expected = diag_normal_log_prob(x, mean_tree, sd_tree)
+
+    assert torch.allclose(result, expected)
+
+    # Test unnormalized
+    result = diag_normal_log_prob(x, mean, sd_diag, normalized=False)
+    expected = tree_reduce(
+        torch.add,
+        tree_map(
+            lambda v, m, sd: -((v - m) ** 2 / (2 * sd**2)).sum(), x, mean_tree, sd_tree
+        ),
+    )
+    assert torch.allclose(result, expected)
+
+    # Test unnormalised gradient
+    result_grad = torch.func.grad(diag_normal_log_prob)(x, mean, sd_diag)
+    expected_grad = tree_map(lambda v, m, sd: -(v - m) / (sd**2), x, mean_tree, sd_tree)
+
+    for key in result_grad.keys():
+        assert torch.allclose(result_grad[key], expected_grad[key])
 
 
 def test_diag_normal_sample():

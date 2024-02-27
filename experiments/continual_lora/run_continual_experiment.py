@@ -165,13 +165,12 @@ for episode_ind in range(config.num_tasks):
     # Train for MAP
     train_dl = train_dataloaders[episode_ind]
     test_dls = [test_dataloaders[i] for i in range(episode_ind + 1)]
+    optimizer.zero_grad()
     for epoch in tqdm.tqdm(range(args.epochs)):
-        for batch in train_dl:
+        for i, batch in enumerate(train_dl):
             batch = optree.tree_map(lambda x: x.to(args.device), batch)
-            optimizer.zero_grad()
             log_post, output = train_sub_param_to_log_posterior(sub_params, batch)
             log_post.backward()
-            optimizer.step()
             log_metrics(
                 config.train_log_dir,
                 epoch,
@@ -186,6 +185,12 @@ for episode_ind in range(config.num_tasks):
                 episode_ind,
                 {"train_loss": output.loss.item()},
             )
+
+            if (
+                (i + 1) % config.accumulate_gradients_every == 0
+            ):  # Wait for several backward steps
+                optimizer.step()
+                optimizer.zero_grad()
 
         # Validation across all tasks seen so far
         with torch.inference_mode():

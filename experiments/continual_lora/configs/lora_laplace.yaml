@@ -3,8 +3,9 @@ logs_dir: &logs_path "./experiments/runs/lora/"
 
 experiment_name: "lora_laplace"
 num_tasks: 3
-lambda_param: 1e1
-lr: 5e-5
+lambda_param: 200
+lr: 75e-6
+accumulate_gradients_every: 5
 
 # Model
 model_config: &model_params
@@ -20,7 +21,7 @@ model_config: &model_params
     dropout: 0.
 
 # Dataset
-dataset_path: "./experiments/continual_lora/data/pg19-5.json"
+dataset_path: "./experiments/continual_lora/data/pg19-10.json"
 train_batch_size: 2
 laplace_batch_size: 1
 drop_last: false

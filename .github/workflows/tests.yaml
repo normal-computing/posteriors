@@ -36,4 +36,4 @@ jobs:
           pip install .[test]
       - name: Run the tests with pytest
         run: |
-          python -m pytest --cov=uqlib
+          python -m pytest --cov=uqlib --cov-report term-missing

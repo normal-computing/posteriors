@@ -234,6 +234,16 @@ def test_diag_normal_sample():
         assert torch.allclose(result_mean[key], mean[key], atol=1e-1)
         assert torch.allclose(result_std[key], sd_diag[key], atol=1e-1)
 
+    # Test float sd_diag
+    sd_diag = 0.1
+    torch.manual_seed(42)
+    result = diag_normal_sample(mean, sd_diag)
+    torch.manual_seed(42)
+    expected = tree_map(lambda m: torch.distributions.Normal(m, sd_diag).sample(), mean)
+
+    for key in result:
+        assert torch.equal(result[key], expected[key])
+
 
 def test_tree_size():
     tree = {

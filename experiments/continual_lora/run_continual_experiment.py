@@ -8,6 +8,7 @@ import optree
 import tqdm
 from ml_collections.config_dict import ConfigDict
 from functools import partial
+import math
 
 import uqlib
 
@@ -196,12 +197,15 @@ for episode_ind in range(config.num_tasks):
         with torch.inference_mode():
             for val_ind, test_dl in enumerate(test_dls):
                 losses = []
+                perplexity = []
                 for batch in test_dl:
                     batch = optree.tree_map(lambda x: x.to(args.device), batch)
                     log_lik, output = sub_param_to_log_likelihood(sub_params, batch)
                     losses.append(-log_lik.item())
+                    perplexity.append(math.exp(output.loss.item()))
 
                 val_loss = sum(losses) / len(losses)
+                val_perplexity = sum(perplexity) / len(perplexity)
 
                 # Print validation
                 print(
@@ -217,6 +221,13 @@ for episode_ind in range(config.num_tasks):
                     {f"val_loss_task_{val_ind}": val_loss},
                 )
 
+                log_metrics(
+                    config.eval_log_dir,
+                    epoch,
+                    episode_ind,
+                    val_ind,
+                    {f"val_perplexity_task_{val_ind}": val_perplexity},
+                )
     # Laplace approximation
     if config.lambda_param > 0.0 and episode_ind < config.num_tasks - 1:
         print(f"Fitting Laplace on episode {episode_ind + 1} of {config.num_tasks}")

@@ -8,7 +8,6 @@ import optree
 import tqdm
 from ml_collections.config_dict import ConfigDict
 from functools import partial
-import math
 
 import uqlib
 
@@ -202,14 +201,11 @@ for episode_ind in range(config.num_tasks):
                     batch = optree.tree_map(lambda x: x.to(args.device), batch)
                     log_lik, output = sub_param_to_log_likelihood(sub_params, batch)
                     losses.append(-log_lik.item())
-                    perplexity.append(math.exp(output.loss.item()))
-
-                val_loss = sum(losses) / len(losses)
-                val_perplexity = sum(perplexity) / len(perplexity)
+                    perplexity.append(torch.exp(output.loss.item()))
 
                 # Print validation
                 print(
-                    f"\nEpisode {episode_ind}, \t Epoch {epoch}, \t Val ind {val_ind}, \t Val loss: {val_loss}"
+                    f"\nEpisode {episode_ind}, \t Epoch {epoch}, \t Val ind {val_ind}, \t Val loss: {torch.tensor(losses).mean()}"
                 )
 
                 # Log validation
@@ -218,7 +214,7 @@ for episode_ind in range(config.num_tasks):
                     epoch,
                     episode_ind,
                     val_ind,
-                    {f"val_loss_task_{val_ind}": val_loss},
+                    {f"val_loss_task_{val_ind}": torch.tensor(losses).mean()},
                 )
 
                 log_metrics(
@@ -226,7 +222,7 @@ for episode_ind in range(config.num_tasks):
                     epoch,
                     episode_ind,
                     val_ind,
-                    {f"val_perplexity_task_{val_ind}": val_perplexity},
+                    {f"val_perplexity_task_{val_ind}": torch.tensor(perplexity).mean()},
                 )
     # Laplace approximation
     if config.lambda_param > 0.0 and episode_ind < config.num_tasks - 1:

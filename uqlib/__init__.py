@@ -9,6 +9,7 @@ from uqlib.utils import linearized_forward_diag
 from uqlib.utils import hvp
 from uqlib.utils import diag_normal_log_prob
 from uqlib.utils import diag_normal_sample
+from uqlib.utils import tree_size
 from uqlib.utils import tree_extract
 from uqlib.utils import tree_insert
 from uqlib.utils import tree_insert_

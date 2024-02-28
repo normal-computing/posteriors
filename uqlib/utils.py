@@ -94,22 +94,42 @@ def hvp(
 
 
 def diag_normal_log_prob(
-    x: TensorTree, mean: TensorTree, sd_diag: TensorTree, validate_args: bool = False
+    x: TensorTree,
+    mean: float | TensorTree = 0.0,
+    sd_diag: float | TensorTree = 1.0,
+    normalized: bool = True,
 ) -> float:
     """Evaluate multivariate normal log probability for a diagonal covariance matrix.
 
+    If either mean or sd_diag are scalars, it will be broadcasted to the same shape as x
+    (in a memory efficient manner).
+
     Args:
         x: Value to evaluate log probability at.
-        mean: Mean of the distribution.
-        sd_diag: Square-root diagonal of the covariance matrix.
-        validate_args: Whether to validate arguments, defaults to False as
-            torch.func.vmap doesn't like the control flows (if statements).
+        mean: Mean of the distribution. Defaults to 0.0.
+        sd_diag: Square-root diagonal of the covariance matrix. Defaults to 1.0.
+        normalized: Whether to use normalised log probability.
+            If False the elementwise log prob is -0.5 * ((x - mean) / sd_diag)**2.
 
     Returns:
         Log probability.
     """
+    if tree_size(mean) == 1:
+        mean = tree_map(lambda t: torch.tensor(mean, device=t.device), x)
+    if tree_size(sd_diag) == 1:
+        sd_diag = tree_map(lambda t: torch.tensor(sd_diag, device=t.device), x)
+
+    if normalized:
+
+        def univariate_norm_and_sum(v, m, sd):
+            return Normal(m, sd, validate_args=False).log_prob(v).sum()
+    else:
+
+        def univariate_norm_and_sum(v, m, sd):
+            return (-0.5 * ((v - m) / sd) ** 2).sum()
+
     log_probs = tree_map(
-        lambda v, m, sd: Normal(m, sd, validate_args=validate_args).log_prob(v).sum(),
+        univariate_norm_and_sum,
         x,
         mean,
         sd_diag,
@@ -119,9 +139,14 @@ def diag_normal_log_prob(
 
 
 def diag_normal_sample(
-    mean: TensorTree, sd_diag: TensorTree, sample_shape: torch.Size = torch.Size([])
+    mean: TensorTree,
+    sd_diag: float | TensorTree,
+    sample_shape: torch.Size = torch.Size([]),
 ) -> dict:
     """Sample from multivariate normal with diagonal covariance matrix.
+
+    If sd_diag is scalar, it will be broadcasted to the same shape as mean
+    (in a memory efficient manner).
 
     Args:
         mean: Mean of the distribution.
@@ -131,11 +156,31 @@ def diag_normal_sample(
     Returns:
         Sample(s) from normal distribution with the same structure as mean and sd_diag.
     """
+    if tree_size(sd_diag) == 1:
+        sd_diag = tree_map(lambda t: torch.tensor(sd_diag, device=t.device), mean)
+
     return tree_map(
         lambda m, sd: m + torch.randn(sample_shape + m.shape, device=m.device) * sd,
         mean,
         sd_diag,
     )
+
+
+def tree_size(tree: TensorTree) -> int:
+    """Returns the total number of elements in a PyTree.
+    Not the number of leaves, but the total sum of the number of elements in each tensor.
+
+    Args:
+        tree: A PyTree of tensors.
+
+    Returns:
+        Number of elements in the PyTree.
+    """
+
+    def ensure_tensor(x):
+        return x if isinstance(x, torch.Tensor) else torch.tensor(x)
+
+    return tree_reduce(torch.add, tree_map(lambda x: ensure_tensor(x).numel(), tree))
 
 
 def tree_extract(f: Callable[[torch.tensor], bool], tree: TensorTree) -> TensorTree:

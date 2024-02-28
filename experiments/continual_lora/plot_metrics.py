@@ -1,5 +1,4 @@
 import pandas as pd
-from scipy.stats import zscore
 import matplotlib.pyplot as plt
 
 
@@ -14,18 +13,21 @@ def produce_plot_A(df_base, df, n, window_size, save_dir, name="plot_A"):
     # Plot validation loss for first n tasks, partitioned by training stage
     fig, axs = plt.subplots(n, 1, figsize=(10, 8), sharex=True)
 
+    df = df_base.merge(
+        df,
+        on=["epoch", "task", "val_task", "metric_name"],
+        suffixes=("_sgd", "_laplace"),
+    )
     df = df[df["task"].isin(range(n))]
-    df_base = df_base[df_base["task"].isin(range(n))]
-
     for i in range(n):
         axs[i].plot(
-            df_base[df_base["metric_name"] == f"val_loss_task_{i}"]["metric_value"]
+            df[df["metric_name"] == f"val_loss_task_{i}"]["metric_value_sgd"]
             .rolling(window=window_size, center=True, min_periods=1)
             .mean(),
             label="SGD",
         )
         axs[i].plot(
-            df[df["metric_name"] == f"val_loss_task_{i}"]["metric_value"]
+            df[df["metric_name"] == f"val_loss_task_{i}"]["metric_value_laplace"]
             .rolling(window=window_size, center=True, min_periods=1)
             .mean(),
             label="Laplace",
@@ -49,35 +51,35 @@ def produce_plot_A(df_base, df, n, window_size, save_dir, name="plot_A"):
 
 
 def produce_plot_B(df_base, df, window_size, save_dir, name="plot_B"):
+    df = df_base.merge(
+        df,
+        on=["epoch", "task", "val_task", "metric_name"],
+        suffixes=("_sgd", "_laplace"),
+    )
+
+    df["group"] = (df["epoch"].diff() < 0).cumsum()
+    df["is_last_epoch"] = df["epoch"] == df.groupby("group")["epoch"].transform("max")
+    df = df[df["is_last_epoch"]]
+
     # Define the losses to plot
     losses = set([val for val in df["metric_name"].values if "val_loss" in val])
 
-    # Function to calculate rolling mean and remove outliers
-    def prepare_data(df):
-        # Calculate rolling mean
-        df_rolled = (
-            df[df["metric_name"].isin(losses)]
-            .groupby(["task", "epoch"])["metric_value"]
-            .rolling(window=window_size, center=True, min_periods=1)
-            .mean()
-            .reset_index()
-        )
+    plt.plot(
+        df[df["metric_name"].isin(losses)]
+        .groupby(["task"])["metric_value_sgd"]
+        .mean()
+        .values,
+        label="SGD",
+    )
+    plt.plot(
+        df[df["metric_name"].isin(losses)]
+        .groupby(["task"])["metric_value_laplace"]
+        .mean()
+        .values,
+        label="Laplace",
+    )
 
-        # Calculate Z-score for the metric values
-        df_rolled["zscore"] = zscore(df_rolled["metric_value"])
-
-        # Filter out outliers
-        df_filtered = df_rolled[abs(df_rolled["zscore"]) <= 3]
-        return df_filtered["metric_value"]
-
-    # Prepare data for both SGD and Laplace
-    df_base_prepared = prepare_data(df_base)
-    df_prepared = prepare_data(df)
-
-    # Plotting
-    plt.plot(df_base_prepared, label="SGD")
-    plt.plot(df_prepared, label="Laplace")
-    plt.xlabel("Training time")
+    plt.xlabel("Episodes")
     plt.ylabel("Validation Loss")
     plt.legend()
     plt.tight_layout()
@@ -86,8 +88,11 @@ def produce_plot_B(df_base, df, window_size, save_dir, name="plot_B"):
     plt.close()  # Close the plot to free memory
 
 
-def plot_training(df_base, df, window_size, save_dir, name="plot_train"):
+def plot_training(df_base, df, window_size, episode, save_dir, name="plot_train"):
     fig, ax = plt.subplots(figsize=(10, 3))
+
+    df = df[df["task"] == episode]
+    df_base = df_base[df_base["task"] == episode]
 
     ax.plot(
         df_base["metric_value"][df_base["metric_name"] == "train_loss"]
@@ -113,13 +118,13 @@ def plot_training(df_base, df, window_size, save_dir, name="plot_train"):
 
 
 # Path to your log file
-BASELINE_LOG_FILE_PATH = "experiments/runs/lora/2024-02-23T12-23-21_lora_sgd"
-LAPLACE_LOG_FILE_PATH = "experiments/runs/lora/2024-02-23T12-23-21_lora_sgd"
+BASELINE_LOG_FILE_PATH = "/path/to/baseline"
+LAPLACE_LOG_FILE_PATH = "/path/to/laplace"
 
 
 WINDOW_SIZE = 1
-WINDOW_SIZE_TRAIN = 1
-N = 3
+WINDOW_SIZE_TRAIN = 10
+N = 4
 SAVE_DIR = "pictures"
 
 if __name__ == "__main__":
@@ -139,5 +144,6 @@ if __name__ == "__main__":
         df_base=df_base_train,
         df=df_train,
         window_size=WINDOW_SIZE_TRAIN,
+        episode=0,
         save_dir=SAVE_DIR,
     )

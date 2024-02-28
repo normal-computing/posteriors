@@ -166,6 +166,7 @@ for episode_ind in range(config.num_tasks):
     train_dl = train_dataloaders[episode_ind]
     test_dls = [test_dataloaders[i] for i in range(episode_ind + 1)]
     optimizer.zero_grad()
+    best_loss = torch.inf
     for epoch in tqdm.tqdm(range(args.epochs)):
         for i, batch in enumerate(train_dl):
             batch = optree.tree_map(lambda x: x.to(args.device), batch)
@@ -201,7 +202,7 @@ for episode_ind in range(config.num_tasks):
                     batch = optree.tree_map(lambda x: x.to(args.device), batch)
                     log_lik, output = sub_param_to_log_likelihood(sub_params, batch)
                     losses.append(-log_lik.item())
-                    perplexity.append(torch.exp(output.loss.item()))
+                    perplexity.append(torch.exp(output.loss))
 
                 # Print validation
                 print(
@@ -224,6 +225,13 @@ for episode_ind in range(config.num_tasks):
                     val_ind,
                     {f"val_perplexity_task_{val_ind}": torch.tensor(perplexity).mean()},
                 )
+        if config.early_stopping:
+            if torch.tensor(losses).mean() < best_loss:
+                best_loss = torch.tensor(losses).mean()
+            else:
+                print(f"Early stopping on epoch {epoch}.")
+                break
+
     # Laplace approximation
     if config.lambda_param > 0.0 and episode_ind < config.num_tasks - 1:
         print(f"Fitting Laplace on episode {episode_ind + 1} of {config.num_tasks}")

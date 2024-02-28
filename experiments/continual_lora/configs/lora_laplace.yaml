@@ -6,6 +6,7 @@ num_tasks: 3
 lambda_param: 200
 lr: 75e-6
 accumulate_gradients_every: 5
+early_stopping: false
 
 # Model
 model_config: &model_params

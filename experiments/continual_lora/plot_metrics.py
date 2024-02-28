@@ -77,12 +77,14 @@ def produce_plot_A_new(df_base, df, n, window_size, save_dir, name="plot_A"):
     axs[i].set_xlabel("Training epoch")
 
     df["task_changed"] = df["task"] != df["task"].shift(1)
-    df["laplace_early"] = (
-        df["metric_value_laplace"].shift(-1).isna() & ~df["metric_value_laplace"].isna()
-    )
-    df["sgd_early"] = (
-        df["metric_value_sgd"].shift(-1).isna() & ~df["metric_value_sgd"].isna()
-    )
+    df["laplace_early"] = df["metric_value_laplace"].shift(-1).isna() & ~df[
+        "metric_value_laplace"
+    ].isna() | (df["task_changed"] & ~df["metric_value_laplace"].shift(1).isna())
+
+    df["sgd_early"] = df["metric_value_sgd"].shift(-1).isna() & ~df[
+        "metric_value_sgd"
+    ].isna() | (df["task_changed"] & ~df["metric_value_sgd"].shift(1).isna())
+
     # Adding vertical lines for training stages
     for ax in axs:
         for val in df[df["task_changed"]].index:

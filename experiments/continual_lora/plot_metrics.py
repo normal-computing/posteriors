@@ -9,6 +9,97 @@ def smooth_dataframe_column(df, column_name, window_size):
     )
 
 
+def produce_plot_A_new(df_base, df, n, window_size, save_dir, name="plot_A"):
+    # Plot validation loss for first n tasks, partitioned by training stage
+    fig, axs = plt.subplots(n, 1, figsize=(10, 8), sharex=True)
+
+    df = pd.merge(
+        df_base,
+        df,
+        on=["epoch", "task", "val_task"],
+        how="outer",
+        suffixes=("_sgd", "_laplace"),
+    )
+    df = (
+        pd.concat(
+            [
+                df[
+                    (
+                        (df["metric_name_sgd"] == f"val_loss_task_{i}")
+                        | df["metric_name_sgd"].isna()
+                    )
+                    & (
+                        (df["metric_name_laplace"] == f"val_loss_task_{i}")
+                        | df["metric_name_laplace"].isna()
+                    )
+                ]
+                for i in range(4)
+            ]
+        )
+        .sort_values(by=["task", "epoch", "val_task"])
+        .reset_index()
+    )
+
+    df = df[df["task"].isin(range(n))]
+    for i in range(n):
+        axs[i].plot(
+            df[
+                (
+                    (df["metric_name_sgd"] == f"val_loss_task_{i}")
+                    | df["metric_name_sgd"].isna()
+                )
+                & (
+                    (df["metric_name_laplace"] == f"val_loss_task_{i}")
+                    | df["metric_name_laplace"].isna()
+                )
+            ]["metric_value_sgd"]
+            .rolling(window=1, center=True, min_periods=1)
+            .mean(),
+            label="SGD",
+        )
+        axs[i].plot(
+            df[
+                (
+                    (df["metric_name_sgd"] == f"val_loss_task_{i}")
+                    | df["metric_name_sgd"].isna()
+                )
+                & (
+                    (df["metric_name_laplace"] == f"val_loss_task_{i}")
+                    | df["metric_name_laplace"].isna()
+                )
+            ]["metric_value_laplace"]
+            .rolling(window=1, center=True, min_periods=1)
+            .mean(),
+            label="Laplace",
+        )
+        axs[i].set_title(f"Task {i}")
+        axs[i].set_ylabel("Val Loss")
+    axs[i].set_xlabel("Training epoch")
+
+    df["task_changed"] = df["task"] != df["task"].shift(1)
+    df["laplace_early"] = (
+        df["metric_value_laplace"].shift(-1).isna() & ~df["metric_value_laplace"].isna()
+    )
+    df["sgd_early"] = (
+        df["metric_value_sgd"].shift(-1).isna() & ~df["metric_value_sgd"].isna()
+    )
+    # Adding vertical lines for training stages
+    for ax in axs:
+        for val in df[df["task_changed"]].index:
+            ax.axvline(x=val, linestyle="--", color="grey")
+        for val in df[df["laplace_early"]].index:
+            ax.axvline(x=val, linestyle="--", color="pink")
+        for val in df[df["sgd_early"]].index:
+            ax.axvline(x=val, linestyle="--", color="blue")
+
+    # Adding legend
+    axs[0].legend()
+
+    plt.tight_layout()
+    plt.savefig(f"{save_dir}/{name}.png", dpi=300)  # Save as PNG file with 300 DPI
+    plt.close()
+
+
 def produce_plot_A(df_base, df, n, window_size, save_dir, name="plot_A"):
     # Plot validation loss for first n tasks, partitioned by training stage
     fig, axs = plt.subplots(n, 1, figsize=(10, 8), sharex=True)

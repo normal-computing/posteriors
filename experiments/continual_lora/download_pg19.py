@@ -4,7 +4,7 @@ from datasets import load_dataset
 # Load the dataset
 dataset = load_dataset("pg19", split="train", streaming=True)
 
-num_subset = 5
+num_subset = 30
 earliest_year = 1900
 min_text_length = 1e5
 max_text_length = 1e6
@@ -24,6 +24,9 @@ while len(subset) < num_subset:
     ):
         subset.append(datum)
     num_tried += 1
+
+subset = subset[5:]
+subset = subset[:2] + subset[3:]
 
 # Save the subset to a JSON file
 with open(f"./experiments/continual_lora/data/pg19-{num_subset}.json", "w") as f:

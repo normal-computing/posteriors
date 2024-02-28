@@ -22,7 +22,7 @@ model_config: &model_params
     dropout: 0.
 
 # Dataset
-dataset_path: "./experiments/continual_lora/data/pg19-10.json"
+dataset_path: "./experiments/continual_lora/data/pg19-30.json"
 train_batch_size: 2
 laplace_batch_size: 1
 drop_last: false

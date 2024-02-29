@@ -2,16 +2,16 @@
 logs_dir: &logs_path "./experiments/runs/lora/"
 
 experiment_name: "lora_sgd"
-num_tasks: 3
+num_tasks: 4
 lambda_param: 0
-lr: 75e-6
+lr: 1e-4
 accumulate_gradients_every: 5
 early_stopping: false
 
 # Model
 model_config: &model_params
   pretrained_model_name_or_path: "meta-llama/Llama-2-7b-hf"
-  first_prior_sd: 1e10
+  first_prior_sd: 1e4
   ignore_first: 2048
 
   #LoRA
@@ -22,7 +22,7 @@ model_config: &model_params
     dropout: 0.
 
 # Dataset
-dataset_path: "./experiments/continual_lora/data/pg19-30.json"
+dataset_path: "./experiments/continual_lora/data/pg19-5.json"
 train_batch_size: 2
 laplace_batch_size: 1
 drop_last: false

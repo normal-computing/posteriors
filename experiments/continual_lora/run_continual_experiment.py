@@ -147,9 +147,6 @@ current_prior_sd = optree.tree_map(
     sub_params,
 )
 
-# Set up optimizer
-optimizer = torch.optim.AdamW(sub_params.values(), lr=config.lr, maximize=True)
-
 # Run experiment!
 for episode_ind in range(config.num_tasks):
     print(f"Training on episode {episode_ind + 1} of {config.num_tasks}")
@@ -161,6 +158,9 @@ for episode_ind in range(config.num_tasks):
         prior_sd=current_prior_sd,
         num_sequences=len(train_dataloaders[episode_ind].dataset.data["input_ids"]),
     )
+
+    # Set up optimizer
+    optimizer = torch.optim.AdamW(sub_params.values(), lr=config.lr, maximize=True)
 
     # Train for MAP
     train_dl = train_dataloaders[episode_ind]
@@ -197,12 +197,10 @@ for episode_ind in range(config.num_tasks):
         with torch.inference_mode():
             for val_ind, test_dl in enumerate(test_dls):
                 losses = []
-                perplexity = []
                 for batch in test_dl:
                     batch = optree.tree_map(lambda x: x.to(args.device), batch)
                     log_lik, output = sub_param_to_log_likelihood(sub_params, batch)
                     losses.append(-log_lik.item())
-                    perplexity.append(torch.exp(output.loss))
 
                 # Print validation
                 print(
@@ -218,13 +216,6 @@ for episode_ind in range(config.num_tasks):
                     {f"val_loss_task_{val_ind}": torch.tensor(losses).mean()},
                 )
 
-                log_metrics(
-                    config.eval_log_dir,
-                    epoch,
-                    episode_ind,
-                    val_ind,
-                    {f"val_perplexity_task_{val_ind}": torch.tensor(perplexity).mean()},
-                )
         if config.early_stopping:
             if torch.tensor(losses).mean() < best_loss:
                 best_loss = torch.tensor(losses).mean()

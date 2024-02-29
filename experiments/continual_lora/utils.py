@@ -1,6 +1,5 @@
 import os
 from omegaconf import OmegaConf
-from pytorch_lightning.utilities import rank_zero_only
 from ml_collections.config_dict import FrozenConfigDict
 
 
@@ -19,7 +18,6 @@ def load_config(file: str) -> FrozenConfigDict:
     return config
 
 
-@rank_zero_only
 def save_config(conf: OmegaConf, fp: str):
     """
     Save config file, only once
@@ -27,7 +25,6 @@ def save_config(conf: OmegaConf, fp: str):
     OmegaConf.save(config=conf, f=fp)
 
 
-@rank_zero_only
 def create_log_dir(log_dir_name: str):
     """
     Create log directory, only once

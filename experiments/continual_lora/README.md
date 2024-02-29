@@ -52,5 +52,6 @@ Hyperparameters for baseline and Laplace methods are set in `configs`. To run th
 - Download (`download_pg19.py`) and process the data (`load_pg19.py`)
 - Download the model and prepare LoRa weights (`load_model.py`)
 - Configurations (`configs/`)
-- Run the experiment (`run_continual_experiment.py`)
+- Run the continual experiment (`run_continual_experiment.py`)
+- Run static offline baseline that sees all data throughout (`run_static_experiment.py`)
 - Plot the results (`plot_metrics.py`)

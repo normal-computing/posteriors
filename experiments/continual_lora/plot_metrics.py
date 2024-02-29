@@ -9,7 +9,9 @@ def smooth_dataframe_column(df, column_name, window_size):
     )
 
 
-def produce_plot_A(df_base, df, n, window_size, save_dir, name="plot_A"):
+def produce_plot_A(
+    df_base, df, n, window_size, save_dir, name="plot_A", df_static_base=None
+):
     # Plot validation loss for first n tasks, partitioned by training stage
     fig, axs = plt.subplots(n, 1, figsize=(10, 8), sharex=True)
 
@@ -41,6 +43,14 @@ def produce_plot_A(df_base, df, n, window_size, save_dir, name="plot_A"):
     for ax in axs:
         for val in df[df["task_changed"]].index:
             ax.axvline(x=val, linestyle="--", color="grey")
+
+    if df_static_base is not None:
+        df_static_base = df_static_base[df_static_base["task"].isin(range(n))]
+        plot_vals = df_static_base["metric_value"][-n:].values
+        for i in range(n):
+            axs[i].axhline(
+                y=plot_vals[i], linestyle="dotted", color="black", label="Static SGD"
+            )
 
     # Adding legend
     axs[0].legend()
@@ -94,6 +104,7 @@ def produce_plot_B(df_base, df, save_dir, name="plot_B"):
 # Path to your log file
 BASELINE_LOG_FILE_PATH = "/path/to/baseline"
 LAPLACE_LOG_FILE_PATH = "/path/to/laplace"
+STATIC_BASELINE_LOG_FILE_PATH = "/path/to/laplace"
 
 WINDOW_SIZE = 1
 WINDOW_SIZE_TRAIN = 1
@@ -104,8 +115,14 @@ if __name__ == "__main__":
     # Read the log file into a pandas DataFrame
     df_base = pd.read_csv(BASELINE_LOG_FILE_PATH + "/eval_metrics.txt")
     df = pd.read_csv(LAPLACE_LOG_FILE_PATH + "/eval_metrics.txt")
+    df_static_base = pd.read_csv(STATIC_BASELINE_LOG_FILE_PATH + "/eval_metrics.txt")
 
     produce_plot_A(
-        df_base=df_base, df=df, n=N, window_size=WINDOW_SIZE, save_dir=SAVE_DIR
+        df_base=df_base,
+        df=df,
+        n=N,
+        window_size=WINDOW_SIZE,
+        save_dir=SAVE_DIR,
+        df_static_base=df_static_base,
     )
     produce_plot_B(df_base=df_base, df=df, save_dir=SAVE_DIR)

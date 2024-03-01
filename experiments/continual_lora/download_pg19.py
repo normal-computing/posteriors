@@ -4,7 +4,7 @@ from datasets import load_dataset
 # Load the dataset
 dataset = load_dataset("pg19", split="train", streaming=True)
 
-num_subset = 5
+num_subset = 20
 earliest_year = 1900
 min_text_length = 1e5
 max_text_length = 1e6

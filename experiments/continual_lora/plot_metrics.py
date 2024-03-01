@@ -2,13 +2,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# Define a function to apply a moving average to a DataFrame column
-def smooth_dataframe_column(df, column_name, window_size):
-    return (
-        df[column_name].rolling(window=window_size, center=True, min_periods=1).mean()
-    )
-
-
 def produce_plot_A(
     df_base, df, n, window_size, save_dir, name="plot_A", df_static_base=None
 ):
@@ -60,7 +53,7 @@ def produce_plot_A(
     plt.close()
 
 
-def produce_plot_B(df_base, df, save_dir, name="plot_B"):
+def produce_plot_B(df_base, df, window_size, save_dir, name="plot_B"):
     df = df_base.merge(
         df,
         on=["epoch", "task", "val_task", "metric_name"],
@@ -82,13 +75,21 @@ def produce_plot_B(df_base, df, save_dir, name="plot_B"):
     )
 
     plt.plot(
-        df_losses.groupby(["task"])["metric_value_sgd"].mean().values
-        - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values,
+        pd.Series(
+            df_losses.groupby(["task"])["metric_value_sgd"].mean().values
+            - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values
+        )
+        .rolling(window=window_size, center=False, min_periods=1)
+        .mean(),
         label="SGD",
     )
     plt.plot(
-        df_losses.groupby(["task"])["metric_value_laplace"].mean().values
-        - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values,
+        pd.Series(
+            df_losses.groupby(["task"])["metric_value_laplace"].mean().values
+            - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values
+        )
+        .rolling(window=window_size, center=False, min_periods=1)
+        .mean(),
         label="Laplace",
     )
 
@@ -106,8 +107,9 @@ BASELINE_LOG_FILE_PATH = "/path/to/baseline"
 LAPLACE_LOG_FILE_PATH = "/path/to/laplace"
 STATIC_BASELINE_LOG_FILE_PATH = "/path/to/laplace"
 
-WINDOW_SIZE = 1
-WINDOW_SIZE_TRAIN = 1
+
+WINDOW_SIZE_A = 1
+WINDOW_SIZE_B = 5
 N = 4
 SAVE_DIR = "pictures"
 
@@ -121,8 +123,8 @@ if __name__ == "__main__":
         df_base=df_base,
         df=df,
         n=N,
-        window_size=WINDOW_SIZE,
+        window_size=WINDOW_SIZE_A,
         save_dir=SAVE_DIR,
         df_static_base=df_static_base,
     )
-    produce_plot_B(df_base=df_base, df=df, save_dir=SAVE_DIR)
+    produce_plot_B(df_base=df_base, df=df, window_size=WINDOW_SIZE_B, save_dir=SAVE_DIR)

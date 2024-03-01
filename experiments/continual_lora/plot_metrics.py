@@ -109,7 +109,7 @@ STATIC_BASELINE_LOG_FILE_PATH = "/path/to/laplace"
 
 
 WINDOW_SIZE_A = 1
-WINDOW_SIZE_B = 5
+WINDOW_SIZE_B = 1
 N = 4
 SAVE_DIR = "pictures"
 

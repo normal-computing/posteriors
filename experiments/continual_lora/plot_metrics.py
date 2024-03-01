@@ -73,28 +73,31 @@ def produce_plot_B(df_base, df, window_size, save_dir, name="plot_B"):
             "metric_value_sgd"
         ].transform("min")
     )
+    df_losses["relative_metric_sgd"] = (
+        df_losses["metric_value_sgd"] - df_losses["best_sgd_val_for_task"]
+    )
+    df_losses["relative_metric_laplace"] = (
+        df_losses["metric_value_laplace"] - df_losses["best_sgd_val_for_task"]
+    )
 
     plt.plot(
-        pd.Series(
-            df_losses.groupby(["task"])["metric_value_sgd"].mean().values
-            - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values
-        )
-        .rolling(window=window_size, center=False, min_periods=1)
+        df_losses.groupby(["task"])["relative_metric_sgd"]
+        .mean()
+        .rolling(window=window_size, center=True, min_periods=1)
         .mean(),
         label="SGD",
     )
     plt.plot(
-        pd.Series(
-            df_losses.groupby(["task"])["metric_value_laplace"].mean().values
-            - df_losses.groupby(["task"])["best_sgd_val_for_task"].mean().values
-        )
-        .rolling(window=window_size, center=False, min_periods=1)
+        df_losses.groupby(["task"])["relative_metric_laplace"]
+        .mean()
+        .rolling(window=window_size, center=True, min_periods=1)
         .mean(),
         label="Laplace",
     )
 
+    plt.xticks(range(len(df_losses["task"].unique())), df_losses["task"].unique())
     plt.xlabel("Episodes")
-    plt.ylabel("Validation Loss - Trained Single Task Loss")
+    plt.ylabel("Relative Validation Loss")
     plt.legend()
     plt.tight_layout()
     # Save the plot
@@ -106,7 +109,6 @@ def produce_plot_B(df_base, df, window_size, save_dir, name="plot_B"):
 BASELINE_LOG_FILE_PATH = "/path/to/baseline"
 LAPLACE_LOG_FILE_PATH = "/path/to/laplace"
 STATIC_BASELINE_LOG_FILE_PATH = "/path/to/laplace"
-
 
 WINDOW_SIZE_A = 1
 WINDOW_SIZE_B = 1

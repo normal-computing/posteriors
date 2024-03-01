@@ -41,7 +41,7 @@ class UpdateFn(Protocol):
     def __call__(
         state: TransformState,
         batch: Any,
-        inplace: bool = True,
+        inplace: bool = False,
     ) -> TransformState:
         """Transform a uqlib state with unified API:
 

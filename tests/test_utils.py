@@ -1,6 +1,7 @@
 import torch
-import torch.nn as nn
 from optree import tree_map, tree_flatten, tree_reduce
+
+from tests.scenarios import TestModel, TestLanguageModel
 
 from uqlib import (
     model_to_function,
@@ -21,33 +22,6 @@ from uqlib import (
     flexi_tree_map,
     per_samplify,
 )
-
-
-class TestModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.device = "cpu"
-        self.linear = nn.Linear(10, 1)
-
-    def forward(self, x):
-        return self.linear(x)
-
-
-class TestLanguageModel(nn.Module):
-    def __init__(self, vocab_size=1000, embedding_dim=256, hidden_dim=512):
-        super().__init__()
-        self.device = "cpu"
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.linear = nn.Linear(embedding_dim, hidden_dim)
-        self.output_layer = nn.Linear(hidden_dim, vocab_size)
-
-    def forward(self, input_ids, attention_mask):
-        embedded = self.embedding(input_ids)
-        hidden = self.linear(embedded)
-        logits = self.output_layer(hidden)
-        expanded_attention_mask = attention_mask.unsqueeze(-1).expand(logits.size())
-        logits = logits * expanded_attention_mask
-        return {"logits": logits}
 
 
 def test_model_to_function():

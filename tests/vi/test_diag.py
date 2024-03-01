@@ -1,36 +1,11 @@
 from functools import partial
-from typing import Any, Tuple
 import torch
 import torchopt
 from optree import tree_map
 
 from uqlib import vi
-from uqlib.utils import diag_normal_log_prob
-from uqlib.types import TensorTree
 
-
-def batch_normal_log_prob(
-    p: dict, batch: Any, mean: dict, sd_diag: dict
-) -> Tuple[torch.Tensor, TensorTree]:
-    return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
-
-
-def test_batch_normal_log_prob():
-    p = {"a": torch.randn(10, 10), "b": torch.randn(10, 1)}
-    mean = tree_map(lambda x: torch.zeros_like(x), p)
-    sd_diag = tree_map(lambda x: torch.ones_like(x), p)
-    batch = torch.arange(10).reshape(-1, 1)
-
-    batch_normal_log_prob_spec = partial(
-        batch_normal_log_prob, mean=mean, sd_diag=sd_diag
-    )
-
-    single_batch_evals = torch.stack(
-        [batch_normal_log_prob_spec(p, b)[0] for b in batch]
-    ).mean()
-    full_batch_evals = batch_normal_log_prob_spec(p, batch)[0]
-
-    assert torch.allclose(single_batch_evals, full_batch_evals)
+from tests.scenarios import batch_normal_log_prob
 
 
 def test_nelbo():
@@ -102,20 +77,22 @@ def _test_vi_diag(optimizer_cls, stl):
     assert torch.isclose(nelbo_target, torch.tensor(0.0), atol=1e-6)
     assert nelbo_init > nelbo_target
 
-    n_steps = 1000
+    n_steps = 500
     n_vi_samps = 5
 
     transform = vi.diag.build(
         batch_normal_log_prob_spec, optimizer, n_samples=n_vi_samps, stl=stl
     )
 
+    # Test inplace = False
+    init_mean = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
+    init_mean_copy = tree_map(lambda x: x.clone(), init_mean)
+
     state = transform.init(init_mean)
-
     nelbos = []
-
     for _ in range(n_steps):
-        state = transform.update(state, batch)
-        nelbos.append(state.nelbo)
+        state = transform.update(state, batch, inplace=False)
+        nelbos.append(state.nelbo.item())
 
     last_nelbos_mean = torch.tensor(nelbos[-10:]).mean()
 
@@ -125,35 +102,28 @@ def _test_vi_diag(optimizer_cls, stl):
     for key in state.mean:
         assert torch.allclose(state.mean[key], target_mean[key], atol=0.5)
         assert torch.allclose(state.log_sd_diag[key].exp(), target_sds[key], atol=0.5)
-
-    # Test inplace
-    state_ip = transform.init(init_mean)
-    state_ip2 = transform.update(
-        state_ip,
-        batch,
-        inplace=True,
-    )
-
-    for key in state_ip2.mean:
-        assert torch.allclose(state_ip2.mean[key], state_ip.mean[key], atol=1e-8)
         assert torch.allclose(
-            state_ip2.log_sd_diag[key], state_ip.log_sd_diag[key], atol=1e-8
-        )
+            init_mean[key], init_mean_copy[key]
+        )  # check init_mean was left untouched
 
-    # Test not inplace
-    state_ip_false = transform.update(
-        state_ip,
-        batch,
-        inplace=False,
-    )
+    # Test inplace = True
+    state = transform.init(init_mean)
+    nelbos = []
+    for _ in range(n_steps):
+        _ = transform.update(state, batch, inplace=True)
+        nelbos.append(state.nelbo.item())
 
-    for key in state_ip.mean:
-        assert not torch.allclose(
-            state_ip_false.mean[key], state_ip.mean[key], atol=1e-8
-        )
-        assert not torch.allclose(
-            state_ip_false.log_sd_diag[key], state_ip.log_sd_diag[key], atol=1e-8
-        )
+    last_nelbos_mean = torch.tensor(nelbos[-10:]).mean()
+
+    assert last_nelbos_mean < nelbo_init
+    assert torch.isclose(last_nelbos_mean, nelbo_target, atol=1)
+
+    for key in state.mean:
+        assert torch.allclose(state.mean[key], target_mean[key], atol=0.5)
+        assert torch.allclose(state.log_sd_diag[key].exp(), target_sds[key], atol=0.5)
+        assert torch.allclose(
+            state.mean[key], init_mean[key]
+        )  # check init_mean was updated in place
 
 
 def test_vi_diag_sgd():

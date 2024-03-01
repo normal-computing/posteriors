@@ -33,20 +33,6 @@ torch.manual_seed(args.seed)
 # Get config with info for dataset, model and simulation params
 config = utils.load_config(args.base)
 
-##########################
-config = utils.load_config("experiments/continual_lora/configs/lora_sgd.yaml")
-
-
-class Args:
-    base = "experiments/continual_lora/configs/lora_sgd.yaml"
-    epochs = 10
-    device = "cuda:0"
-    seed = 42
-
-
-args = Args()
-##########################
-
 # Set up logging
 timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 experiment_name = config.get("experiment_name", None)

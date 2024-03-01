@@ -13,14 +13,13 @@ The Laplace updates are implemented in `uqlib` and easily integrated into our Py
 
 ## Results 
 
-![Validation loss by episode](./pictures/plot_A.png)
+![Validation loss by episode](https://storage.googleapis.com/normal-blog-artifacts/uqlib/plot_A_uqlib_laplace.png)
 
-Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss, while SGD forgets immediately. Early stopping is used to determine number of epochs per episode.
+Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss, while SGD forgets immediately. The dashed line shows an offline train with access to all four training datasets concurrently; it represents the LoRA network's total capacity.
 
-![Average validation performance](./pictures/plot_B.png)
+![Average validation performance](https://storage.googleapis.com/normal-blog-artifacts/uqlib/plot_B_uqlib_laplace.png)
 
-Average validation loss on last epoch of each episode. (Includes validation data for current task and all previous.)
-
+Difference of validation loss from baseline, averaged over all episodes seen thus far. 
 
 ## Data
 

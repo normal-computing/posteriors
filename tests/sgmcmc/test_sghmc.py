@@ -9,6 +9,7 @@ from tests.scenarios import batch_normal_log_prob
 
 
 def test_sghmc():
+    torch.manual_seed(42)
     target_mean = {"a": torch.randn(2, 1) + 10, "b": torch.randn(1, 1) + 10}
     target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
 

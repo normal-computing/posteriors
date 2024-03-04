@@ -1,3 +1,4 @@
+from pytest import raises
 import torch
 
 import uqlib
@@ -20,3 +21,6 @@ def test_optim():
 
     assert state.loss < 1e-3
     assert state.params < 1e-3
+
+    with raises(NotImplementedError):
+        transform.update(state, torch.tensor([1.0]), inplace=False)

@@ -120,7 +120,6 @@ def update(
         state.log_likelihood = log_liks.mean().detach()
         state.aux = aux
         return state
-
     return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
 
 

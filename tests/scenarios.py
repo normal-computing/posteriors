@@ -8,6 +8,8 @@ from uqlib.types import TensorTree
 
 
 class TestModel(nn.Module):
+    __test__ = False
+
     def __init__(self):
         super().__init__()
         self.device = "cpu"
@@ -18,6 +20,8 @@ class TestModel(nn.Module):
 
 
 class TestLanguageModel(nn.Module):
+    __test__ = False
+
     def __init__(self, vocab_size=1000, embedding_dim=256, hidden_dim=512):
         super().__init__()
         self.device = "cpu"

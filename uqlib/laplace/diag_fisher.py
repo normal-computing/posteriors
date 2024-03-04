@@ -89,7 +89,6 @@ def update(
     if inplace:
         state.aux = aux
         return state
-
     return DiagLaplaceState(state.mean, prec_diag, aux)
 
 

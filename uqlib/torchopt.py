@@ -1,12 +1,14 @@
-from typing import NamedTuple, Any
+from typing import Any
 from functools import partial
 import torch
 import torchopt
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 
 
-class TorchOptState(NamedTuple):
+@dataclass
+class TorchOptState:
     """State of a TorchOpt optimizer.
 
     Args:
@@ -18,7 +20,7 @@ class TorchOptState(NamedTuple):
 
     params: TensorTree
     opt_state: torch.optim.Optimizer
-    loss: torch.tensor = torch.tensor(0.0)
+    loss: torch.tensor = None
     aux: Any = None
 
 
@@ -68,6 +70,10 @@ def update(
         )
     updates, opt_state = optimizer.update(grads, opt_state, params=params)
     params = torchopt.apply_updates(params, updates, inplace=inplace)
+    if inplace:
+        state.loss = loss.detach()
+        state.aux = aux
+        return state
     return TorchOptState(params, opt_state, loss, aux)
 
 

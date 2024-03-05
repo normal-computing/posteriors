@@ -1,21 +1,22 @@
 import json
 import os
+import argparse
 import pickle
 import importlib
-import torch
 from tqdm import tqdm
 from optree import tree_map
 import uqlib
 
 from experiments.yelp.load import load_dataloaders, load_model
 
-
-# Parser
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-config_dir = "experiments/yelp/configs/map.py"
+# Get config path and device from user
+parser = argparse.ArgumentParser()
+parser.add_argument("--config", type=str)
+parser.add_argument("--device", default="cpu", type=str)
+args = parser.parse_args()
 
 # Import configuration
-config = importlib.import_module(config_dir.replace("/", ".").replace(".py", ""))
+config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""))
 
 if not os.path.exists(config.save_dir):
     os.makedirs(config.save_dir)
@@ -32,13 +33,13 @@ def log_training_metrics(losses, log_posts):
 
 # Load data and model
 train_dataloader, test_dataloader = load_dataloaders(
-    small=config.small_dataset, batch_size=8
+    small=config.small_dataset, batch_size=config.batch_size
 )
 num_data = len(train_dataloader.dataset)
 model, log_posterior = load_model(
     prior_sd=config.prior_sd, num_data=num_data, params_dir=config.params_dir
 )
-model.to(device)
+model.to(args.device)
 
 
 # Extract parameters
@@ -61,7 +62,7 @@ for epoch in range(config.n_epochs):
     for batch in tqdm(
         train_dataloader, desc=f"Epoch {epoch+1}/{config.n_epochs}", position=0
     ):
-        batch = tree_map(lambda x: x.to(device), batch)
+        batch = tree_map(lambda x: x.to(args.device), batch)
         state = transform.update(state, batch)
 
         losses.append(state.aux.loss.item())

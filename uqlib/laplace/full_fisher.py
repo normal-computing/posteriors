@@ -7,6 +7,7 @@ from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
 from optree.integration.torch import ravel_pytree
 from uqlib.utils import per_samplify, tree_size
 
+
 @dataclass
 class FullLaplaceState:
     """State encoding a Normal distribution over parameters,
@@ -16,9 +17,11 @@ class FullLaplaceState:
         prec: Precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.
     """
+
     mean: TensorTree
     prec: Tensor
     aux: Any = None
+
 
 def init(
     params: TensorTree,
@@ -38,6 +41,7 @@ def init(
         init_prec = torch.zeros((num_params, num_params), requires_grad=False)
 
     return FullLaplaceState(params, init_prec)
+
 
 def update(
     state: FullLaplaceState,
@@ -61,20 +65,19 @@ def update(
         directly writing log_posterior to be per sample.
         inplace: If True, the state is updated in place. Otherwise, a new
             state is returned.
-    
+
     Returns:
         Updated FullLaplaceState.
     """
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
-    
+
     with torch.no_grad():
-        
         jac, aux = jacrev(log_posterior, has_aux=True)(state.mean, batch)
         flat_jac, _ = ravel_pytree(jac)
         flat_jac = flat_jac.reshape(batch[0].shape[0], -1)
         fisher = flat_jac.T @ flat_jac
-    
+
     if inplace:
         state.prec += fisher
         state.aux = aux
@@ -110,6 +113,7 @@ def build(
     update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
     return Transform(init_fn, update_fn)
 
+
 def sample(
     state: FullLaplaceState,
     sample_shape: torch.Size = torch.Size([]),
@@ -123,6 +127,6 @@ def sample(
     Returns:
         Sample(s) from the Normal distribution.
     """
-    return torch.distributions.MultivariateNormal(loc=state.mean, 
-                                                  precision_matrix=state.prec).sample(sample_shape
-                                                    )
+    return torch.distributions.MultivariateNormal(
+        loc=state.mean, precision_matrix=state.prec
+    ).sample(sample_shape)

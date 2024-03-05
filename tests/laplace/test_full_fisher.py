@@ -4,11 +4,11 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
-from optree import tree_map
 from uqlib.utils import tree_size
 from optree.integration.torch import ravel_pytree
 
 from uqlib.laplace import full_fisher
+
 
 class TestModel(nn.Module):
     def __init__(self):
@@ -65,7 +65,7 @@ def test_full_fisher_vmap():
     laplace_state = transform.init(params)
     for batch in dataloader:
         laplace_state = transform.update(laplace_state, batch)
-        #print(laplace_state.prec)
+        # print(laplace_state.prec)
 
     print("finished full fisher")
     num_params = tree_size(params)
@@ -74,7 +74,7 @@ def test_full_fisher_vmap():
         x = x.unsqueeze(0)
         y = y.unsqueeze(0)
         with torch.no_grad():
-            jac, _ =  torch.func.jacrev(log_posterior, has_aux=True)(params, (x, y))
+            jac, _ = torch.func.jacrev(log_posterior, has_aux=True)(params, (x, y))
             flat_jac, _ = ravel_pytree(jac)
             flat_jac = flat_jac.reshape(x.shape[0], -1)
             fisher = flat_jac.T @ flat_jac
@@ -86,7 +86,7 @@ def test_full_fisher_vmap():
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
-    #print(laplace_state_fb.prec)
+    # print(laplace_state_fb.prec)
     laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
     print(laplace_state_fb.prec)
 
@@ -102,10 +102,7 @@ def test_full_fisher_vmap():
             batch,
         )
 
-  
-    assert torch.allclose(
-            laplace_state_ps.prec, laplace_state_fb.prec, atol=1e-5
-    )
+    assert torch.allclose(laplace_state_ps.prec, laplace_state_fb.prec, atol=1e-5)
 
     # Test inplace
     laplace_state_ip = transform.init(params)
@@ -115,10 +112,7 @@ def test_full_fisher_vmap():
         inplace=True,
     )
 
-
-    assert torch.allclose(
-        laplace_state_ip2.prec, laplace_state_ip.prec, atol=1e-8
-    )
+    assert torch.allclose(laplace_state_ip2.prec, laplace_state_ip.prec, atol=1e-8)
 
     # Test not inplace
     laplace_state_ip_false = transform.update(
@@ -128,9 +122,10 @@ def test_full_fisher_vmap():
     )
 
     assert not torch.allclose(
-            laplace_state_ip_false.prec,
-            laplace_state_ip.prec,
-            atol=1e-8,
-        )
+        laplace_state_ip_false.prec,
+        laplace_state_ip.prec,
+        atol=1e-8,
+    )
+
 
 test_full_fisher_vmap()

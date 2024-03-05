@@ -1,13 +1,21 @@
-from typing import NamedTuple, Protocol, Any, TypeAlias, Tuple, Callable
+from typing import Protocol, Any, TypeAlias, Tuple, Callable, Dict
+from dataclasses import dataclass
 from optree.typing import PyTreeTypeVar
 from torch import Tensor
 
 TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
 
-TransformState: TypeAlias = NamedTuple
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
+
+
+class TransformState(Protocol):
+    """A uqlib state is a `dataclass` containing the required information for the
+    uqlib iterative algorithm defined by the `init` and `update` functions.
+    """
+
+    __dataclass_fields__: Dict[str, Any]
 
 
 class InitFn(Protocol):
@@ -22,7 +30,7 @@ class InitFn(Protocol):
         ```
 
         where params is a PyTree of parameters around which we want to
-        quantify uncertainty. The produced `state` is a `NamedTuple` containing
+        quantify uncertainty. The produced `state` is a `dataclass` containing
         the required information for the uqlib iterative algorithm
         defined by the `init` and `update` functions.
 
@@ -32,7 +40,7 @@ class InitFn(Protocol):
             params: PyTree containing initial value of parameters.
 
         Returns:
-            The initial state (NamedTuple).
+            The initial state (dataclass).
         """
 
 
@@ -49,7 +57,7 @@ class UpdateFn(Protocol):
         state = update(state, batch, inplace=False)
         ```
 
-        where state is a `NamedTuple` containing the required information for the
+        where state is a `dataclass` containing the required information for the
         uqlib iterative algorithm defined by the `init` and `update` functions.
 
         See also uqlib.types.InitFn and uqlib.types.Transform.
@@ -60,11 +68,12 @@ class UpdateFn(Protocol):
             inplace: Whether to modify state using inplace operations. Defaults to True.
 
         Returns:
-            The transformed state (NamedTuple).
+            The transformed state (dataclass).
         """
 
 
-class Transform(NamedTuple):
+@dataclass(frozen=True)
+class Transform:
     """A transform contains init and update functions defining an iterative algorithm.
 
     See also uqlib.types.InitFn and uqlib.types.UpdateFn.
@@ -74,7 +83,8 @@ class Transform(NamedTuple):
         update: The update function.
 
     Returns:
-        A transform (`NamedTuple` containing `init` and `update` functions).
+        A transform (frozen, i.e. immutable, `dataclass`
+        containing `init` and `update` functions).
     """
 
     init: InitFn

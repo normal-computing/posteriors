@@ -66,7 +66,7 @@ def update(
         grads, (loss, aux) = torch.func.grad_and_value(loss_fn, has_aux=True)(
             params, batch
         )
-    updates, opt_state = optimizer.update(grads, opt_state)
+    updates, opt_state = optimizer.update(grads, opt_state, params=params)
     params = torchopt.apply_updates(params, updates, inplace=inplace)
     return TorchOptState(params, opt_state, loss, aux)
 

@@ -1,19 +1,47 @@
 
 ## Laplace LoRA for Continual Learning
 
-This experiment demonstrates how probablisitic strategies can be used to remedy catastophic forgetting in a continual learning setting. In particular, we consider the task of fine-tuning a language model on episodic data. We show that while continued fine-tuning catastrophically forgets all previous tasks, Bayesian and approximate Bayesian methods avoid this outcome. We implement our experiment using the built-in functionality of `uqlib`. The api easily integrates into our involved use case.
+The purpose of this benchmark is to investigate the effects of catastrophic forgetting 
+in a language model fine-tuning task, where data is continuously recieved in an online 
+setting. Continuing to apply gradient descent as new data arrives 
+will result in catastrophic forgetting, where the model's performance on previous tasks 
+deteriorates as it learns new ones. Exact Bayesian updating would avoid this issue, but is 
+intractable. Instead, we investigate how an approximate Bayesian approach from 
+`uqlib` can be successfully used to mitigate catastrophic forgetting for language models.
+
+We observe that a applying diagonal Laplace approximation (details below) allows the model 
+to retain information from previous tasks, and maintain low loss on all tasks. This is 
+in contrast to the continual gradient descent baseline, which quickly forgets previous tasks.
+
+The Laplace approximation, however, does not provide a silver bullet, and the model 
+still forgets some information from previous tasks and somewhat prohibits learning of 
+new tasks. This is a transparent trade-off dictated by the Bayesian forgetting 
+parameter. The Laplace approximation also assumes that data is arriving in episodes 
+(i.e. there are strict pre-defined boundaries between tasks). In practice the data may 
+be arriving continuously and still exhibiting distribution shift which we'd like the 
+model to adapt to without forgetting.
+
 
 ## Methods 
 
-Instead of learning the best point-estimates of the weights each episode, we implement a local Gaussian approximation to the posterior distribution of the model parameters. We first fine-tune the model to arrive at MAP estimates of the parameters, and use the empirical Fisher information at the MAP as our covariance (a [Laplace approximation](https://proceedings.neurips.cc/paper/2021/file/a7c9585703d275249f30a088cebba0ad-Paper.pdf)).
+The baseline method for our continual learning experiment is to fine-tune the model on the new data each episode. This is a standard approach, but it will result in catastrophic forgetting.
 
-The prior for the next episode is the posterior from the previous episode, becoming a quadratic penalty in the loss function during gradient descent. Whereas the original [paper](https://www.pnas.org/doi/10.1073/pnas.1611835114) suggested using multiple penalties (incorporating data from all previous episodes into the prior), we use a single penalty following this [note](https://www.inference.vc/comment-on-overcoming-catastrophic-forgetting-in-nns-are-multiple-penalties-needed-2/) (we use only the last epsiode's posterior).
+Instead, we can approximate Bayesian updates at each episode, converting the posterior 
+from the previous episdeo $p(\theta | \mathcal{D}_{1:n-1})$ after recieving the dataset 
+from the $n$th episode to give a new posterior $p(\theta | \mathcal{D}_{1:n}) \propto p(\theta | \mathcal{D}_{1:n-1})p(\mathcal{D}_n | \theta)$, for language model parameters $\theta$. The true Bayesian 
+posterior will be highly complex and intractable. The Laplace approximation approximates the posterior as a Gaussian distribution $p(\theta | \mathcal{D}_{1:n}) \approx \mathcal{N}(\theta | \mu_n, F^{-1}_n)$, with the mean, $\mu_n$, at the maximum a posteriori (MAP) estimate of the parameters and the covariance as the inverse of the empirical Fisher information, $F^{-1}_n$, which we take to be diagonal. Extensive details can be found in the [Laplace Redux paper](https://proceedings.neurips.cc/paper/2021/file/a7c9585703d275249f30a088cebba0ad-Paper.pdf). The Laplace updates are implemented in `uqlib` and are easily integrated into our PyTorch training loops!
 
-The Laplace updates are implemented in `uqlib` and easily integrated into our PyTorch training loops!
+The prior for the next episode is the posterior from the previous episode, becoming a quadratic penalty in the loss function during gradient descent. Whereas the original [catastrophic forgetting paper](https://www.pnas.org/doi/10.1073/pnas.1611835114) suggested using multiple penalties (incorporating data from all previous episodes into the prior), we use a single penalty following this [note](https://www.inference.vc/comment-on-overcoming-catastrophic-forgetting-in-nns-are-multiple-penalties-needed-2/) (we use only the last epsiode's posterior, reminiscent of exact Bayesian updates).
+
+
+## Data
+
+We use a subset of [pg19](https://huggingface.co/datasets/pg19), a large corpus of books. The data can easily be downloaded using the `datasets` library from Huggingface. An episode is represented by a single book, and we hold out the last 15% of the book for testing.
+
 
 ## Experiments
 
-The purpose of this experiment is to demonstrate the added control probalisitic methods provide in a setting where continued training is requried. **In particular, we demonstrate the benefits of controlling the trade-off between learning new tasks and retaining old ones.** Our dataset (a subset of [pg19](https://huggingface.co/datasets/pg19)) is divided into `N` "episodes" of train and test data. In the results reported below, we use 1 book per episode, holding out the last 15% for testing. For each episode of data, we perform the following:
+This experiment demonstrates the added control probalisitic methods provide in a setting where continued training is requried. **In particular, we demonstrate the benefits of controlling the trade-off between learning new tasks and retaining old ones.** Our dataset (a subset of [pg19](https://huggingface.co/datasets/pg19)) is divided into `N` "episodes" of train and test data. In the results reported below, we use 1 book per episode, holding out the last 15% for testing. For each episode of data, we perform the following:
 
 (Baseline SGD) 
 - Finetune the model on the `N`th train data
@@ -26,9 +54,9 @@ The purpose of this experiment is to demonstrate the added control probalisitic 
 
 We finetune the model using LoRA on the last decoder weights, as implemented in [PEFT](https://github.com/huggingface/peft/tree/main). We use `r=8` and `alpha=32`. By setting the sequential prior scaling parameter `lambda=0`, we recover the baseline SGD method, so only one script is necessary. We stride over the texts so that all tokens have 2048 context tokens.
 
-Hyperparameters for baseline and Laplace methods are set in `configs`. To run the experiment, use the following command: `PYTHONPATH=. python experiments/continual_lora/run_continual_experiment.py --base <path/to/config.yaml> --epochs <epochs> --device <cuda device> [optional]`
+Hyperparameters for baseline and Laplace methods are set in `configs`. To run the experiment, use the following command: `PYTHONPATH=. python experiments/continual_lora/run_continual_experiment.py --base <path/to/config.yaml> --epochs <epochs> --device <cuda device> [optional]` from the root directory.
 
-We also report results on a static offline baseline that sees all data every episode. This represents the LoRA network's total capacity, but is computationally infeasible in practice.
+We also report results on a static offline baseline that sees all data every episode. This represents the LoRA network's total capacity, but is computationally infeasible in practice as it requires all data to available at all times.
 
 ## Results 
 
@@ -38,7 +66,7 @@ We also report results on a static offline baseline that sees all data every epi
   <em>Figure 1: Validation loss by episode.</em>
 </p>
 
-Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss, while SGD forgets (improvement in validation loss is reversed). The dashed line shows an offline train with access to all four training datasets concurrently; it represents the LoRA network's total capacity.
+Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss in early tasks, whilst SGD forgets. For example, in the top row, the Laplace approximation stays low throughout training demonstrating that it continues to perform well on task 0 even though it is now being trained on data from tasks 1-3. In contrast, continuing applying to gradient descent quickly decreases the performance of the model on task 0. The dashed line shows an offline train with access to all four training datasets concurrently; the LoRA network's total learning capacity.
 
 
 <p align="center">
@@ -47,15 +75,13 @@ Validation loss for each episode, over all four episodes. Vertical lines indicat
   <em>Figure 2: Average validation performance.</em>
 </p>
 
-Difference of validation loss from baseline, averaged over all episodes seen thus far. 
+Difference of validation loss from baseline, averaged over all episodes seen thus far. Where we clearly see the Laplace approximation 
+maintains low loss averaged over all tasks.
 
-## Data
-
-We use a subset of [pg19](https://huggingface.co/datasets/pg19), a large corpus of books. The data can easily be downloaded using the `datasets` library from Huggingface. 
 
 ## Model
 
-We finetune Meta's 7 billion parameter [Llama-2 model](https://huggingface.co/meta-llama/Llama-2-7b-hf), available from the `transformers` library.
+We fine-tune Meta's 7 billion parameter [Llama-2 model](https://huggingface.co/meta-llama/Llama-2-7b-hf) (available from the `transformers` library), combined with last-layer LoRA (via the [PEFT](https://github.com/huggingface/peft/tree/main) library).
 
 ## Code structure 
 

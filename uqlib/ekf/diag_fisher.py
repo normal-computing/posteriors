@@ -6,7 +6,7 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
+from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
 
 
 @dataclass
@@ -29,21 +29,22 @@ class EKFDiagState:
 
 def init(
     params: TensorTree,
-    init_sds: TensorTree | None = None,
+    init_sds: TensorTree | float = 1.0,
 ) -> EKFDiagState:
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
         params: Initial mean of the variational distribution.
         init_sds: Initial square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to ones.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to ones.
 
     Returns:
         Initial EKFDiagState.
     """
-    if init_sds is None:
+    if is_scalar(init_sds):
         init_sds = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=x.requires_grad), params
+            lambda x: torch.ones_like(x, requires_grad=True) * init_sds, params
         )
 
     return EKFDiagState(params, init_sds)
@@ -128,7 +129,7 @@ def build(
     lr: float,
     transition_sd: float = 0.0,
     per_sample: bool = False,
-    init_sds: TensorTree | None = None,
+    init_sds: TensorTree | float = 1.0,
 ) -> Transform:
     """Builds a transform for variational inference with a diagonal Normal
     distribution over parameters.
@@ -147,7 +148,8 @@ def build(
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_likelihood to be per sample.
         init_sds: Initial square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to ones.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to ones.
 
     Returns:
         Diagonal EKF transform (uqlib.types.Transform instance).

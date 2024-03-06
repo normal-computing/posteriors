@@ -463,3 +463,15 @@ def per_samplify(
         return f(params, batch)
 
     return f_per_sample
+
+
+def is_scalar(x: Any) -> bool:
+    """Returns True if x is a scalar (int, float, bool) or a tensor with a single element.
+
+    Args:
+        x: Any object.
+
+    Returns:
+        True if x is a scalar.
+    """
+    return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)

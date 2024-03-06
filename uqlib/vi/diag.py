@@ -7,7 +7,7 @@ import torchopt
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_log_prob, diag_normal_sample, tree_size
+from uqlib.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
 
 
 @dataclass
@@ -61,16 +61,9 @@ def init(
     Returns:
         Initial DiagVIState.
     """
-    if init_log_sds is None:
-        init_log_sds = 0.0
-
-    if isinstance(init_log_sds, (float, int)) or (
-        torch.is_tensor(init_log_sds) and tree_size(init_log_sds) == 1
-    ):
-        scale = torch.tensor(init_log_sds).item()
+    if is_scalar(init_log_sds):
         init_log_sds = tree_map(
-            lambda x: scale * torch.ones_like(x, dtype=torch.float, requires_grad=True),
-            params,
+            lambda x: torch.ones_like(x, requires_grad=True) * init_log_sds, params
         )
 
     optimizer_state = optimizer.init([params, init_log_sds])

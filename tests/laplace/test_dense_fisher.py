@@ -69,8 +69,7 @@ def test_full_fisher_vmap():
         expected += fisher
 
     assert torch.allclose(expected, laplace_state.prec, atol=1e-5)
-    assert not torch.allclose(laplace_state.prec, laplace_state_prec_init
-                              )
+    assert not torch.allclose(laplace_state.prec, laplace_state_prec_init)
 
     # Also check full batch
     laplace_state_fb = transform.init(params)

@@ -40,8 +40,7 @@ def init(
     """
     if is_scalar(init_prec_diag):
         init_prec_diag = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=x.requires_grad)
-            * init_prec_diag,
+            lambda x: torch.full_like(x, init_prec_diag, requires_grad=x.requires_grad),
             params,
         )
 

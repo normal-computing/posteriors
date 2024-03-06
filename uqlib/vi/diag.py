@@ -63,7 +63,7 @@ def init(
     """
     if is_scalar(init_log_sds):
         init_log_sds = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=x.requires_grad) * init_log_sds,
+            lambda x: torch.full_like(x, init_log_sds, requires_grad=x.requires_grad),
             params,
         )
 

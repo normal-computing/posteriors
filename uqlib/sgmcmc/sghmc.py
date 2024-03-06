@@ -39,7 +39,7 @@ def init(params: TensorTree, momenta: TensorTree | float = 0.0) -> SGHMCState:
     """
     if is_scalar(momenta):
         momenta = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=x.requires_grad) * momenta,
+            lambda x: torch.full_like(x, momenta, requires_grad=x.requires_grad),
             params,
         )
 

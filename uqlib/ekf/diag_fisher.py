@@ -44,7 +44,7 @@ def init(
     """
     if is_scalar(init_sds):
         init_sds = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=x.requires_grad) * init_sds,
+            lambda x: torch.full_like(x, init_sds, requires_grad=x.requires_grad),
             params,
         )
 

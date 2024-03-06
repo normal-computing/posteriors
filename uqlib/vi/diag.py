@@ -7,7 +7,7 @@ import torchopt
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_log_prob, diag_normal_sample
+from uqlib.utils import diag_normal_log_prob, diag_normal_sample, tree_size
 
 
 @dataclass
@@ -34,7 +34,7 @@ class VIDiagState:
 def init(
     params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
-    init_log_sds: TensorTree | None = None,
+    init_log_sds: TensorTree | float | None = None,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
@@ -55,14 +55,22 @@ def init(
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to zero.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to zero.
 
     Returns:
         Initial DiagVIState.
     """
     if init_log_sds is None:
+        init_log_sds = 0.0
+
+    if isinstance(init_log_sds, (float, int)) or (
+        torch.is_tensor(init_log_sds) and tree_size(init_log_sds) == 1
+    ):
+        scale = torch.tensor(init_log_sds).item()
         init_log_sds = tree_map(
-            lambda x: torch.zeros_like(x, requires_grad=True), params
+            lambda x: scale * torch.ones_like(x, dtype=torch.float, requires_grad=True),
+            params,
         )
 
     optimizer_state = optimizer.init([params, init_log_sds])
@@ -152,7 +160,8 @@ def build(
             https://arxiv.org/abs/1703.09194.
             Defaults to True.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to zero.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to zero.
 
     Returns:
         Diagonal VI transform (uqlib.types.Transform instance).

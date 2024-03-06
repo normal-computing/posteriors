@@ -99,13 +99,13 @@ def test_diag_fisher_vmap():
         )
 
     # Test sample
-    mean_copy = tree_map(lambda x: x.clone(), laplace_state.mean)
+    mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
     samples = diag_fisher.sample(laplace_state, (1000,))
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
     samples_sd = tree_map(lambda x: x.std(dim=0), samples)
     for key in samples_mean:
-        assert torch.allclose(samples_mean[key], laplace_state.mean[key], atol=1e-1)
+        assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
         assert torch.allclose(
             samples_sd[key], laplace_state.prec_diag[key] ** -0.5, atol=1e-1
         )
-        assert torch.allclose(mean_copy[key], laplace_state.mean[key])
+        assert torch.allclose(mean_copy[key], laplace_state.params[key])

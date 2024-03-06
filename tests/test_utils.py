@@ -168,7 +168,7 @@ def test_diag_normal_log_prob():
     assert torch.allclose(result, expected)
 
     # Test unnormalized
-    result = diag_normal_log_prob(x, mean, sd_diag, normalized=False)
+    result = diag_normal_log_prob(x, mean, sd_diag, normalize=False)
     expected = tree_reduce(
         torch.add,
         tree_map(

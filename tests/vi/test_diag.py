@@ -59,7 +59,7 @@ def _test_vi_diag(optimizer_cls, stl):
     batch = torch.arange(3).reshape(-1, 1)
 
     nelbo_init, _ = vi.diag.nelbo(
-        state.mean,
+        state.params,
         init_sds,
         batch,
         batch_normal_log_prob_spec,
@@ -99,8 +99,8 @@ def _test_vi_diag(optimizer_cls, stl):
     assert last_nelbos_mean < nelbo_init
     assert torch.isclose(last_nelbos_mean, nelbo_target, atol=1)
 
-    for key in state.mean:
-        assert torch.allclose(state.mean[key], target_mean[key], atol=0.5)
+    for key in state.params:
+        assert torch.allclose(state.params[key], target_mean[key], atol=0.5)
         assert torch.allclose(state.log_sd_diag[key].exp(), target_sds[key], atol=0.5)
         assert torch.allclose(
             init_mean[key], init_mean_copy[key]
@@ -118,20 +118,20 @@ def _test_vi_diag(optimizer_cls, stl):
     assert last_nelbos_mean < nelbo_init
     assert torch.isclose(last_nelbos_mean, nelbo_target, atol=1)
 
-    for key in state.mean:
-        assert torch.allclose(state.mean[key], target_mean[key], atol=0.5)
+    for key in state.params:
+        assert torch.allclose(state.params[key], target_mean[key], atol=0.5)
         assert torch.allclose(state.log_sd_diag[key].exp(), target_sds[key], atol=0.5)
         assert torch.allclose(
-            state.mean[key], init_mean[key]
+            state.params[key], init_mean[key]
         )  # check init_mean was updated in place
 
     # Test sample
-    mean_copy = tree_map(lambda x: x.clone(), state.mean)
+    mean_copy = tree_map(lambda x: x.clone(), state.params)
     samples = vi.diag.sample(state, (1000,))
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
     samples_sd = tree_map(lambda x: x.std(dim=0), samples)
     for key in samples_mean:
-        assert torch.allclose(samples_mean[key], state.mean[key], atol=1e-1)
+        assert torch.allclose(samples_mean[key], state.params[key], atol=1e-1)
         assert torch.allclose(samples_sd[key], state.log_sd_diag[key].exp(), atol=1e-1)
         assert not torch.allclose(samples_mean[key], mean_copy[key])
 

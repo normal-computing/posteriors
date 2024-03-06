@@ -220,11 +220,12 @@ def nelbo(
     return -(log_p - log_q * temperature).mean(), aux
 
 
-def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])):
+def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])) -> TensorTree:
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
         state: State encoding mean and log standard deviations.
+        sample_shape: Shape of the desired samples.
 
     Returns:
         Sample from Normal distribution.

@@ -97,7 +97,7 @@ def diag_normal_log_prob(
     x: TensorTree,
     mean: float | TensorTree = 0.0,
     sd_diag: float | TensorTree = 1.0,
-    normalized: bool = True,
+    normalize: bool = True,
 ) -> float:
     """Evaluate multivariate normal log probability for a diagonal covariance matrix.
 
@@ -108,7 +108,7 @@ def diag_normal_log_prob(
         x: Value to evaluate log probability at.
         mean: Mean of the distribution. Defaults to 0.0.
         sd_diag: Square-root diagonal of the covariance matrix. Defaults to 1.0.
-        normalized: Whether to use normalised log probability.
+        normalize: Whether to use normalized log probability.
             If False the elementwise log prob is -0.5 * ((x - mean) / sd_diag)**2.
 
     Returns:
@@ -119,7 +119,7 @@ def diag_normal_log_prob(
     if tree_size(sd_diag) == 1:
         sd_diag = tree_map(lambda t: torch.tensor(sd_diag, device=t.device), x)
 
-    if normalized:
+    if normalize:
 
         def univariate_norm_and_sum(v, m, sd):
             return Normal(m, sd, validate_args=False).log_prob(v).sum()

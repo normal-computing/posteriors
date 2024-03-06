@@ -127,6 +127,7 @@ def sample(
 
     Args:
         state: State encoding mean and diagonal precision.
+        sample_shape: Shape of the desired samples.
 
     Returns:
         Sample(s) from Normal distribution.

@@ -163,11 +163,14 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-def sample(state: EKFDiagState, sample_shape: torch.Size = torch.Size([])):
+def sample(
+    state: EKFDiagState, sample_shape: torch.Size = torch.Size([])
+) -> TensorTree:
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
         state: State encoding mean and standard deviations.
+        sample_shape: Shape of the desired samples.
 
     Returns:
         Sample from Normal distribution.

@@ -15,7 +15,7 @@ class VIDiagState:
     """State encoding a diagonal Normal variational distribution over parameters.
 
     Args:
-        mean: Mean of the variational distribution.
+        params: Mean of the variational distribution.
         log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.
         optimizer_state: torchopt state storing optimizer data for updating the
@@ -24,7 +24,7 @@ class VIDiagState:
         aux: Auxiliary information from the log_posterior call.
     """
 
-    mean: TensorTree
+    params: TensorTree
     log_sd_diag: TensorTree
     optimizer_state: tuple
     nelbo: torch.tensor = None
@@ -109,16 +109,16 @@ def update(
     with torch.no_grad():
         nelbo_grads, (nelbo_val, aux) = grad_and_value(
             nelbo_log_sd, argnums=(0, 1), has_aux=True
-        )(state.mean, state.log_sd_diag)
+        )(state.params, state.log_sd_diag)
 
     updates, optimizer_state = optimizer.update(
         nelbo_grads,
         state.optimizer_state,
-        params=[state.mean, state.log_sd_diag],
+        params=[state.params, state.log_sd_diag],
         inplace=inplace,
     )
     mean, log_sd_diag = torchopt.apply_updates(
-        (state.mean, state.log_sd_diag), updates, inplace=inplace
+        (state.params, state.log_sd_diag), updates, inplace=inplace
     )
 
     if inplace:
@@ -231,4 +231,4 @@ def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])) -> Ten
         Sample from Normal distribution.
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
-    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)
+    return diag_normal_sample(state.params, sd_diag, sample_shape=sample_shape)

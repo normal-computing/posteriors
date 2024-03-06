@@ -14,12 +14,12 @@ class DiagLaplaceState:
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:
-        mean: Mean of the Normal distribution.
+        params: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.
     """
 
-    mean: TensorTree
+    params: TensorTree
     prec_diag: TensorTree
     aux: Any = None
 
@@ -76,7 +76,7 @@ def update(
         log_posterior = per_samplify(log_posterior)
 
     with torch.no_grad():
-        jac, aux = jacrev(log_posterior, has_aux=True)(state.mean, batch)
+        jac, aux = jacrev(log_posterior, has_aux=True)(state.params, batch)
         batch_diag_score_sq = tree_map(lambda j: j.square().sum(0), jac)
 
     def update_func(x, y):
@@ -89,7 +89,7 @@ def update(
     if inplace:
         state.aux = aux
         return state
-    return DiagLaplaceState(state.mean, prec_diag, aux)
+    return DiagLaplaceState(state.params, prec_diag, aux)
 
 
 def build(
@@ -133,4 +133,4 @@ def sample(
         Sample(s) from Normal distribution.
     """
     sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.prec_diag)
-    return diag_normal_sample(state.mean, sd_diag, sample_shape=sample_shape)
+    return diag_normal_sample(state.params, sd_diag, sample_shape=sample_shape)

@@ -6,11 +6,12 @@ from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
 from uqlib.utils import per_samplify, tree_size, empirical_fisher
 from optree.integration.torch import tree_ravel
 
+
 @dataclass
 class FullLaplaceState:
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
-    
+
     Args:
         mean: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.

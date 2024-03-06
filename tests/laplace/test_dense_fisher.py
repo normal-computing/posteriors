@@ -1,11 +1,9 @@
 from functools import partial
 import torch
-import torch.nn as nn
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
 from uqlib.utils import tree_size, empirical_fisher
-from optree import tree_map
 from optree.integration.torch import tree_ravel
 
 from uqlib.laplace import dense_fisher
@@ -113,11 +111,20 @@ def test_full_fisher_vmap():
 
     # Test sampling
     num_samples = 100000
-    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(num_params) # regularize to ensure PSD and reduce variance
+    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(
+        num_params
+    )  # regularize to ensure PSD and reduce variance
     samples, _ = dense_fisher.sample(laplace_state, (num_samples,))
 
-    expected_samples = torch.distributions.MultivariateNormal(loc=tree_ravel(laplace_state.mean)[0], precision_matrix=laplace_state.prec, validate_args=False).sample((num_samples,))
+    expected_samples = torch.distributions.MultivariateNormal(
+        loc=tree_ravel(laplace_state.mean)[0],
+        precision_matrix=laplace_state.prec,
+        validate_args=False,
+    ).sample((num_samples,))
 
-    assert torch.allclose(torch.mean(samples, dim=0), torch.mean(expected_samples, dim=0), atol=1e-1)
+    assert torch.allclose(
+        torch.mean(samples, dim=0), torch.mean(expected_samples, dim=0), atol=1e-1
+    )
+
 
 test_full_fisher_vmap()

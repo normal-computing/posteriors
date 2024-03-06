@@ -1,4 +1,3 @@
-import json
 import os
 import argparse
 import pickle
@@ -8,6 +7,7 @@ from optree import tree_map
 import uqlib
 
 from experiments.yelp.load import load_dataloaders, load_model
+from experiments.yelp.utils import log_training_metrics, append_metrics
 
 # Get config path and device from user
 parser = argparse.ArgumentParser()
@@ -18,17 +18,9 @@ args = parser.parse_args()
 # Import configuration
 config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""))
 
+# Create save directory if it does not exist
 if not os.path.exists(config.save_dir):
     os.makedirs(config.save_dir)
-
-
-def log_training_metrics(losses, log_posts):
-    save_file = f"{config.save_dir}/training.json"
-
-    log_dict = {"losses": losses, "log_posts": log_posts}
-
-    with open(save_file, "w") as f:
-        json.dump(log_dict, f)
 
 
 # Load data and model
@@ -42,7 +34,7 @@ model, log_posterior = load_model(
 model.to(args.device)
 
 
-# Extract parameters
+# Extract model parameters
 params = dict(model.named_parameters())
 num_params = uqlib.tree_size(params).item()
 print(f"Number of parameters: {int(num_params/1e6)}M")
@@ -54,10 +46,11 @@ transform = config.method.build(log_posterior, **config.config_args)
 # Initialize state
 state = transform.init(params)
 
+
 # Train
-losses = []
-log_posts = []
-log_post_bar = tqdm(total=0, position=1, bar_format="{desc}")
+i = 0
+log_dict = {k: [] for k in config.log_metrics.keys()}
+log_bar = tqdm(total=0, position=1, bar_format="{desc}")
 for epoch in range(config.n_epochs):
     for batch in tqdm(
         train_dataloader, desc=f"Epoch {epoch+1}/{config.n_epochs}", position=0
@@ -65,10 +58,17 @@ for epoch in range(config.n_epochs):
         batch = tree_map(lambda x: x.to(args.device), batch)
         state = transform.update(state, batch)
 
-        losses.append(state.aux.loss.item())
-        log_posts.append(state.loss.item())
-        log_post_bar.set_description_str(f"Log posterior: {log_posts[-1]:.2f}")
+        # Update metrics
+        append_metrics(log_dict, state, config.log_metrics)
+        log_bar.set_description_str(
+            f"{config.display_metric}: {log_dict[config.display_metric][-1]:.2f}"
+        )
 
-    log_training_metrics(losses, log_posts)
+        i += 1
+        # Log
+        if i % config.log_frequency == 0 or i % len(train_dataloader) == 0:
+            log_training_metrics(log_dict, config.save_dir)
+
+    # Save state
     with open(f"{config.save_dir}/state.pkl", "wb") as f:
         pickle.dump(state, f)

@@ -15,3 +15,10 @@ method = uqlib.torchopt
 config_args = {
     "optimizer": torchopt.adamw(lr=1e-5, maximize=True)
 }  # arguments for method.build (aside from log_posterior)
+log_metrics = {
+    "log_post": "aux.loss",
+    "loss": "loss",
+}  # dict containing names of metrics as keys and their paths in state as values
+display_metric = "loss"  # metric to display in tqdm progress bar
+
+log_frequency = 100  # frequency at which to log metrics

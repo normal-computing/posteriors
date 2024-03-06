@@ -22,6 +22,7 @@ from uqlib.utils import inplacify
 from uqlib.utils import tree_map_inplacify_
 from uqlib.utils import flexi_tree_map
 from uqlib.utils import per_samplify
+from uqlib.utils import is_scalar
 
 
 import logging

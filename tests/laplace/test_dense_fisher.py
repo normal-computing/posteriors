@@ -5,9 +5,10 @@ from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
 from uqlib.utils import tree_size, empirical_fisher
+from optree import tree_map
+from optree.integration.torch import tree_ravel
 
-from uqlib.laplace import full_fisher
-
+from uqlib.laplace import dense_fisher
 
 class TestModel(nn.Module):
     def __init__(self):
@@ -60,7 +61,7 @@ def test_full_fisher_vmap():
 
     params = dict(model.named_parameters())
 
-    transform = full_fisher.build(log_posterior)
+    transform = dense_fisher.build(log_posterior)
     laplace_state = transform.init(params)
     for batch in dataloader:
         laplace_state = transform.update(laplace_state, batch)
@@ -85,7 +86,7 @@ def test_full_fisher_vmap():
 
     #  Test per_sample
     log_posterior_per_sample = partial(log_posterior_n, model=model, n_data=len(xs))
-    transform_ps = full_fisher.build(log_posterior_per_sample, per_sample=True)
+    transform_ps = dense_fisher.build(log_posterior_per_sample, per_sample=True)
     laplace_state_ps = transform_ps.init(params)
     for batch in dataloader:
         laplace_state_ps = transform_ps.update(
@@ -117,3 +118,14 @@ def test_full_fisher_vmap():
         laplace_state_ip.prec,
         atol=1e-8,
     )
+
+    # Test sampling
+    num_samples = 100000
+    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(num_params) # regularize to ensure PSD and reduce variance
+    samples, _ = dense_fisher.sample(laplace_state, (num_samples,))
+
+    expected_samples = torch.distributions.MultivariateNormal(loc=tree_ravel(laplace_state.mean)[0], precision_matrix=laplace_state.prec, validate_args=False).sample((num_samples,))
+
+    assert torch.allclose(torch.mean(samples, dim=0), torch.mean(expected_samples, dim=0), atol=1e-1)
+
+test_full_fisher_vmap()

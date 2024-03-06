@@ -4,12 +4,13 @@ from functools import partial
 import torch
 from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
 from uqlib.utils import per_samplify, tree_size, empirical_fisher
-
+from optree.integration.torch import tree_ravel
 
 @dataclass
 class FullLaplaceState:
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
+    
     Args:
         mean: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
@@ -25,11 +26,13 @@ def init(
     params: TensorTree,
     init_prec: Tensor | None = None,
 ) -> FullLaplaceState:
-    """Initialise Normal distribution over parameters,
+    """Initialise Normal distribution over parameters
     with a dense precision matrix.
+
     Args:
         params: Mean of the Normal distribution.
-        init_prec: Initial precision matrix. Defaults to identity.
+        init_prec: Initial precision matrix. Defaults to all zeros.
+
     Returns:
         Initial FullLaplaceState.
     """
@@ -70,7 +73,8 @@ def update(
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
 
-    fisher, aux = empirical_fisher(log_posterior, state.mean, batch)
+    with torch.no_grad():
+        fisher, aux = empirical_fisher(log_posterior, state.mean, batch)
 
     if inplace:
         state.prec += fisher
@@ -116,11 +120,15 @@ def sample(
 
     Args:
         state: State encoding mean and precision matrix.
-        sample_shapa: Shape of the desired samples.
+        sample_shape: Shape of the desired samples.
 
     Returns:
         Sample(s) from the Normal distribution.
     """
     return torch.distributions.MultivariateNormal(
-        loc=state.mean, precision_matrix=state.prec
-    ).sample(sample_shape)
+        loc=tree_ravel(state.mean)[0], precision_matrix=state.prec, validate_args=False
+    ).sample(sample_shape), state.mean
+
+    # return tree_map(torch.distributions.MultivariateNormal(
+    #     loc=tree_ravel(state.mean)[0], precision_matrix=state.prec, validate_args=False
+    # ).sample(sample_shape)

@@ -480,11 +480,24 @@ def is_scalar(x: Any) -> bool:
 def empirical_fisher(
     f: Callable[[TensorTree, TensorTree], Any], params: TensorTree, batch: Any
 ) -> Tensor:
-    with torch.no_grad():
-        batch_jac, aux = jacrev(f, has_aux=True)(params, batch)
-        batched_params = [
-            batch_jac[key].reshape(batch_jac[key].shape[0], -1) for key in batch_jac
-        ]
-        flat_jac = torch.cat(batched_params, dim=1)
-        fisher = flat_jac.T @ flat_jac
+    """
+    Compute the empirical Fisher information matrix of a function f with respect to its
+    parameters, defined as:
+
+    F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ)^T ∇_θ f_θ(xᵢ, yᵢ)
+
+    Args:
+        f: A function that takes params and batch and returns the output of the model.
+        params: PyTree of tensors.
+        batch: Input data to f, of the form (x, y).
+
+    Returns:
+        fisher: The empirical Fisher information matrix.
+    """
+    batch_jac, aux = jacrev(f, has_aux=True)(params, batch)
+    batched_params = [
+        batch_jac[key].reshape(batch_jac[key].shape[0], -1) for key in batch_jac
+    ]
+    flat_jac = torch.cat(batched_params, dim=1)
+    fisher = flat_jac.T @ flat_jac
     return fisher, aux

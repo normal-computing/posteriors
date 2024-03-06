@@ -16,6 +16,8 @@ class TransformState(Protocol):
     """
 
     __dataclass_fields__: Dict[str, Any]
+    params: TensorTree
+    aux: Any
 
 
 class InitFn(Protocol):

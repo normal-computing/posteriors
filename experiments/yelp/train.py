@@ -36,6 +36,9 @@ model, log_posterior = load_model(
 model.to(args.device)
 print("Device: ", model.device)
 
+if "temperature" in config.config_args and config.config_args["temperature"] is None:
+    config.config_args["temperature"] = 1 / num_data
+
 # Extract model parameters
 params = dict(model.named_parameters())
 num_params = uqlib.tree_size(params).item()

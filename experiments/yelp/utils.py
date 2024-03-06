@@ -31,6 +31,7 @@ def log_training_metrics(log_dict, save_dir, window=1):
         ax.set_xlabel("Iteration")
         fig.tight_layout()
         fig.savefig(f"{save_dir}/training_{k}.png", dpi=200)
+        plt.close(fig)
 
 
 # Function to append metrics to log_dict

@@ -37,7 +37,7 @@ def init(
         params: Initial mean of the variational distribution.
         init_sds: Initial square-root diagonal of the covariance matrix
             of the variational distribution. Can be tree like params or scalar.
-            Defaults to ones.
+            Defaults to one.
 
     Returns:
         Initial EKFDiagState.

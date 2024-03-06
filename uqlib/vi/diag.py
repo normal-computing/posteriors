@@ -39,7 +39,7 @@ def init(
     """Initialise diagonal Normal variational distribution over parameters.
 
     optimizer.init will be called on flattened variational parameters so hyperparameters
-    such as learning rate need to prespecifed through torchopt's functional API:
+    such as learning rate need to pre-specified through torchopt's functional API:
 
     ```
     import torchopt
@@ -81,7 +81,7 @@ def update(
     stl: bool = True,
     inplace: bool = False,
 ) -> VIDiagState:
-    """Updates the variational parameters to minimise the NELBO.
+    """Updates the variational parameters to minimize the NELBO.
 
     Args:
         state: Current state.

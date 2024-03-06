@@ -51,10 +51,12 @@ def test_full_fisher_vmap():
 
     params = dict(model.named_parameters())
 
+    # Test inplace = False
     transform = dense_fisher.build(log_posterior)
     laplace_state = transform.init(params)
+    laplace_state_prec_init = laplace_state.prec
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch)
+        laplace_state = transform.update(laplace_state, batch, inplace=False)
 
     num_params = tree_size(params)
     expected = torch.zeros((num_params, num_params))
@@ -67,6 +69,8 @@ def test_full_fisher_vmap():
         expected += fisher
 
     assert torch.allclose(expected, laplace_state.prec, atol=1e-5)
+    assert not torch.allclose(laplace_state.prec, laplace_state_prec_init
+                              )
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
@@ -96,18 +100,15 @@ def test_full_fisher_vmap():
 
     assert torch.allclose(laplace_state_ip2.prec, laplace_state_ip.prec, atol=1e-8)
 
-    # Test not inplace
-    laplace_state_ip_false = transform.update(
-        laplace_state_ip,
-        batch,
-        inplace=False,
-    )
+    # Test inplace = True
+    transform = dense_fisher.build(log_posterior)
+    laplace_state = transform.init(params)
+    laplace_state_prec_diag_init = laplace_state.prec
+    for batch in dataloader:
+        laplace_state = transform.update(laplace_state, batch, inplace=True)
 
-    assert not torch.allclose(
-        laplace_state_ip_false.prec,
-        laplace_state_ip.prec,
-        atol=1e-8,
-    )
+    assert torch.allclose(expected, laplace_state.prec, atol=1e-5)
+    assert torch.allclose(laplace_state.prec, laplace_state_prec_diag_init, atol=1e-5)
 
     # Test sampling
     num_samples = 100000
@@ -125,6 +126,3 @@ def test_full_fisher_vmap():
     assert torch.allclose(
         torch.mean(samples, dim=0), torch.mean(expected_samples, dim=0), atol=1e-1
     )
-
-
-test_full_fisher_vmap()

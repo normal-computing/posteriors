@@ -246,7 +246,7 @@ for episode_ind in range(config.num_tasks):
         laplace_state = optree.tree_map(detach, laplace_state)
 
         # Update sequential prior
-        current_prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.mean)
+        current_prior_mean = optree.tree_map(lambda x: x.clone(), laplace_state.params)
         current_prior_sd = optree.tree_map(
             lambda p, f: (p**-2 + f * config.lambda_param) ** -0.5,
             current_prior_sd,

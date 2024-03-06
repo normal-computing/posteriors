@@ -14,14 +14,14 @@ class EKFDiagState:
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:
-        mean: Mean of the Normal distribution.
+        params: Mean of the Normal distribution.
         sd_diag: Square-root diagonal of the covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
         aux: Auxiliary information from the log_likelihood call.
     """
 
-    mean: TensorTree
+    params: TensorTree
     sd_diag: TensorTree
     log_likelihood: float = 0
     aux: Any = None
@@ -97,8 +97,8 @@ def update(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
     with torch.no_grad():
-        log_liks, aux = log_likelihood(state.mean, batch)
-        jac, _ = jacrev(log_likelihood, has_aux=True)(state.mean, batch)
+        log_liks, aux = log_likelihood(state.params, batch)
+        jac, _ = jacrev(log_likelihood, has_aux=True)(state.params, batch)
         grad = tree_map(lambda x: x.mean(0), jac)
         diag_lik_hessian_approx = tree_map(lambda x: -(x**2).mean(0), jac)
 
@@ -110,7 +110,7 @@ def update(
     )
     update_mean = flexi_tree_map(
         lambda mu, sig, g: mu + sig**2 * lr * g,
-        state.mean,
+        state.params,
         update_sd_diag,
         grad,
         inplace=inplace,
@@ -163,13 +163,16 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-def sample(state: EKFDiagState, sample_shape: torch.Size = torch.Size([])):
+def sample(
+    state: EKFDiagState, sample_shape: torch.Size = torch.Size([])
+) -> TensorTree:
     """Single sample from diagonal Normal distribution over parameters.
 
     Args:
         state: State encoding mean and standard deviations.
+        sample_shape: Shape of the desired samples.
 
     Returns:
         Sample from Normal distribution.
     """
-    return diag_normal_sample(state.mean, state.sd_diag, sample_shape=sample_shape)
+    return diag_normal_sample(state.params, state.sd_diag, sample_shape=sample_shape)

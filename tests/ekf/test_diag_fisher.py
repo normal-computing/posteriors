@@ -32,9 +32,9 @@ def test_ekf_diag():
 
     assert log_liks[0] < log_liks[-1]
 
-    for key in state.mean:
-        assert torch.allclose(state.mean[key], target_mean[key], atol=1e-1)
-        assert not torch.allclose(state.mean[key], init_mean[key])
+    for key in state.params:
+        assert torch.allclose(state.params[key], target_mean[key], atol=1e-1)
+        assert not torch.allclose(state.params[key], init_mean[key])
 
     # Test inplace = True
     state = transform.init(init_mean)
@@ -43,16 +43,16 @@ def test_ekf_diag():
         state = transform.update(state, batch, inplace=True)
         log_liks.append(state.log_likelihood.item())
 
-    for key in state.mean:
-        assert torch.allclose(state.mean[key], target_mean[key], atol=1e-1)
-        assert torch.allclose(state.mean[key], init_mean[key])
+    for key in state.params:
+        assert torch.allclose(state.params[key], target_mean[key], atol=1e-1)
+        assert torch.allclose(state.params[key], init_mean[key])
 
     # Test sample
-    mean_copy = tree_map(lambda x: x.clone(), state.mean)
+    mean_copy = tree_map(lambda x: x.clone(), state.params)
     samples = ekf.diag_fisher.sample(state, (1000,))
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
     samples_sd = tree_map(lambda x: x.std(dim=0), samples)
     for key in samples_mean:
-        assert torch.allclose(samples_mean[key], state.mean[key], atol=1e-1)
+        assert torch.allclose(samples_mean[key], state.params[key], atol=1e-1)
         assert torch.allclose(samples_sd[key], state.sd_diag[key], atol=1e-1)
         assert not torch.allclose(samples_mean[key], mean_copy[key])

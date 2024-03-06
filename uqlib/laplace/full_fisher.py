@@ -2,10 +2,8 @@ from typing import Any
 from dataclasses import dataclass
 from functools import partial
 import torch
-from torch.func import jacrev
 from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
-from optree.integration.torch import ravel_pytree
-from uqlib.utils import per_samplify, tree_size
+from uqlib.utils import per_samplify, tree_size, empirical_fisher
 
 
 @dataclass
@@ -72,11 +70,7 @@ def update(
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
 
-    with torch.no_grad():
-        jac, aux = jacrev(log_posterior, has_aux=True)(state.mean, batch)
-        flat_jac, _ = ravel_pytree(jac)
-        flat_jac = flat_jac.reshape(batch[0].shape[0], -1)
-        fisher = flat_jac.T @ flat_jac
+    fisher, aux = empirical_fisher(log_posterior, state.mean, batch)
 
     if inplace:
         state.prec += fisher

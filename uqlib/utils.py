@@ -5,7 +5,7 @@ from torch.func import grad, jvp, functional_call, jacrev
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
 
-from uqlib.types import TensorTree, ForwardFn
+from uqlib.types import TensorTree, ForwardFn, Tensor
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
@@ -475,3 +475,16 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
+
+
+def empirical_fisher(
+    f: Callable[[TensorTree, TensorTree], Any], params: TensorTree, batch: Any
+) -> Tensor:
+    with torch.no_grad():
+        batch_jac, aux = jacrev(f, has_aux=True)(params, batch)
+        batched_params = [
+            batch_jac[key].reshape(batch_jac[key].shape[0], -1) for key in batch_jac
+        ]
+        flat_jac = torch.cat(batched_params, dim=1)
+        fisher = flat_jac.T @ flat_jac
+    return fisher, aux

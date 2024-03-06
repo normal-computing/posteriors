@@ -22,6 +22,7 @@ from uqlib import (
     flexi_tree_map,
     per_samplify,
     is_scalar,
+    empirical_fisher
 )
 
 
@@ -450,3 +451,29 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
+
+def test_empirical_fisher():
+    def f(params, batch):
+        return batch[1] - batch[0] @ params["weights"] - params["bias"], params
+
+    num_samples = 1
+    num_features = 4
+
+    x = torch.randn(num_samples, num_features)
+    y = torch.randn(num_samples, 1)
+    params = {
+        "weights": torch.randn(num_features, 1, requires_grad=True),
+        "bias": torch.randn(1, requires_grad=True),
+    }
+
+    batch = (x, y)
+    fisher, _ = empirical_fisher(per_samplify(f), params, batch)
+
+    expected_fisher = torch.zeros((num_features + 1, num_features + 1))
+    expected_fisher[:num_features, :num_features] = x.T @ x
+    expected_fisher[:num_features, num_features] = torch.sum(x, dim=0)
+    expected_fisher[num_features, :num_features] = torch.sum(x, dim=0)
+
+    expected_fisher[num_features, num_features] = num_samples
+
+    assert torch.allclose(fisher, expected_fisher, rtol=1e-5)

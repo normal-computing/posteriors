@@ -22,7 +22,6 @@ config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""
 if not os.path.exists(config.save_dir):
     os.makedirs(config.save_dir)
 
-
 # Load data and model
 train_dataloader, test_dataloader = load_dataloaders(
     small=config.small_dataset, batch_size=config.batch_size
@@ -33,12 +32,10 @@ model, log_posterior = load_model(
 )
 model.to(args.device)
 
-
 # Extract model parameters
 params = dict(model.named_parameters())
 num_params = uqlib.tree_size(params).item()
 print(f"Number of parameters: {int(num_params/1e6)}M")
-
 
 # Build transform
 transform = config.method.build(log_posterior, **config.config_args)
@@ -46,9 +43,9 @@ transform = config.method.build(log_posterior, **config.config_args)
 # Initialize state
 state = transform.init(params)
 
-
 # Train
 i = 0
+num_batches = len(train_dataloader)
 log_dict = {k: [] for k in config.log_metrics.keys()}
 log_bar = tqdm(total=0, position=1, bar_format="{desc}")
 for epoch in range(config.n_epochs):
@@ -59,15 +56,15 @@ for epoch in range(config.n_epochs):
         state = transform.update(state, batch)
 
         # Update metrics
-        append_metrics(log_dict, state, config.log_metrics)
+        log_dict = append_metrics(log_dict, state, config.log_metrics)
         log_bar.set_description_str(
             f"{config.display_metric}: {log_dict[config.display_metric][-1]:.2f}"
         )
 
-        i += 1
         # Log
-        if i % config.log_frequency == 0 or i % len(train_dataloader) == 0:
-            log_training_metrics(log_dict, config.save_dir)
+        i += 1
+        if i % config.log_frequency == 0 or i % num_batches == 0:
+            log_training_metrics(log_dict, config.save_dir, window=config.log_window)
 
     # Save state
     with open(f"{config.save_dir}/state.pkl", "wb") as f:

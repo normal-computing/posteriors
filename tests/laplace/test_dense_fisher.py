@@ -9,15 +9,7 @@ from optree import tree_map
 from optree.integration.torch import tree_ravel
 
 from uqlib.laplace import dense_fisher
-
-class TestModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.device = "cpu"
-        self.linear = nn.Linear(10, 1)
-
-    def forward(self, x):
-        return self.linear(x)
+from tests.scenarios import TestModel
 
 
 # Note this won't work if you replace torch.stack with torch.tensor

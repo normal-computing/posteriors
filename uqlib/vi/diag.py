@@ -1,15 +1,17 @@
-from typing import Callable, Any, NamedTuple, Tuple
+from typing import Callable, Any, Tuple
 from functools import partial
 import torch
 from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_log_prob, diag_normal_sample
 
 
-class VIDiagState(NamedTuple):
+@dataclass
+class VIDiagState:
     """State encoding a diagonal Normal variational distribution over parameters.
 
     Args:
@@ -25,7 +27,7 @@ class VIDiagState(NamedTuple):
     mean: TensorTree
     log_sd_diag: TensorTree
     optimizer_state: tuple
-    nelbo: float = 0
+    nelbo: torch.tensor = None
     aux: Any = None
 
 
@@ -75,7 +77,7 @@ def update(
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> VIDiagState:
     """Updates the variational parameters to minimise the NELBO.
 
@@ -94,7 +96,7 @@ def update(
         stl: Whether to use the `stick-the-landing` estimator
             https://arxiv.org/abs/1703.09194.
             Defaults to True.
-        inplace: Whether to update the state parameters in-place.
+        inplace: Whether to modify state in place.
 
     Returns:
         Updated DiagVIState.
@@ -118,6 +120,11 @@ def update(
     mean, log_sd_diag = torchopt.apply_updates(
         (state.mean, state.log_sd_diag), updates, inplace=inplace
     )
+
+    if inplace:
+        state.nelbo = nelbo_val.detach()
+        state.aux = aux
+        return state
     return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.detach(), aux)
 
 

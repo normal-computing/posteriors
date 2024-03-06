@@ -34,7 +34,7 @@ class VIDiagState:
 def init(
     params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
-    init_log_sds: TensorTree | float | None = None,
+    init_log_sds: TensorTree | float = 0.0,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
@@ -142,7 +142,7 @@ def build(
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
-    init_log_sds: TensorTree | None = None,
+    init_log_sds: TensorTree | float = 0.0,
 ) -> Transform:
     """Builds a transform for variational inference with a diagonal Normal
     distribution over parameters.

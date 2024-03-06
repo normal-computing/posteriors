@@ -7,7 +7,7 @@ from optree import tree_map
 import uqlib
 
 from experiments.yelp.load import load_dataloaders, load_model
-from experiments.yelp.utils import log_training_metrics, append_metrics
+from experiments.yelp import utils
 
 # Get config path and device from user
 parser = argparse.ArgumentParser()
@@ -17,6 +17,9 @@ args = parser.parse_args()
 
 # Import configuration
 config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""))
+
+# Save config as json
+utils.save_config(args.config)
 
 # Create save directory if it does not exist
 if not os.path.exists(config.save_dir):
@@ -56,7 +59,7 @@ for epoch in range(config.n_epochs):
         state = transform.update(state, batch)
 
         # Update metrics
-        log_dict = append_metrics(log_dict, state, config.log_metrics)
+        log_dict = utils.append_metrics(log_dict, state, config.log_metrics)
         log_bar.set_description_str(
             f"{config.display_metric}: {log_dict[config.display_metric][-1]:.2f}"
         )
@@ -64,7 +67,9 @@ for epoch in range(config.n_epochs):
         # Log
         i += 1
         if i % config.log_frequency == 0 or i % num_batches == 0:
-            log_training_metrics(log_dict, config.save_dir, window=config.log_window)
+            utils.log_training_metrics(
+                log_dict, config.save_dir, window=config.log_window
+            )
 
     # Save state
     with open(f"{config.save_dir}/state.pkl", "wb") as f:

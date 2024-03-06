@@ -1,6 +1,12 @@
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+import shutil
+
+
+# Save config
+def save_config(config_dir, save_dir):
+    shutil.copy(config_dir, save_dir + "/config.py")
 
 
 # Function to calculate moving average and accompanying x-axis values
@@ -27,6 +33,7 @@ def log_training_metrics(log_dict, save_dir, window=1):
         fig.savefig(f"{save_dir}/training_{k}.png", dpi=200)
 
 
+# Function to append metrics to log_dict
 def append_metrics(log_dict, state, config_dict):
     for k, v in config_dict.items():
         if v[:4] == "aux.":

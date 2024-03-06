@@ -1,14 +1,16 @@
-from typing import NamedTuple, Any
+from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import flexi_tree_map
 
 
-class SGHMCState(NamedTuple):
+@dataclass
+class SGHMCState:
     """State enconding momenta for SGHMC.
 
     Args:
@@ -20,7 +22,7 @@ class SGHMCState(NamedTuple):
 
     params: TensorTree
     momenta: TensorTree
-    log_posterior: torch.tensor = torch.tensor(0.0)
+    log_posterior: torch.tensor = None
     aux: Any = None
 
 
@@ -47,7 +49,7 @@ def update(
     alpha: float = 0.01,
     beta: float = 0.0,
     temperature: float = 1.0,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> SGHMCState:
     """Updates parameters and momenta for SGHMC.
 
@@ -62,7 +64,7 @@ def update(
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the joint parameter + momenta distribution.
         params: Values of parameters, not used for SGHMC update.
-        inplace: Whether to modify updates and state in place.
+        inplace: Whether to modify state in place.
 
     Returns:
         Updated state
@@ -90,6 +92,10 @@ def update(
     )
     momenta = flexi_tree_map(transform_momenta, state.momenta, grads, inplace=inplace)
 
+    if inplace:
+        state.log_posterior = log_post.detach()
+        state.aux = aux
+        return state
     return SGHMCState(params, momenta, log_post.detach(), aux)
 
 

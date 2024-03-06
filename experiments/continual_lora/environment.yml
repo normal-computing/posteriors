@@ -1,0 +1,20 @@
+name: base
+channels:
+  - conda-forge
+  - huggingface
+dependencies:
+  - pip
+  - datasets==2.14.5
+  - huggingface-hub==0.20.3
+  - numpy==1.25.2
+  - optree==0.10.0
+  - pandas==2.1.0
+  - peft==0.8.2
+  - pre-commit==3.6.0
+  - tokenizers==0.13.3
+  - torch==2.0.1
+  - torchaudio==2.0.0
+  - torchmetrics==1.2.0
+  - torchopt==0.7.3
+  - torchvision==0.15.2
+  - transformers==4.33.2

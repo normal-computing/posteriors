@@ -1,14 +1,16 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 from torch.func import jacrev
 from optree import tree_map
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
 
 
-class EKFDiagState(NamedTuple):
+@dataclass
+class EKFDiagState:
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:
@@ -54,7 +56,7 @@ def update(
     lr: float,
     transition_sd: float = 0.0,
     per_sample: bool = False,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> EKFDiagState:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
     The update is first order, i.e. the likelihood is approximated by a
@@ -113,6 +115,11 @@ def update(
         grad,
         inplace=inplace,
     )
+
+    if inplace:
+        state.log_likelihood = log_liks.mean().detach()
+        state.aux = aux
+        return state
     return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
 
 

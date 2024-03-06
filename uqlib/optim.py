@@ -1,11 +1,13 @@
-from typing import Type, NamedTuple, Any
+from typing import Type, Any
 from functools import partial
 import torch
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 
 
-class OptimState(NamedTuple):
+@dataclass
+class OptimState:
     """State of an optimizer.
 
     Args:
@@ -17,7 +19,7 @@ class OptimState(NamedTuple):
 
     params: TensorTree
     optimizer: torch.optim.Optimizer
-    loss: torch.tensor = torch.tensor(0.0)
+    loss: torch.tensor = None
     aux: Any = None
 
 
@@ -69,7 +71,9 @@ def update(
     loss, aux = loss_fn(state.params, batch)
     loss.backward()
     state.optimizer.step()
-    return OptimState(state.params, state.optimizer, state.loss.detach(), aux)
+    state.loss = loss
+    state.aux = aux
+    return state
 
 
 def build(

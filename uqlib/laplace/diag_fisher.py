@@ -1,14 +1,16 @@
 from functools import partial
-from typing import Any, NamedTuple
+from typing import Any
 import torch
 from torch.func import jacrev
 from optree import tree_map
+from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
 from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
 
 
-class DiagLaplaceState(NamedTuple):
+@dataclass
+class DiagLaplaceState:
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:
@@ -48,7 +50,7 @@ def update(
     batch: Any,
     log_posterior: LogProbFn,
     per_sample: bool = False,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> DiagLaplaceState:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
@@ -84,6 +86,9 @@ def update(
         update_func, state.prec_diag, batch_diag_score_sq, inplace=inplace
     )
 
+    if inplace:
+        state.aux = aux
+        return state
     return DiagLaplaceState(state.mean, prec_diag, aux)
 
 

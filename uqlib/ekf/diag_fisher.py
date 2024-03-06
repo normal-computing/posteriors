@@ -44,7 +44,8 @@ def init(
     """
     if is_scalar(init_sds):
         init_sds = tree_map(
-            lambda x: torch.ones_like(x, requires_grad=True) * init_sds, params
+            lambda x: torch.ones_like(x, requires_grad=x.requires_grad) * init_sds,
+            params,
         )
 
     return EKFDiagState(params, init_sds)

@@ -56,7 +56,7 @@ def load_model(
         return (
             categorical_log_likelihood(batch["labels"], output.logits).mean()
         ) + diag_normal_log_prob(
-            p, sd_diag=prior_sd, normalized=False
+            p, sd_diag=prior_sd, normalize=False
         ) / num_data, output
 
     if num_data is not None:

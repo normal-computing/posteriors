@@ -18,12 +18,12 @@ args = parser.parse_args()
 # Import configuration
 config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""))
 
-# Save config as json
-utils.save_config(args.config)
-
 # Create save directory if it does not exist
 if not os.path.exists(config.save_dir):
     os.makedirs(config.save_dir)
+
+# Save config
+utils.save_config(args.config, config.save_dir)
 
 # Load data and model
 train_dataloader, test_dataloader = load_dataloaders(
@@ -34,6 +34,7 @@ model, log_posterior = load_model(
     prior_sd=config.prior_sd, num_data=num_data, params_dir=config.params_dir
 )
 model.to(args.device)
+print("Device: ", model.device)
 
 # Extract model parameters
 params = dict(model.named_parameters())

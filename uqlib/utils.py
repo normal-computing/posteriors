@@ -487,17 +487,19 @@ def empirical_fisher(
     F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ)^T ∇_θ f_θ(xᵢ, yᵢ)
 
     Args:
-        f: A function that takes params and batch and returns the output of the model.
+        f: A function that takes params and batch and returns a 1D vector
+            with length equal to batch size.
         params: PyTree of tensors.
         batch: Input data to f, of the form (x, y).
 
     Returns:
         fisher: The empirical Fisher information matrix.
     """
-    batch_jac, aux = jacrev(f, has_aux=True)(params, batch)
-    batched_params = [
-        batch_jac[key].reshape(batch_jac[key].shape[0], -1) for key in batch_jac
-    ]
-    flat_jac = torch.cat(batched_params, dim=1)
-    fisher = flat_jac.T @ flat_jac
-    return fisher, aux
+    with torch.no_grad():
+        jac, aux = jacrev(f, has_aux=True)(params, batch)
+
+    # Convert Jacobian to be flat in parameter dimension
+    jac = tree_flatten(jac)[0]
+    jac = torch.cat([x.flatten(start_dim=1) for x in jac], dim=1)
+
+    return jac.T @ jac, aux

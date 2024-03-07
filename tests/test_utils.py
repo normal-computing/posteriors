@@ -1,5 +1,6 @@
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
+from optree.integration.torch import tree_ravel
 
 from tests.scenarios import TestModel, TestLanguageModel
 
@@ -455,26 +456,31 @@ def test_is_scalar():
 
 def test_empirical_fisher():
     def f(params, batch):
-        return batch[1] - batch[0] @ params["weights"] - params["bias"], params
+        return torch.squeeze(
+            batch[1] - batch[0] @ params["weights"] - params["bias"]
+        ), params
 
-    num_samples = 1
+    f_per_sample = torch.vmap(f, in_dims=(None, 0))
+
+    num_samples = 2
     num_features = 4
 
     x = torch.randn(num_samples, num_features)
-    y = torch.randn(num_samples, 1)
+    y = torch.randn(
+        num_samples,
+    )
     params = {
         "weights": torch.randn(num_features, 1, requires_grad=True),
         "bias": torch.randn(1, requires_grad=True),
     }
 
     batch = (x, y)
-    fisher, _ = empirical_fisher(per_samplify(f), params, batch)
+    fisher, _ = empirical_fisher(f_per_sample, params, batch)
 
     expected_fisher = torch.zeros((num_features + 1, num_features + 1))
-    expected_fisher[:num_features, :num_features] = x.T @ x
-    expected_fisher[:num_features, num_features] = torch.sum(x, dim=0)
-    expected_fisher[num_features, :num_features] = torch.sum(x, dim=0)
-
-    expected_fisher[num_features, num_features] = num_samples
+    for xs, ys in zip(x, y):
+        g = torch.func.grad(f, has_aux=True)(params, (xs, ys))[0]
+        g = tree_ravel(g)[0]
+        expected_fisher += torch.outer(g, g)
 
     assert torch.allclose(fisher, expected_fisher, rtol=1e-5)

@@ -7,7 +7,7 @@ import torchopt
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_log_prob, diag_normal_sample
+from uqlib.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
 
 
 @dataclass
@@ -34,12 +34,12 @@ class VIDiagState:
 def init(
     params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
-    init_log_sds: TensorTree | None = None,
+    init_log_sds: TensorTree | float = 0.0,
 ) -> VIDiagState:
     """Initialise diagonal Normal variational distribution over parameters.
 
     optimizer.init will be called on flattened variational parameters so hyperparameters
-    such as learning rate need to prespecifed through torchopt's functional API:
+    such as learning rate need to pre-specified through torchopt's functional API:
 
     ```
     import torchopt
@@ -55,14 +55,16 @@ def init(
         optimizer: torchopt functional optimizer for updating the variational
             parameters.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to zero.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to zero.
 
     Returns:
         Initial DiagVIState.
     """
-    if init_log_sds is None:
+    if is_scalar(init_log_sds):
         init_log_sds = tree_map(
-            lambda x: torch.zeros_like(x, requires_grad=True), params
+            lambda x: torch.full_like(x, init_log_sds, requires_grad=x.requires_grad),
+            params,
         )
 
     optimizer_state = optimizer.init([params, init_log_sds])
@@ -79,7 +81,7 @@ def update(
     stl: bool = True,
     inplace: bool = False,
 ) -> VIDiagState:
-    """Updates the variational parameters to minimise the NELBO.
+    """Updates the variational parameters to minimize the NELBO.
 
     Args:
         state: Current state.
@@ -134,7 +136,7 @@ def build(
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
-    init_log_sds: TensorTree | None = None,
+    init_log_sds: TensorTree | float = 0.0,
 ) -> Transform:
     """Builds a transform for variational inference with a diagonal Normal
     distribution over parameters.
@@ -152,7 +154,8 @@ def build(
             https://arxiv.org/abs/1703.09194.
             Defaults to True.
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Defaults to zero.
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to zero.
 
     Returns:
         Diagonal VI transform (uqlib.types.Transform instance).

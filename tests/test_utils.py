@@ -21,6 +21,7 @@ from uqlib import (
     tree_map_inplacify_,
     flexi_tree_map,
     per_samplify,
+    is_scalar,
 )
 
 
@@ -440,3 +441,12 @@ def test_per_samplify():
     expected_b = torch.tensor([1.0, 1.0])
     assert torch.allclose(ra, expected_a)
     assert torch.allclose(rb, expected_b)
+
+
+def test_is_scalar():
+    assert is_scalar(1)
+    assert is_scalar(1.0)
+    assert is_scalar(torch.ones(1))
+    assert is_scalar(torch.tensor(1.0))
+    assert is_scalar(torch.ones(1, 1))
+    assert not is_scalar(torch.ones(2))

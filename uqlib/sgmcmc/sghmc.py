@@ -6,12 +6,12 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import flexi_tree_map
+from uqlib.utils import flexi_tree_map, is_scalar
 
 
 @dataclass
 class SGHMCState:
-    """State enconding momenta for SGHMC.
+    """State encoding params and momenta for SGHMC.
 
     Args:
         params: Parameters.
@@ -26,18 +26,23 @@ class SGHMCState:
     aux: Any = None
 
 
-def init(params: TensorTree, momenta: TensorTree | None = None) -> SGHMCState:
+def init(params: TensorTree, momenta: TensorTree | float = 0.0) -> SGHMCState:
     """Initialise momenta for SGHMC.
 
     Args:
         params: Parameters for which to initialise.
-        momenta: Initial momenta. Defaults to all zeroes.
+        momenta: Initial momenta. Can be tree like params or scalar.
+            Defaults to all zero.
 
     Returns:
         Initial SGHMCState containing momenta.
     """
-    if momenta is None:
-        momenta = tree_map(torch.zeros_like, params)
+    if is_scalar(momenta):
+        momenta = tree_map(
+            lambda x: torch.full_like(x, momenta, requires_grad=x.requires_grad),
+            params,
+        )
+
     return SGHMCState(params, momenta)
 
 
@@ -105,7 +110,7 @@ def build(
     alpha: float = 0.01,
     beta: float = 0.0,
     temperature: float = 1.0,
-    momenta: TensorTree | None = None,
+    momenta: TensorTree | float = 0.0,
 ) -> Transform:
     """Builds SGHMC transform.
 
@@ -117,7 +122,8 @@ def build(
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the joint parameter + momenta distribution.
-        momenta: Initial momenta. Defaults to all zeroes.
+        momenta: Initial momenta. Can be tree like params or scalar.
+            Defaults to all zero.
 
     Returns:
         SGHMC transform (uqlib.types.Transform instance).

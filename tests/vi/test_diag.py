@@ -81,7 +81,11 @@ def _test_vi_diag(optimizer_cls, stl):
     n_vi_samps = 5
 
     transform = vi.diag.build(
-        batch_normal_log_prob_spec, optimizer, n_samples=n_vi_samps, stl=stl
+        batch_normal_log_prob_spec,
+        optimizer,
+        n_samples=n_vi_samps,
+        stl=stl,
+        init_log_sds=0.0,
     )
 
     # Test inplace = False

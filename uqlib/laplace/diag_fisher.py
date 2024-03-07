@@ -6,7 +6,7 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from uqlib.types import TensorTree, Transform, LogProbFn
-from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify
+from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
 
 
 @dataclass
@@ -26,20 +26,22 @@ class DiagLaplaceState:
 
 def init(
     params: TensorTree,
-    init_prec_diag: TensorTree | None = None,
+    init_prec_diag: TensorTree | float = 0.0,
 ) -> DiagLaplaceState:
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
         params: Mean of the Normal distribution.
-        init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
+        init_prec_diag: Initial diagonal precision matrix.
+            Can be tree like params or scalar. Defaults to zero.
 
     Returns:
         Initial DiagLaplaceState.
     """
-    if init_prec_diag is None:
+    if is_scalar(init_prec_diag):
         init_prec_diag = tree_map(
-            lambda x: torch.zeros_like(x, requires_grad=x.requires_grad), params
+            lambda x: torch.full_like(x, init_prec_diag, requires_grad=x.requires_grad),
+            params,
         )
 
     return DiagLaplaceState(params, init_prec_diag)
@@ -95,7 +97,7 @@ def update(
 def build(
     log_posterior: LogProbFn,
     per_sample: bool = False,
-    init_prec_diag: TensorTree | None = None,
+    init_prec_diag: TensorTree | float = 0.0,
 ) -> Transform:
     """Builds a transform for diagonal empirical Fisher information
     Laplace approximation.
@@ -109,7 +111,8 @@ def build(
             is assumed to return a scalar log posterior for the whole batch, in this
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_posterior to be per sample.
-        init_prec_diag: Initial diagonal of the precision matrix. Defaults to zero.
+        init_prec_diag: Initial diagonal precision matrix.
+            Can be tree like params or scalar. Defaults to zero.
 
     Returns:
         Diagonal empirical Fisher information Laplace approximation transform

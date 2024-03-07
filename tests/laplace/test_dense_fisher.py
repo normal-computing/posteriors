@@ -22,7 +22,7 @@ def log_posterior_n(params, batch, model, n_data):
     ) * n_data, torch.tensor([])
 
 
-def test_full_fisher_vmap():
+def test_dense_fisher_vmap():
     torch.manual_seed(42)
     model = TestModel()
 

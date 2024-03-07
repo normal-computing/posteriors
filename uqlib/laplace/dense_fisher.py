@@ -38,7 +38,7 @@ def init(
             scaled by that float.
 
     Returns:
-        Initial FullLaplaceState.
+        Initial DenseLaplaceState.
     """
 
     if is_scalar(init_prec):
@@ -72,7 +72,7 @@ def update(
             state is returned.
 
     Returns:
-        Updated FullLaplaceState.
+        Updated DenseLaplaceState.
     """
     if not per_sample:
         log_posterior = per_samplify(log_posterior)

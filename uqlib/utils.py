@@ -494,7 +494,7 @@ def empirical_fisher(
         batch: Input data to f, of the form (x, y).
 
     Returns:
-        fisher: The empirical Fisher information matrix.
+        The empirical Fisher information matrix.
     """
     jac, aux = jacrev(f, has_aux=True)(params, batch)
 

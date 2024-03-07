@@ -479,7 +479,7 @@ def is_scalar(x: Any) -> bool:
 
 def empirical_fisher(
     f: Callable[[TensorTree, TensorTree], Any], params: TensorTree, batch: Any
-) -> Tensor:
+) -> Tuple[Tensor, Any]:
     """
     Compute the empirical Fisher information matrix of a function f with respect to its
     parameters, defined as:

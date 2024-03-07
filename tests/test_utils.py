@@ -22,7 +22,7 @@ from uqlib import (
     flexi_tree_map,
     per_samplify,
     is_scalar,
-    empirical_fisher
+    empirical_fisher,
 )
 
 
@@ -451,6 +451,7 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
+
 
 def test_empirical_fisher():
     def f(params, batch):

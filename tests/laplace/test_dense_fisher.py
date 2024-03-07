@@ -3,10 +3,14 @@ import torch
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
+from optree import tree_map
+from optree.integration.torch import tree_ravel
+
 from uqlib.utils import tree_size, empirical_fisher
 from uqlib.laplace import dense_fisher
-from tests.scenarios import TestModel
 from uqlib import diag_normal_log_prob
+
+from tests.scenarios import TestModel
 
 
 def normal_log_likelihood(y, y_pred):
@@ -90,21 +94,24 @@ def test_dense_fisher_vmap():
     assert torch.allclose(laplace_state.prec, laplace_state_prec_diag_init, atol=1e-5)
 
     # Test sampling
-    # num_samples = 100000
-    # laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(
-    # num_params
-    # )  # regularize to ensure PSD and reduce variance
+    num_samples = 10000
+    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(
+        num_params
+    )  # regularize to ensure PSD and reduce variance
 
-    # mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
+    mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
+    sd_flat = torch.diag(laplace_state.prec).sqrt().reciprocal()
 
-    # samples = dense_fisher.sample(laplace_state, (num_samples,))
+    samples = dense_fisher.sample(laplace_state, (num_samples,))
 
-    # samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
-    # samples_sd = tree_map(lambda x: x.std(dim=0), samples)
-    # samples_sd_flat = tree_ravel(samples_sd)[0]
+    samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
+    samples_sd = tree_map(lambda x: x.std(dim=0), samples)
+    samples_sd_flat = tree_ravel(samples_sd)[0]
 
-    # print(samples_mean, laplace_state.params)
+    for key in samples_mean:
+        assert samples[key].shape[0] == num_samples
+        assert samples[key].shape[1:] == samples_mean[key].shape
+        assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
+        assert torch.allclose(mean_copy[key], laplace_state.params[key])
 
-    # for key in samples_mean:
-    #    assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
-    #    assert torch.allclose(mean_copy[key], laplace_state.params[key])
+    assert torch.allclose(sd_flat, samples_sd_flat, atol=1e-1)

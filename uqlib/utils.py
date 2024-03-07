@@ -4,6 +4,7 @@ import torch
 from torch.func import grad, jvp, functional_call, jacrev
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
+from optree.integration.torch import tree_ravel
 
 from uqlib.types import TensorTree, ForwardFn, Tensor
 
@@ -498,7 +499,6 @@ def empirical_fisher(
     jac, aux = jacrev(f, has_aux=True)(params, batch)
 
     # Convert Jacobian to be flat in parameter dimension
-    jac = tree_flatten(jac)[0]
-    jac = torch.cat([x.flatten(start_dim=1) for x in jac], dim=1)
+    jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
 
     return jac.T @ jac, aux

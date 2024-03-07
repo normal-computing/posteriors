@@ -1,0 +1,14 @@
+# Site information
+site_name: uqlib
+site_author: Normal Computing
+site_description: A torch library for the UQ community
+
+# Repository
+repo_name: normal-computing/uqlib
+repo_url: https://github.com/normal-computing/uqlib
+
+# Configuration
+theme:
+  name: material
+  font:
+    text: Inter

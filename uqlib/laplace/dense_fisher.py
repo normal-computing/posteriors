@@ -15,7 +15,7 @@ class DenseLaplaceState:
     with a dense precision matrix
 
     Args:
-        mean: Mean of the Normal distribution.
+        params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.
     """

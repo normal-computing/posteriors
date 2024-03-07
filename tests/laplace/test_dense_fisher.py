@@ -100,7 +100,7 @@ def test_dense_fisher_vmap():
     )  # regularize to ensure PSD and reduce variance
 
     mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
-    sd_flat = torch.diag(laplace_state.prec).sqrt().reciprocal()
+    sd_flat = torch.diag(torch.linalg.inv(laplace_state.prec)).sqrt()
 
     samples = dense_fisher.sample(laplace_state, (num_samples,))
 

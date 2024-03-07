@@ -495,8 +495,7 @@ def empirical_fisher(
     Returns:
         fisher: The empirical Fisher information matrix.
     """
-    with torch.no_grad():
-        jac, aux = jacrev(f, has_aux=True)(params, batch)
+    jac, aux = jacrev(f, has_aux=True)(params, batch)
 
     # Convert Jacobian to be flat in parameter dimension
     jac = tree_flatten(jac)[0]

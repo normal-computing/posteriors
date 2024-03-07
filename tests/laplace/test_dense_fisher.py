@@ -37,6 +37,8 @@ def test_dense_fisher_vmap():
     def log_posterior(p, b):
         return log_posterior_n(p, b, model, len(xs))[0].mean(), torch.tensor([])
 
+    log_posterior_per_sample = torch.vmap(log_posterior, in_dims=(None, 0))
+
     params = dict(model.named_parameters())
 
     # Test inplace = False
@@ -52,7 +54,7 @@ def test_dense_fisher_vmap():
         x = x.unsqueeze(0)
         y = y.unsqueeze(0)
         with torch.no_grad():
-            fisher = empirical_fisher(log_posterior, params, (x, y))[0]
+            fisher = empirical_fisher(log_posterior_per_sample, params, (x, y))[0]
 
         expected += fisher
 
@@ -76,16 +78,6 @@ def test_dense_fisher_vmap():
         )
 
     assert torch.allclose(laplace_state_ps.prec, laplace_state_fb.prec, atol=1e-5)
-
-    # Test inplace
-    laplace_state_ip = transform.init(params)
-    laplace_state_ip2 = transform.update(
-        laplace_state_ip,
-        batch,
-        inplace=True,
-    )
-
-    assert torch.allclose(laplace_state_ip2.prec, laplace_state_ip.prec, atol=1e-8)
 
     # Test inplace = True
     transform = dense_fisher.build(log_posterior)

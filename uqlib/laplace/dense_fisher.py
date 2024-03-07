@@ -2,10 +2,11 @@ from typing import Any
 from dataclasses import dataclass
 from functools import partial
 import torch
-from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
-from uqlib.utils import per_samplify, tree_size, empirical_fisher, is_scalar
 from optree import tree_map
 from optree.integration.torch import tree_ravel
+
+from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
+from uqlib.utils import per_samplify, tree_size, empirical_fisher, is_scalar
 
 
 @dataclass
@@ -131,24 +132,14 @@ def sample(
     Returns:
         Sample(s) from the Normal distribution.
     """
-
-    mean_samples_tree = tree_map(
-        lambda m: m + torch.randn(sample_shape + m.shape, device=m.device) * 0,
-        state.params,
-    )
-    mean_samples_tree_flat, unravel = tree_ravel(mean_samples_tree)
-    print(mean_samples_tree_flat.shape)
-
-    samples = (
-        torch.distributions.MultivariateNormal(
-            loc=tree_ravel(state.params)[0],
-            precision_matrix=state.prec,
-            validate_args=False,
-        )
-        .sample(sample_shape)
-        .transpose(0, 1)
-    )
-
-    samples_tree = unravel(samples.reshape(-1))
-
-    return samples_tree
+    samples = torch.distributions.MultivariateNormal(
+        loc=torch.zeros(state.prec.shape[0], device=state.prec.device),
+        precision_matrix=state.prec,
+        validate_args=False,
+    ).sample(sample_shape)
+    samples = samples.flatten(end_dim=-2)  # ensure samples is 2D
+    mean_flat, unravel_func = tree_ravel(state.params)
+    samples += mean_flat
+    samples = torch.vmap(unravel_func)(samples)
+    samples = tree_map(lambda x: x.reshape(sample_shape + x.shape[-1:]), samples)
+    return samples

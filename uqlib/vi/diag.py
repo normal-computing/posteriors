@@ -6,12 +6,12 @@ from optree import tree_map
 import torchopt
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 from uqlib.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
 
 
 @dataclass
-class VIDiagState:
+class VIDiagState(TransformState):
     """State encoding a diagonal Normal variational distribution over parameters.
 
     Args:

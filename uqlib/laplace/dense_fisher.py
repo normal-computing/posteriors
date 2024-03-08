@@ -5,12 +5,12 @@ import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from uqlib.types import TensorTree, Transform, LogProbFn, Tensor
+from uqlib.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
 from uqlib.utils import per_samplify, tree_size, empirical_fisher, is_scalar
 
 
 @dataclass
-class DenseLaplaceState:
+class DenseLaplaceState(TransformState):
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
 

@@ -3,7 +3,7 @@ import torchopt
 
 name = "vi"
 save_dir = "experiments/yelp/results/" + name
-params_dir = "experiments/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
+params_dir = None  # directory to load state containing initialisation params
 
 prior_sd = 1e3
 small_dataset = False
@@ -13,7 +13,7 @@ n_epochs = 1
 
 method = uqlib.vi.diag
 config_args = {
-    "optimizer": torchopt.adamw(lr=1e-5),
+    "optimizer": torchopt.adamw(lr=3e-5),
     "temperature": None,
     "n_samples": 1,
     "stl": True,

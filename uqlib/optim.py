@@ -3,11 +3,11 @@ from functools import partial
 import torch
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 
 
 @dataclass
-class OptimState:
+class OptimState(TransformState):
     """State of an optimizer.
 
     Args:

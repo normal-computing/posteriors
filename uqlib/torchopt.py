@@ -4,11 +4,11 @@ import torch
 import torchopt
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 
 
 @dataclass
-class TorchOptState:
+class TorchOptState(TransformState):
     """State of a TorchOpt optimizer.
 
     Args:

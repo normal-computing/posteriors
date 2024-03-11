@@ -5,12 +5,12 @@ from torch.func import grad_and_value
 from optree import tree_map
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 from uqlib.utils import flexi_tree_map, is_scalar
 
 
 @dataclass
-class SGHMCState:
+class SGHMCState(TransformState):
     """State encoding params and momenta for SGHMC.
 
     Args:

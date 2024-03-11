@@ -5,12 +5,12 @@ from torch.func import jacrev
 from optree import tree_map
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
 
 
 @dataclass
-class DiagLaplaceState:
+class DiagLaplaceState(TransformState):
     """State encoding a diagonal Normal distribution over parameters.
 
     Args:

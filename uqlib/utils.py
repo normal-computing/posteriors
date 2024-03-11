@@ -4,8 +4,9 @@ import torch
 from torch.func import grad, jvp, functional_call, jacrev
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
+from optree.integration.torch import tree_ravel
 
-from uqlib.types import TensorTree, ForwardFn
+from uqlib.types import TensorTree, ForwardFn, Tensor
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
@@ -475,3 +476,29 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
+
+
+def empirical_fisher(
+    f: Callable[[TensorTree, TensorTree], Any], params: TensorTree, batch: Any
+) -> Tuple[Tensor, Any]:
+    """
+    Compute the empirical Fisher information matrix of a function f with respect to its
+    parameters, defined as:
+
+    F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ)^T ∇_θ f_θ(xᵢ, yᵢ)
+
+    Args:
+        f: A function that takes params and batch and returns a 1D vector
+            with length equal to batch size.
+        params: PyTree of tensors.
+        batch: Input data to f, of the form (x, y).
+
+    Returns:
+        The empirical Fisher information matrix.
+    """
+    jac, aux = jacrev(f, has_aux=True)(params, batch)
+
+    # Convert Jacobian to be flat in parameter dimension
+    jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
+
+    return jac.T @ jac, aux

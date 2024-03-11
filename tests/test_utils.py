@@ -1,5 +1,6 @@
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
+from optree.integration.torch import tree_ravel
 
 from tests.scenarios import TestModel, TestLanguageModel
 
@@ -22,6 +23,7 @@ from uqlib import (
     flexi_tree_map,
     per_samplify,
     is_scalar,
+    empirical_fisher,
 )
 
 
@@ -450,3 +452,35 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
+
+
+def test_empirical_fisher():
+    def f(params, batch):
+        return torch.squeeze(
+            batch[1] - batch[0] @ params["weights"] - params["bias"]
+        ), params
+
+    f_per_sample = torch.vmap(f, in_dims=(None, 0))
+
+    num_samples = 2
+    num_features = 4
+
+    x = torch.randn(num_samples, num_features)
+    y = torch.randn(
+        num_samples,
+    )
+    params = {
+        "weights": torch.randn(num_features, 1, requires_grad=True),
+        "bias": torch.randn(1, requires_grad=True),
+    }
+
+    batch = (x, y)
+    fisher, _ = empirical_fisher(f_per_sample, params, batch)
+
+    expected_fisher = torch.zeros((num_features + 1, num_features + 1))
+    for xs, ys in zip(x, y):
+        g = torch.func.grad(f, has_aux=True)(params, (xs, ys))[0]
+        g = tree_ravel(g)[0]
+        expected_fisher += torch.outer(g, g)
+
+    assert torch.allclose(fisher, expected_fisher, rtol=1e-5)

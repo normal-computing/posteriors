@@ -11,7 +11,7 @@ class OptimState(TransformState):
     """State of an optimizer.
 
     Args:
-        params: Parameters to be optimised.
+        params: Parameters to be optimized.
         optimizer: torch.optim optimizer instance.
         loss: Loss value.
         aux: Auxiliary information from the loss function call.
@@ -32,7 +32,7 @@ def init(
     """Initialise an optimizer.
 
     Args:
-        params: Parameters to be optimised.
+        params: Parameters to be optimized.
         optimizer_cls: Optimizer class from torch.optim.
         *args: Positional arguments to pass to the optimizer class.
         **kwargs: Keyword arguments to pass to the optimizer class.

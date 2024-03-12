@@ -4,15 +4,15 @@ import torch
 import torchopt
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn
+from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
 
 
 @dataclass
-class TorchOptState:
+class TorchOptState(TransformState):
     """State of a TorchOpt optimizer.
 
     Args:
-        params: Parameters to be optimised.
+        params: Parameters to be optimized.
         opt_state: TorchOpt optimizer state.
         loss: Loss value.
         aux: Auxiliary information from the loss function call.
@@ -31,7 +31,7 @@ def init(
     """Initialise a TorchOpt optimizer.
 
     Args:
-        params: Parameters to be optimised.
+        params: Parameters to be optimized.
         optimizer: TorchOpt functional optimizer.
             Make sure to use lower case like torchopt.adam()
 

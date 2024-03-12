@@ -1,5 +1,6 @@
 import uqlib
 import torchopt
+from optree import tree_map
 
 name = "vi"
 save_dir = "experiments/yelp/results/" + name
@@ -13,11 +14,11 @@ n_epochs = 1
 
 method = uqlib.vi.diag
 config_args = {
-    "optimizer": torchopt.adamw(lr=3e-5),
+    "optimizer": torchopt.adamw(lr=1e-4),
     "temperature": None,
     "n_samples": 1,
     "stl": True,
-    "init_log_sds": -10,
+    "init_log_sds": -5,
 }  # arguments for method.build (aside from log_posterior)
 log_metrics = {
     "nelbo": "nelbo",
@@ -27,3 +28,10 @@ display_metric = "nelbo"  # metric to display in tqdm progress bar
 
 log_frequency = 100  # frequency at which to log metrics
 log_window = 10  # window size for moving average
+
+test_batch_size = 2
+n_test_samples = 10
+
+
+def to_sd_diag(state):
+    return tree_map(lambda x: x.exp(), state.log_sd_diag)

@@ -23,3 +23,5 @@ display_metric = "log_post"  # metric to display in tqdm progress bar
 
 log_frequency = 100  # frequency at which to log metrics
 log_window = 10  # window size for moving average
+
+test_batch_size = batch_size

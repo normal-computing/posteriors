@@ -71,10 +71,8 @@ for epoch in range(config.n_epochs):
         # Log
         i += 1
         if i % config.log_frequency == 0 or i % num_batches == 0:
-            utils.log_training_metrics(
-                log_dict, config.save_dir, window=config.log_window
-            )
+            utils.log_metrics(log_dict, config.save_dir, window=config.log_window)
 
     # Save state
-    with open(f"{config.save_dir}/state.pkl", "wb") as f:
+    with open(f"{config.save_dir}/state2.pkl", "wb") as f:
         pickle.dump(state, f)

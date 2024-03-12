@@ -11,7 +11,10 @@ from uqlib import model_to_function, diag_normal_log_prob
 # From https://huggingface.co/docs/transformers/training#train-in-native-pytorch
 
 
-def load_dataloaders(small=False, batch_size=8):
+def load_dataloaders(small=False, batch_size=8, test_batch_size=None):
+    if test_batch_size is None:
+        test_batch_size = batch_size
+
     dataset = load_dataset("yelp_review_full")
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
@@ -32,7 +35,7 @@ def load_dataloaders(small=False, batch_size=8):
         eval_dataset = tokenized_datasets["test"]
 
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
-    eval_dataloader = DataLoader(eval_dataset, batch_size=batch_size)
+    eval_dataloader = DataLoader(eval_dataset, batch_size=test_batch_size)
 
     return train_dataloader, eval_dataloader
 

@@ -128,7 +128,7 @@ def build(
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the joint parameter + momenta distribution.
         momenta: Initial momenta. Can be tree like params or scalar.
-            Defaults to all zero.
+            Defaults to random iid samples from N(0, 1).
 
     Returns:
         SGHMC transform (uqlib.types.Transform instance).

@@ -26,23 +26,18 @@ class SGHMCState(TransformState):
     aux: Any = None
 
 
-def init(params: TensorTree, momenta: TensorTree | float | None = None) -> SGHMCState:
+def init(params: TensorTree, momenta: TensorTree | float = 0.0) -> SGHMCState:
     """Initialise momenta for SGHMC.
 
     Args:
         params: Parameters for which to initialise.
         momenta: Initial momenta. Can be tree like params or scalar.
-            Defaults to random iid samples from N(0, 1).
+            Defaults to all zero.
 
     Returns:
         Initial SGHMCState containing momenta.
     """
-    if momenta is None:
-        momenta = tree_map(
-            lambda x: torch.randn_like(x, requires_grad=x.requires_grad),
-            params,
-        )
-    elif is_scalar(momenta):
+    if is_scalar(momenta):
         momenta = tree_map(
             lambda x: torch.full_like(x, momenta, requires_grad=x.requires_grad),
             params,
@@ -115,7 +110,7 @@ def build(
     alpha: float = 0.01,
     beta: float = 0.0,
     temperature: float = 1.0,
-    momenta: TensorTree | float | None = None,
+    momenta: TensorTree | float = 0.0,
 ) -> Transform:
     """Builds SGHMC transform.
 

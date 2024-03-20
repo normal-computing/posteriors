@@ -7,7 +7,6 @@ configs_dirs = [
     "experiments/yelp/configs/map_last_layer.py",
     "experiments/yelp/configs/sghmc_last_layer.py",
     "experiments/yelp/configs/sghmc_last_layer_parallel.py",
-    "experiments/yelp/configs/laplace_last_layer.py",
     "experiments/yelp/configs/vi_last_layer.py",
 ]
 
@@ -58,7 +57,7 @@ for metric in list(test_metrics.values())[0].keys():
     if "uncertainty" not in metric:
         fig, ax = plt.subplots()
         metric_vals = [v[metric] for v in test_metrics_mean.values()]
-        ax.bar(labels, metric_vals)
+        ax.bar(labels, metric_vals, color="cornflowerblue", alpha=0.8)
         ax.set_ylabel(metric)
         fig.tight_layout()
         fig.savefig(save_base + f"{metric}.png")
@@ -81,80 +80,10 @@ ax.bar(
 ax.bar(
     labels, total_uncertainties.values(), color="darkgrey", label="Aleatoric", zorder=0
 )
-ax.set_ylabel("Uncertainty")
+ax.set_ylabel("Entropy")
+ax.set_title("Out of Distribution" if spanish else "In Distribution")
 ax.legend()
+ax.set_ylim(0, 0.12)
 fig.tight_layout()
 fig.savefig(save_base + "uncertainty.png", dpi=300)
-plt.close()
-
-
-# Split uncertainties into correct and incorrect
-def accurate_uncertainty(uncertainty, accuracy):
-    uncertainty = np.array(uncertainty)
-    accuracy = np.array(accuracy)
-    return uncertainty[accuracy > 0.5].mean()
-
-
-accurate_epistemic = {
-    k: accurate_uncertainty(v["epistemic_uncertainty"], v["accuracy"])
-    for k, v in test_metrics.items()
-}
-accurate_total = {
-    k: accurate_uncertainty(v["total_uncertainty"], v["accuracy"])
-    for k, v in test_metrics.items()
-}
-inaccurate_epistemic = {
-    k: accurate_uncertainty(v["epistemic_uncertainty"], 1 - np.array(v["accuracy"]))
-    for k, v in test_metrics.items()
-}
-inaccurate_total = {
-    k: accurate_uncertainty(v["total_uncertainty"], 1 - np.array(v["accuracy"]))
-    for k, v in test_metrics.items()
-}
-
-
-x = np.arange(len(labels))  # the label locations
-width = 0.35  # the width of the bars
-
-fig, ax = plt.subplots()
-rects1_bottom = ax.bar(
-    x - width / 2 - width / 100,
-    accurate_epistemic.values(),
-    width,
-    label="Accurate: Epistemic",
-    color="firebrick",
-    hatch="/",
-    zorder=1,
-)
-rects1_top = ax.bar(
-    x - width / 2 - width / 100,
-    accurate_total.values(),
-    width,
-    label="Accurate: Aleatoric",
-    color="darkgrey",
-    hatch="/",
-    zorder=0,
-)
-rects1_bottom = ax.bar(
-    x + width / 2 + width / 100,
-    inaccurate_epistemic.values(),
-    width,
-    label="Inaccurate: Epistemic",
-    color="firebrick",
-    zorder=1,
-)
-rects1_top = ax.bar(
-    x + width / 2 + width / 100,
-    inaccurate_total.values(),
-    width,
-    label="Inaccurate: Aleatoric",
-    color="darkgrey",
-    zorder=0,
-)
-ax.set_ylabel("Uncertainty")
-ax.set_xticks(x)
-ax.set_xticklabels(labels)
-ax.legend()
-fig.tight_layout()
-fig.savefig(save_base + "accurate_uncertainty.png", dpi=300)
 plt.close()

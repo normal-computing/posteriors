@@ -59,7 +59,7 @@ def test_sghmc():
     )  # Check that the parameters are not updated
 
     # Test inplace = True
-    sghmc_state = sampler.init(params)
+    sghmc_state = sampler.init(params, momenta=0.0)
     log_posts = []
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 

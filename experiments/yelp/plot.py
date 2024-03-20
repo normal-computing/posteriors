@@ -4,38 +4,64 @@ import numpy as np
 import json
 
 configs_dirs = [
-    "experiments/yelp/configs/map.py",
-    "experiments/yelp/configs/laplace.py",
-    "experiments/yelp/configs/vi.py",
+    "experiments/yelp/configs/map_last_layer.py",
+    "experiments/yelp/configs/sghmc_last_layer.py",
+    "experiments/yelp/configs/sghmc_last_layer_parallel.py",
+    "experiments/yelp/configs/laplace_last_layer.py",
+    "experiments/yelp/configs/vi_last_layer.py",
 ]
+
+spanish = False
 
 configs = [
     importlib.import_module(config.replace("/", ".").replace(".py", ""))
     for config in configs_dirs
 ]
 
-test_metrics = {c.name: json.load(open(c.save_dir + "/test.json")) for c in configs}
-test_metrics |= {
-    c.name + " linearised": json.load(open(c.save_dir + "/linearised_test.json"))
-    for c in configs
-    if hasattr(c.method, "sample")
-}
+if spanish:
+    test_metrics = {
+        c.name: json.load(open(c.test_save_dir + "/test_spanish.json")) for c in configs
+    }
+    test_metrics |= {
+        c.name + "_linearised": json.load(
+            open(c.test_save_dir + "/linearised_test_spanish.json")
+        )
+        for c in configs
+        if hasattr(c.method, "sample")
+    }
 
+    save_base = "experiments/yelp/results/spanish_"
+else:
+    test_metrics = {
+        c.name: json.load(open(c.test_save_dir + "/test.json")) for c in configs
+    }
+    test_metrics |= {
+        c.name + "_linearised": json.load(
+            open(c.test_save_dir + "/linearised_test.json")
+        )
+        for c in configs
+        if hasattr(c.method, "sample")
+    }
+
+    save_base = "experiments/yelp/results/"
 
 test_metrics_mean = {
     k: {kk: np.mean(vv) for kk, vv in v.items()} for k, v in test_metrics.items()
 }
 
+labels = [
+    k.replace("_last_layer", "").replace("_", "\n") for k in test_metrics_mean.keys()
+]
 
-for metric in test_metrics["map"].keys():
+
+for metric in list(test_metrics.values())[0].keys():
     if "uncertainty" not in metric:
         fig, ax = plt.subplots()
         metric_vals = [v[metric] for v in test_metrics_mean.values()]
-        labels = [k.replace(" ", "\n") for k in test_metrics_mean.keys()]
         ax.bar(labels, metric_vals)
         ax.set_ylabel(metric)
         fig.tight_layout()
-        fig.savefig(f"experiments/yelp/results/{metric}.png")
+        fig.savefig(save_base + f"{metric}.png")
         plt.close()
 
 
@@ -44,7 +70,6 @@ epistemic_uncertainties = {
 }
 total_uncertainties = {k: v["total_uncertainty"] for k, v in test_metrics_mean.items()}
 
-labels = [k.replace(" ", "\n") for k in epistemic_uncertainties.keys()]
 fig, ax = plt.subplots()
 ax.bar(
     labels,
@@ -59,7 +84,7 @@ ax.bar(
 ax.set_ylabel("Uncertainty")
 ax.legend()
 fig.tight_layout()
-fig.savefig("experiments/yelp/results/uncertainty.png", dpi=300)
+fig.savefig(save_base + "uncertainty.png", dpi=300)
 plt.close()
 
 
@@ -96,7 +121,7 @@ rects1_bottom = ax.bar(
     x - width / 2 - width / 100,
     accurate_epistemic.values(),
     width,
-    label="Accurate - Epistemic",
+    label="Accurate: Epistemic",
     color="firebrick",
     hatch="/",
     zorder=1,
@@ -105,7 +130,7 @@ rects1_top = ax.bar(
     x - width / 2 - width / 100,
     accurate_total.values(),
     width,
-    label="Accurate - Aleatoric",
+    label="Accurate: Aleatoric",
     color="darkgrey",
     hatch="/",
     zorder=0,
@@ -114,7 +139,7 @@ rects1_bottom = ax.bar(
     x + width / 2 + width / 100,
     inaccurate_epistemic.values(),
     width,
-    label="Inaccurate - Epistemic",
+    label="Inaccurate: Epistemic",
     color="firebrick",
     zorder=1,
 )
@@ -122,7 +147,7 @@ rects1_top = ax.bar(
     x + width / 2 + width / 100,
     inaccurate_total.values(),
     width,
-    label="Inaccurate - Aleatoric",
+    label="Inaccurate: Aleatoric",
     color="darkgrey",
     zorder=0,
 )
@@ -131,5 +156,5 @@ ax.set_xticks(x)
 ax.set_xticklabels(labels)
 ax.legend()
 fig.tight_layout()
-fig.savefig("experiments/yelp/results/accurate_uncertainty.png", dpi=300)
+fig.savefig(save_base + "accurate_uncertainty.png", dpi=300)
 plt.close()

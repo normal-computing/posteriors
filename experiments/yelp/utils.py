@@ -17,7 +17,7 @@ def moving_average(x, w):
 
 
 # Function to log and plot metrics
-def log_metrics(log_dict, save_dir, window=1, file_name="training", plot=True):
+def log_metrics(log_dict, save_dir, window=1, file_name="metrics", plot=True):
     save_file = f"{save_dir}/{file_name}.json"
 
     with open(save_file, "w") as f:

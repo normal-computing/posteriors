@@ -18,7 +18,8 @@ layer and then investigate how this affects predictions. The methods we compare 
 
 - **map**: Maximum a posteriori (MAP) estimate of the parameters. Simple optimization 
 using [AdamW](https://arxiv.org/abs/1711.05101) via `uqlib.torchopt`.
-- **sghmc**: [Stochastic gradient Hamiltonian Monte Carlo](https://proceedings.mlr.press/v32/cheni14.pdf) using `uqlib.sgmcmc.sghmc`. SGHMC approximately simulates a trajectory that has the 
+- **sghmc**: [Stochastic gradient Hamiltonian Monte Carlo](https://proceedings.mlr.press/v32/cheni14.pdf) 
+using `uqlib.sgmcmc.sghmc`. SGHMC approximately simulates a trajectory that has the 
 Bayesian posterior as its stationary distribution, meaning that taking spaced samples 
 along the trajectory gives approximate samples from the posterior. We run for 100 epochs 
 and take 14 samples from the trajectory after a burnin.

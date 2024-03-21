@@ -18,6 +18,7 @@ dependencies = ["torch>=2.0.0", "torchopt>=0.7.3", "optree>=0.10.0"]
 
 [project.optional-dependencies]
 test = ["pre-commit", "pytest-cov"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [tool.setuptools]
 packages = ["uqlib"]

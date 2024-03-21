@@ -28,7 +28,7 @@ def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any
 
 def linearized_forward_diag(
     forward_func: ForwardFn, params: TensorTree, batch: TensorTree, sd_diag: TensorTree
-) -> Tuple[TensorTree, TensorTree, TensorTree]:
+) -> Tuple[TensorTree, Tensor, TensorTree]:
     """Compute the linearized forward mean and its square root covariance, assuming
     posterior covariance over parameters is diagonal.
 
@@ -46,10 +46,9 @@ def linearized_forward_diag(
         sd_diag: PyTree of tensors of same shape as params.
 
     Returns:
-        A tuple of (forward_vals, linearised_chol, aux) where forward_vals is the
-        output of the forward function (mean), linearised_chol is the linearized
-        square root of the covariance matrix (non-diagonal) and aux is any auxiliary
-        information returned by the forward function.
+        A tuple of (forward_vals, chol, aux) where forward_vals is the output of the
+        forward function (mean), chol is the tensor square root of the covariance matrix
+        (non-diagonal) and aux is auxiliary info from the forward function.
     """
     forward_vals, aux = forward_func(params, batch)
 

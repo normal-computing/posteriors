@@ -96,6 +96,23 @@ is telling us that it doesn't know the answer here and would like to receive mor
 training data on Spanish reviews.
 
 
+### Laplace approximation?
+
+`uqlib` indeed also provides the tools to seamlessly apply a Laplace approximation using 
+the empirical Fisher information matrix. However, in this smaller data, 
+overparameterized setting, the MAP estimate fits very well and essentially all of the 
+gradients in the training data are close to zero, that is 
+$\nabla_\theta \log p(y_n \mid x_n, \theta) \approx 0$ for all input, output pairs 
+$(x_n, y_n)$ in the training data. This means that the empirical Fisher 
+information matrix, $\hat{F} = \sum_{n} \nabla_\theta \log p(y_n \mid x_n, \theta) \nabla_\theta \log p(y_n \mid x_n, \theta)^T$, is extremely small and fails to provide useful uncertainty quantification. In 
+our case, all values of the diagonal empirical Fisher information matrix
+were less than $10^{-22}$. For more information on the empirical Fisher information 
+matrix and how its use is only advised in large data settings, see [Kunstner et al](https://arxiv.org/abs/1905.12558).
+Additionally, the [continual_lora](experiments/continual_lora) 
+provides an in depth example of how the empirical Fisher Laplace approximation can be 
+used in a practical continual learning setting.
+
+
 ## Data
 
 Both the Yelp and Spanish reviews are available from the Hugging Face datasets library 

@@ -80,3 +80,39 @@ nav:
 
 extra_css:
   - stylesheets/extra.css
+  palette:
+    - scheme: default
+      primary: custom
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            members_order: source
+            show_root_toc_entry: false
+            show_root_members_full_path: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Examples: examples.md
+  - Contributing: contributing.md
+  - API:
+    - EKF:
+      - Diag Fisher: api/ekf/diag_fisher.md
+    - Laplace:
+      - Dense Fisher: api/laplace/dense_fisher.md
+      - Diag Fisher: api/laplace/diag_fisher.md
+    - SGMCMC:
+      - api/sgmcmc/sghmc.md
+    - VI:
+      - api/vi/diag.md
+    - api/optim.md
+    - api/torchopt.md
+    - api/types.md
+    - api/utils.md
+
+extra_css:
+  - stylesheets/extra.css

@@ -1,6 +1,7 @@
 /* Theme color */
 :root {
     --md-primary-fg-color:        #cc1921;
+    --md-accent-fg-color:        #cc1921;
   }
 
 /* Left padding for functions/classes */

@@ -64,8 +64,9 @@ Pull requests are welcomed! Please go through the following steps:
 (or your can run `pre-commit install` in the repo to make `pre-commit` 
 run automatically on `git commit`).
 5. Run `python -m pytest` to check that all tests pass.
-6. Commit your changes and push your branch to GitHub.
-7. Create pull request into the `main` branch.
+6. Update the docs if necessary.
+7. Commit your changes and push your branch to GitHub.
+8. Create pull request into the `main` branch.
 
 Feel free to open a draft PR to discuss changes or get feedback.
 

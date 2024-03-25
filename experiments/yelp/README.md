@@ -47,7 +47,7 @@ multiple plausible parameter configurations.
 <p align="center">
   <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_loss.png" width=65%">
   <br>
-  <em>Figure 1. Test loss on Yelp data.</em>
+  <em>Figure 1. Test loss on Yelp data (lower is better).</em>
 </p>
 
 In particular, the linearized VI method is particularly efficient as in this case the 
@@ -67,7 +67,11 @@ English ones.
     <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_uncertainty.png" width=45%">
     <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_spanish_uncertainty.png" width=45%">
     <br>
-    <em>Figure 2. Left: Uncertainty on English test data. Right: Uncertainty on Spanish test data (OOD).</em>
+    <em>Figure 2. Left: Uncertainty on English test data. Right: Uncertainty on Spanish test data (OOD). <br />
+     We'd like low epistemic uncertainty on familiar topics e.g. English
+     and higher epistemic uncertainty on unfamiliar topics e.g. Spanish. Aleatoric uncertainty represents natural
+     ambiguity also present in the training data which we do not desire to be high or low, only to fairly represent
+     natural uncertainty in the reviews.</em>
 </p>
 
 In Figure 2 we show the uncertainty of the methods on the English test 

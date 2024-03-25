@@ -1,4 +1,9 @@
+# Constructing Log Posteriors
+
 !!! abstract "TL;DR"
+    - `uqlib` enforces `log_posterior` or `log_likelihood` functions to have a
+    `log_posterior(params, batch) -> log_prob, aux` signature, where the second element
+    is a tensor valued `PyTree` containing any auxiliary information.
     - Define your `log_posterior` or `log_likelihood` to be averaged across the batch.
     - Set `temperature=1/num_data` for Bayesian methods such as 
     [`uqlib.sgmcmc.sghmc`](/api/sgmcmc/sghmc/) and [`uqlib.vi.diag`](/api/vi/diag/).
@@ -6,13 +11,25 @@
     batchsizes.
 
 
+## Auxiliary information
+
+Model calls can be expensive, and they might provide more information than just an output
+value (and gradient). In order to avoid, losing this information `uqlib` enforces the
+`log_posterior` or `log_likelihood` functions to have a
+`log_posterior(params, batch) -> log_prob, aux` signature, where the second element
+contains any auxiliary information, such as 
+predictions or alternative metrics.
+
+`uqlib` algorithms will store this information in `state.aux`.
+
+
 
 ## Gradient Ascent
 
 Normally in gradient descent we minimize a loss function such as cross-entropy or 
 squared error. This is equivalent to gradient ascent to maximise a log likelihood 
-function. In `uqlib` we prefer the probabilistic interpretation, e.g. cross-entropy 
-loss corresponds to the log likelihood of a categorical distribution:
+function e.g. cross-entropy  loss corresponds to the log likelihood of a categorical 
+distribution:
 
 \begin{aligned}
 \log p(y_{1:N} \mid x_{1:N}, \theta) &= \sum_{i=1}^N \log p(y_{i} \mid x_i, \theta) \\
@@ -32,7 +49,7 @@ logits from the model (i.e. neural network) for input $x_i$ and parameters $\the
     or equivalently
     ```py
     from torch.distributions import Categorical
-    mean_log_lik = Categorical(logits=logits).log_prob(labels).mean()
+    mean_log_lik = Categorical(logits=logits, validate_args=False).log_prob(labels).mean()
     ```
 
 ## Going Bayesian
@@ -73,9 +90,14 @@ stable as either $N$ or $n$ grow really large.
     from optree import tree_map, tree_reduce
     from torch.distributions import Categorical
 
-    log_prior = diag_normal_log_prob(params, sd=1., normalize=False)
-    mean_log_lik = Categorical(logits=logits).log_prob(labels).mean()
-    mean_log_post = log_prior / num_data + mean_log_lik
+    model_function = uqlib.model_to_function(model)
+
+    def log_posterior(params, batch):
+        logits = model_function(params, **batch)
+        log_prior = diag_normal_log_prob(params, sd=1., normalize=False)
+        mean_log_lik = Categorical(logits=logits).log_prob(batch['labels']).mean()
+        mean_log_post = log_prior / num_data + mean_log_lik
+        return mean_log_post
     ```
 
 The issue with running Bayesian methods (such as VI or SGHMC) on this mean log posterior
@@ -102,6 +124,25 @@ can also do MAP optimisation simply by setting temperature = 0.
 Or we do a simple adjustment to rescale the log posterior 
 `log_post = mean_log_post * num_data` but this might not scale well as `log_post` values 
 could be extremely large and the user might have to use an extremely small learning rate.
+
+!!! example
+    ```py
+    import torchopt
+    # Define log_posterior as above
+    # Load dataloader
+    num_data = len(dataloader.dataset)
+
+    vi_transform = uqlib.vi.diag.build(
+        log_posterior=log_posterior,
+        optimizer = torchopt.adam(lr=1e-3),
+        temperature=1/num_data
+    )
+    
+    vi_state = vi_transform.init(params)
+
+    for batch in dataloader:
+        vi_state = vi_transform.update(vi_state, batch)
+    ```
 
 
 ## Prior Hyperparameters

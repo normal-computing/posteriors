@@ -61,6 +61,7 @@ nav:
   - Log Posteriors: log_posteriors.md
   - gotchas.md
   - Examples: examples/index.md
+  - contributing.md
   - API:
     - api/index.md
     - EKF:

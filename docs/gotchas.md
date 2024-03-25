@@ -1,3 +1,19 @@
+## Auxiliary information
+
+`uqlib` enforces `log_posterior` and `log_likelihood` functions to have a
+`log_posterior(params, batch) -> log_prob, aux` signature, where the second element
+contains any auxiliary information. If you don't have any auxiliary information, just
+return an empty tensor:
+
+```python
+def log_posterior(params, batch):
+    log_prob = ...
+    return log_prob, torch.tensor([])
+```
+
+More info in the [constructing log posteriors](log_posteriors.md) page.
+
+
 
 
 ## `torch.no_grad`
@@ -12,7 +28,7 @@ with torch.no_grad():
     grad_f_x = torch.func.grad(f)(params, batch)
 ```
 
-Don't worry, `torch.no_grad` won't prevent the gradients being calculated correctly
+Do not worry, `torch.no_grad` won't prevent the gradients being calculated correctly
 in the functional call. More info in the [torch.func docs](https://pytorch.org/docs/stable/generated/torch.func.grad.html).
 
 

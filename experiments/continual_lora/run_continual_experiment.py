@@ -9,7 +9,7 @@ import tqdm
 from ml_collections.config_dict import ConfigDict
 from functools import partial
 
-import uqlib
+import posteriors
 
 from experiments.continual_lora import utils
 from experiments.continual_lora.load_pg19 import load_pg19_dataloaders
@@ -78,7 +78,7 @@ laplace_train_dataloaders, _ = load_pg19_dataloaders(
 
 # Load LoRA language model
 model = load_lora(config.model_config)
-model_func = uqlib.model_to_function(model)
+model_func = posteriors.model_to_function(model)
 model.print_trainable_parameters()
 
 
@@ -111,7 +111,7 @@ def param_to_log_likelihood(params, batch):
 
 
 # Extract only the LoRA parameters that require gradients
-sub_params, sub_param_to_log_likelihood = uqlib.extract_requires_grad_and_func(
+sub_params, sub_param_to_log_likelihood = posteriors.extract_requires_grad_and_func(
     dict(model.named_parameters()), param_to_log_likelihood
 )
 
@@ -228,7 +228,9 @@ for episode_ind in range(config.num_tasks):
         print(f"Fitting Laplace on episode {episode_ind + 1} of {config.num_tasks}")
 
         # Get Laplace precision diag
-        laplace_transform = uqlib.laplace.diag_fisher.build(sub_param_to_log_likelihood)
+        laplace_transform = posteriors.laplace.diag_fisher.build(
+            sub_param_to_log_likelihood
+        )
 
         # Update Laplace state through data
         laplace_state = laplace_transform.init(sub_params)

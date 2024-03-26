@@ -4,7 +4,7 @@ from optree.integration.torch import tree_ravel
 
 from tests.scenarios import TestModel, TestLanguageModel
 
-from uqlib import (
+from posteriors import (
     model_to_function,
     linearized_forward_diag,
     hvp,

@@ -5,7 +5,7 @@ import importlib
 from tqdm import tqdm
 from optree import tree_map
 import torch
-import uqlib
+import posteriors
 
 from experiments.yelp.load import load_dataloaders, load_model
 from experiments.yelp import utils
@@ -56,7 +56,7 @@ if "temperature" in config.config_args and config.config_args["temperature"] is 
     config.config_args["temperature"] = 1 / num_data
 
 # Extract model parameters
-num_params = uqlib.tree_size(params).item()
+num_params = posteriors.tree_size(params).item()
 print(f"Number of parameters: {num_params/1e6:.3f}M")
 
 # Build transform

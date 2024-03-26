@@ -1,4 +1,4 @@
-import uqlib
+import posteriors
 import torchopt
 from optree import tree_map
 
@@ -17,7 +17,7 @@ save_frequency = None
 
 n_epochs = 20
 
-method = uqlib.vi.diag
+method = posteriors.vi.diag
 config_args = {
     "optimizer": torchopt.adamw(lr=1e-2),
     "temperature": None,  # None temperature gets set to 1/num_data

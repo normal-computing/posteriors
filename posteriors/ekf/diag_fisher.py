@@ -5,8 +5,8 @@ from torch.func import jacrev
 from optree import tree_map
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
-from uqlib.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
 
 
 @dataclass
@@ -153,7 +153,7 @@ def build(
             Defaults to ones.
 
     Returns:
-        Diagonal EKF transform (uqlib.types.Transform instance).
+        Diagonal EKF transform (posteriors.types.Transform instance).
     """
     init_fn = partial(init, init_sds=init_sds)
     update_fn = partial(

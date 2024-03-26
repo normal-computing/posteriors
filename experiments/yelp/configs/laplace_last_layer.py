@@ -1,5 +1,5 @@
 import torch
-import uqlib
+import posteriors
 from optree import tree_map
 
 name = "laplace_last_layer"
@@ -16,7 +16,7 @@ save_frequency = None
 
 n_epochs = 1
 
-method = uqlib.laplace.diag_fisher
+method = posteriors.laplace.diag_fisher
 config_args = {}  # arguments for method.build (aside from log_posterior)
 log_metrics = {
     "loss": "aux.loss",

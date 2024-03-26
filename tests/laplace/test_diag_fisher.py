@@ -5,8 +5,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
 from optree import tree_map
 
-from uqlib.laplace import diag_fisher
-from uqlib import diag_normal_log_prob
+from posteriors.laplace import diag_fisher
+from posteriors import diag_normal_log_prob
 
 from tests.scenarios import TestModel
 

@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 from optree import tree_map
 
-from uqlib.utils import diag_normal_log_prob, diag_normal_sample
-from uqlib.types import TensorTree
+from posteriors.utils import diag_normal_log_prob, diag_normal_sample
+from posteriors.types import TensorTree
 
 
 class TestModel(nn.Module):

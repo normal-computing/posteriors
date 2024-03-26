@@ -61,7 +61,7 @@ We also report results on a static offline baseline that sees all data every epi
 ## Results 
 
 <p align="center">
-  <img src="https://storage.googleapis.com/posteriors/plot_A_posteriors_laplace.png" width=75%">
+  <img src="https://storage.googleapis.com/posteriors/plot_A_laplace.png" width=75%">
   <br>
   <em>Figure 1: Validation loss by episode.</em>
 </p>
@@ -70,7 +70,7 @@ Validation loss for each episode, over all four episodes. Vertical lines indicat
 
 
 <p align="center">
-  <img src="https://storage.googleapis.com/posteriors/plot_B_posteriors_laplace.png" width=75%">
+  <img src="https://storage.googleapis.com/posteriors/plot_B_laplace.png" width=75%">
   <br>
   <em>Figure 2: Average validation performance.</em>
 </p>

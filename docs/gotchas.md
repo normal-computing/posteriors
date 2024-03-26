@@ -14,8 +14,6 @@ def log_posterior(params, batch):
 More info in the [constructing log posteriors](log_posteriors.md) page.
 
 
-
-
 ## `torch.no_grad`
 
 If you find yourself running out of memory when using `torch.func.grad` and friends.

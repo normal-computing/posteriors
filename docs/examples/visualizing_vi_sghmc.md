@@ -16,8 +16,6 @@ import uqlib
 
 torch.manual_seed(42)
 
-
-# 2D multi_modal log posterior function (double well)
 def log_posterior(x, batch):
     log_prob = -torch.sum(x**4, axis=-1) / 10.0 + torch.sum(x**2, axis=-1)
     return log_prob, torch.tensor([])
@@ -100,9 +98,8 @@ lim = 4
 x = torch.linspace(-lim, lim, 1000)
 X, Y = torch.meshgrid(x, x)
 Z = torch.vmap(log_posterior, in_dims=(0, None))(torch.stack([X, Y], axis=-1), None)[0]
-plt.contourf(X, Y, Z, levels=50, cmap="Purples", alpha=0.5, zorder=-1)
+plt.contourf(X, Y, Z, levels=50, cmap="Purples", alpha=0.3, zorder=-1)
 
-# Plot VI Gaussian and SGHMC samples
 mean = vi_state.params
 sd_diag = torch.exp(vi_state.log_sd_diag)
 Z_gauss = torch.vmap(

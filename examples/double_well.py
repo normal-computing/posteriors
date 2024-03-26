@@ -53,7 +53,7 @@ lim = 4
 x = torch.linspace(-lim, lim, 1000)
 X, Y = torch.meshgrid(x, x)
 Z = torch.vmap(log_posterior, in_dims=(0, None))(torch.stack([X, Y], axis=-1), None)[0]
-plt.contourf(X, Y, Z, levels=50, cmap="Purples", alpha=0.5, zorder=-1)
+plt.contourf(X, Y, Z, levels=50, cmap="Purples", alpha=0.3, zorder=-1)
 
 # Plot VI Gaussian and SGHMC samples
 mean = vi_state.params

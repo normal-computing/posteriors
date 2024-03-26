@@ -1,5 +1,5 @@
 [project]
-name = "uqlib"
+name = "posteriors"
 version = "0.0.1"
 description = "Uncertainty Quantification Library for PyTorch"
 readme = "README.md"
@@ -21,7 +21,7 @@ test = ["pre-commit", "pytest-cov", "ruff"]
 docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [tool.setuptools]
-packages = ["uqlib"]
+packages = ["posteriors"]
 
 [tool.ruff]
 [tool.ruff.lint.per-file-ignores]

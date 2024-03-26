@@ -2,7 +2,7 @@ import torch
 from dataclasses import dataclass
 import optree
 
-from uqlib.types import TransformState
+from posteriors.types import TransformState
 
 
 def test_TransformState():

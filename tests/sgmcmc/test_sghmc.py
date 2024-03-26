@@ -3,7 +3,7 @@ import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from uqlib.sgmcmc import sghmc
+from posteriors.sgmcmc import sghmc
 
 from tests.scenarios import batch_normal_log_prob
 

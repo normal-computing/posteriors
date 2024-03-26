@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch
 from torch.distributions import Categorical
 from optree import tree_map
-import uqlib
+import posteriors
 
 from experiments.yelp.load import load_dataloaders, load_model, load_spanish_dataloader
 from experiments.yelp import utils
@@ -53,7 +53,7 @@ def penultimate_layer_func(batch):
 
 
 # Function that maps last layer params and output from penultimate_layer to logits
-last_layer_func = uqlib.model_to_function(model.classifier)
+last_layer_func = posteriors.model_to_function(model.classifier)
 
 
 def sub_params_to_classifier_params(sub_params):
@@ -77,7 +77,9 @@ elif hasattr(config, "to_sd_diag"):
     sd_diag = tree_map(lambda x: x.to(args.device), sd_diag)
 
     def get_params():
-        return uqlib.diag_normal_sample(state.params, sd_diag, (config.n_test_samples,))
+        return posteriors.diag_normal_sample(
+            state.params, sd_diag, (config.n_test_samples,)
+        )
 
 else:
     state = pickle.load(open(config.save_dir + "/state.pkl", "rb"))
@@ -147,7 +149,7 @@ for batch in tqdm(test_dataloader, position=0):
             log_dict[k] += metrics[k].tolist()
 
         if hasattr(config, "to_sd_diag"):
-            lin_mean, lin_chol, _ = uqlib.linearized_forward_diag(
+            lin_mean, lin_chol, _ = posteriors.linearized_forward_diag(
                 lambda p, pl: (last_layer_func(p, pl), torch.tensor([])),
                 state.params,
                 penultimate_layer,

@@ -5,8 +5,8 @@ import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from uqlib.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
-from uqlib.utils import per_samplify, tree_size, empirical_fisher, is_scalar
+from posteriors.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
+from posteriors.utils import per_samplify, tree_size, empirical_fisher, is_scalar
 
 
 @dataclass
@@ -112,7 +112,7 @@ def build(
 
     Returns:
         Diagonal empirical Fisher information Laplace approximation transform
-        (uqlib.types.Transform instance).
+        (posteriors.types.Transform instance).
     """
     init_fn = partial(init, init_prec=init_prec)
     update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)

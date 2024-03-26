@@ -3,7 +3,7 @@ import torch
 import torchopt
 from optree import tree_map
 
-from uqlib import vi
+from posteriors import vi
 
 from tests.scenarios import batch_normal_log_prob
 

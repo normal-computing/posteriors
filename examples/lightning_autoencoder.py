@@ -8,18 +8,18 @@ import lightning as L
 import torchopt
 import optree
 
-import uqlib
+import posteriors
 
 # Example from https://lightning.ai/docs/pytorch/stable/starter/introduction.html
 
-method, config_args = uqlib.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
-# method, config_args = uqlib.sgmcmc.sghmc, {"lr": 1e-3}
+method, config_args = posteriors.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
+# method, config_args = posteriors.sgmcmc.sghmc, {"lr": 1e-3}
 
 encoder = nn.Sequential(nn.Linear(28 * 28, 64), nn.ReLU(), nn.Linear(64, 3))
 decoder = nn.Sequential(nn.Linear(3, 64), nn.ReLU(), nn.Linear(64, 28 * 28))
 
-encoder_function = uqlib.model_to_function(encoder)
-decoder_function = uqlib.model_to_function(decoder)
+encoder_function = posteriors.model_to_function(encoder)
+decoder_function = posteriors.model_to_function(decoder)
 
 
 def log_normal_prior(params):

@@ -2,7 +2,7 @@ from functools import partial
 import torch
 from optree import tree_map
 
-from uqlib import ekf
+from posteriors import ekf
 
 from tests.scenarios import batch_normal_log_prob
 

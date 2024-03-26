@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from torch.distributions import Categorical
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from uqlib import (
+from posteriors import (
     model_to_function,
     diag_normal_log_prob,
     extract_requires_grad_and_func,

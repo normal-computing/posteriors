@@ -5,8 +5,8 @@ from torch.func import grad_and_value
 from optree import tree_map
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
-from uqlib.utils import flexi_tree_map, is_scalar
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.utils import flexi_tree_map, is_scalar
 
 
 @dataclass
@@ -131,7 +131,7 @@ def build(
             Defaults to random iid samples from N(0, 1).
 
     Returns:
-        SGHMC transform (uqlib.types.Transform instance).
+        SGHMC transform (posteriors.types.Transform instance).
     """
     init_fn = partial(init, momenta=momenta)
     update_fn = partial(

@@ -6,7 +6,7 @@ from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
 from optree.integration.torch import tree_ravel
 
-from uqlib.types import TensorTree, ForwardFn, Tensor
+from posteriors.types import TensorTree, ForwardFn, Tensor
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:

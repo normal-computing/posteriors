@@ -59,12 +59,8 @@ def download_data(start=21, end=23):
 
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=1)
 
-epsilon = 0.2
-transition_sd = 0.1
-
-
-def sigmoid(x):
-    return 1 / (1 + torch.exp(-x))
+epsilon = 1.0
+transition_sd_scale = 0.1
 
 
 def log_likelihood(params, batch):
@@ -73,8 +69,10 @@ def log_likelihood(params, batch):
 
     player_skills = params[player_indices]
 
-    home_win_prob = sigmoid(player_skills[:, 0] - player_skills[:, 1] - epsilon)
-    away_win_prob = 1 - sigmoid(player_skills[:, 0] - player_skills[:, 1] + epsilon)
+    home_win_prob = torch.sigmoid(player_skills[:, 0] - player_skills[:, 1] - epsilon)
+    away_win_prob = 1 - torch.sigmoid(
+        player_skills[:, 0] - player_skills[:, 1] + epsilon
+    )
     draw_prob = 1 - home_win_prob - away_win_prob
     result_probs = torch.vstack([draw_prob, home_win_prob, away_win_prob]).T
     log_liks = torch.log(result_probs[torch.arange(len(match_results)), match_results])
@@ -83,13 +81,12 @@ def log_likelihood(params, batch):
 
 num_teams = len(players_id_to_name_dict)
 
+init_means = torch.zeros((num_teams,))
+init_sds = torch.ones((num_teams,))
 
-means = torch.zeros((num_teams,))
-sds = torch.ones((num_teams,))
-
-state = uqlib.ekf.diag_fisher.init(means, sds)
-all_means = means.unsqueeze(0)
-all_sds = sds.unsqueeze(0)
+state = uqlib.ekf.diag_fisher.init(init_means, init_sds)
+all_means = init_means.unsqueeze(0)
+all_sds = init_sds.unsqueeze(0)
 previous_time = 0.0
 for match in dataloader:
     match_time = match["match_times"]
@@ -100,14 +97,14 @@ for match in dataloader:
         log_likelihood,
         lr=1.0,
         per_sample=True,
-        transition_sd=torch.sqrt(transition_sd**2 * (match_time - previous_time)),
+        transition_sd=torch.sqrt(transition_sd_scale**2 * (match_time - previous_time)),
     )
     all_means = torch.vstack([all_means, state.params.unsqueeze(0)])
     all_sds = torch.vstack([all_sds, state.sd_diag.unsqueeze(0)])
     previous_time = match_time
 
 
-# Plot last season
+# Plot the last season
 last_season_start = (len(all_means) - 1) // 2
 times = dataset.datasets["match_times"][last_season_start:]
 means = all_means[last_season_start + 1 :]

@@ -45,7 +45,7 @@ the uncertainty methods are able to provide more robust predictions by averaging
 multiple plausible parameter configurations.
 
 <p align="center">
-  <img src="https://storage.googleapis.com/normal-blog-artifacts/posteriors/yelp_loss.png" width=65%">
+  <img src="https://storage.googleapis.com/posteriors/yelp_loss.png" width=65%">
   <br>
   <em>Figure 1. Test loss on Yelp data (lower is better).</em>
 </p>
@@ -64,8 +64,8 @@ English ones.
 
 
 <p align="center">
-    <img src="https://storage.googleapis.com/normal-blog-artifacts/posteriors/yelp_uncertainty.png" width=45%">
-    <img src="https://storage.googleapis.com/normal-blog-artifacts/posteriors/yelp_spanish_uncertainty.png" width=45%">
+    <img src="https://storage.googleapis.com/posteriors/yelp_uncertainty.png" width=45%">
+    <img src="https://storage.googleapis.com/posteriors/yelp_spanish_uncertainty.png" width=45%">
     <br>
     <em>Figure 2. Left: Uncertainty on English test data. Right: Uncertainty on Spanish test data (OOD). <br />
      We'd like low epistemic uncertainty on familiar topics e.g. English

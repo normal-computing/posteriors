@@ -54,7 +54,7 @@ plt.plot(nelbos)
 plt.ylabel("NELBO")
 ```
 
-![NELBO](https://storage.googleapis.com/normal-blog-artifacts/uqlib/double_well_nelbo.png)
+![NELBO](https://storage.googleapis.com/posteriors/double_well_nelbo.png)
 
 Looks like its converged, but there's a fair amount of variance around the minima,
 maybe a Gaussian isn't a great fit for our target distribution....
@@ -84,7 +84,7 @@ plt.plot(log_posts)
 plt.ylabel("SGHMC Log Posterior")
 ```
 
-![SGHMC](https://storage.googleapis.com/normal-blog-artifacts/uqlib/double_well_sghmc_log_post.png)
+![SGHMC](https://storage.googleapis.com/posteriors/double_well_sghmc_log_post.png)
 
 Certainly some exploration going on!
 
@@ -118,7 +118,7 @@ plt.legend(handles=[vi_legend_line, sghmc_samps])
 plt.xlim(-lim, lim)
 plt.ylim(-lim, lim)
 ```
-![Double Well](https://storage.googleapis.com/normal-blog-artifacts/uqlib/double_well_compare.png)
+![Double Well](https://storage.googleapis.com/posteriors/double_well_compare.png)
 
 We can see the variational Gaussian ignores the multiple modes, 
 but SGHMC explores them well.

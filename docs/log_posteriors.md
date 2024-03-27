@@ -27,7 +27,7 @@ predictions or alternative metrics.
 ## Gradient Ascent
 
 Normally in gradient descent we minimize a loss function such as cross-entropy or 
-squared error. This is equivalent to gradient ascent to maximise a log likelihood 
+mean squared error. This is equivalent to gradient ascent to maximise a log likelihood 
 function e.g. cross-entropy  loss corresponds to the log likelihood of a categorical 
 distribution:
 

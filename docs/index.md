@@ -1,6 +1,6 @@
 ---
 hide:
-  - navigation
+  # - navigation
   - toc
 ---
 
@@ -17,14 +17,14 @@ posteriors
 
 <h2>Uncertainty quantification with torch</h2>
 
-<div style="font-size:1.25em;" class="grid cards" markdown>
+<!-- <div style="font-size:1.25em;" class="grid cards" markdown>
 - [**Getting Started**](getting_started.md)
 - [**Constructing Log Posteriors**](log_posteriors.md)
 - [**Gotchas**](gotchas.md)
 - [**Examples**](examples/index.md)
 - [**Contributing**](contributing.md)
 - [**API**](api/index.md)
-</div>
+</div> -->
 
 
 </center>

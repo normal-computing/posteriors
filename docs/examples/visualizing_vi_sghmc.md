@@ -5,7 +5,7 @@ a two dimensional distribution which we can visualize.
 
 ## Target distribution
 
-We'll start by defining the target distribution, a two dimensional double well
+We'll start by defining the target distribution, a two dimensional double well:
 
 ```python
 import torch
@@ -21,11 +21,11 @@ def log_posterior(x, batch):
     return log_prob, torch.tensor([])
 ```
 
-Not that the `log_posterior` has to conform to the signature `log_posterior(params, batch) -> log_prob, aux` where `params` is a tensor of shape `(batch_size, num_params)` and 
+Note that the `log_posterior` has to conform to the signature `log_posterior(params, batch) -> log_prob, aux` where `params` is a tensor of shape `(batch_size, num_params)` and 
 `batch` is a dictionary of tensors. More info on the
 [constructing log posteriors](../log_posteriors.md) page.
 
-In this simple, example we don't have varying batches so we'll just ignore that input.
+In this simple example we don't have varying batches so we'll just ignore that input.
 We also don't have any auxiliary information we'd like to keep hold of, so we just
 return an empty tensor.
 
@@ -56,13 +56,13 @@ plt.ylabel("NELBO")
 
 ![NELBO](https://storage.googleapis.com/posteriors/double_well_nelbo.png)
 
-Looks like its converged, but there's a fair amount of variance around the minima,
+Looks like it converged, but there's a fair amount of variance around the minima,
 maybe a Gaussian isn't a great fit for our target distribution....
 
 
 ## SGHMC
 
-Let's generating samples with `posteriors.vi.sgmcmc.sghmc` instead:
+Let's generate samples with `posteriors.vi.sgmcmc.sghmc` instead:
 
 ```python
 sghmc_transform = posteriors.sgmcmc.sghmc.build(log_posterior, lr=5e-2, alpha=1.0)
@@ -86,7 +86,10 @@ plt.ylabel("SGHMC Log Posterior")
 
 ![SGHMC](https://storage.googleapis.com/posteriors/double_well_sghmc_log_post.png)
 
-Certainly some exploration going on!
+Certainly some exploration going on! We can see that the log posterior evaluations vary
+quite a lot during sampling but in the most part stay significantly higher that the
+initialization value. Hopefully this means we're exploring the modes of the distribution,
+but we'll find out for sure when we visualize the samples.
 
 
 ## Visualizing

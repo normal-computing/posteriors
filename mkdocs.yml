@@ -16,6 +16,7 @@ theme:
     - scheme: default
       primary: custom
       accent: custom
+  logo: assets/logo_light.png
   icon:
     repo: fontawesome/brands/github
   features:
@@ -42,7 +43,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - toc:
-      permalink: "θ"  # Adds a clickable permalink to each section heading
+      permalink: "𝞡"  # Adds a clickable permalink to each section heading
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.emoji:

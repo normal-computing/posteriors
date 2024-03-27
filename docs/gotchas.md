@@ -1,7 +1,7 @@
 ## `torch.no_grad`
 
-If you find yourself running out of memory when using `torch.func.grad` and friends.
-It might be because `torch` is trying to accumulate gradients through your
+If you find yourself running out of memory when using `torch.func.grad` and friends,
+it might be because `torch` is trying to accumulate gradients through your
 `torch.func.grad`calls. To prevent this, somewhat counterintuitively, 
 wrap your code in `torch.no_grad`:
 
@@ -10,7 +10,7 @@ with torch.no_grad():
     grad_f_x = torch.func.grad(f)(params, batch)
 ```
 
-Do not worry, `torch.no_grad` won't prevent the gradients being calculated correctly
+Don't worry, `torch.no_grad` won't prevent the gradients being calculated correctly
 in the functional call. More info in the [torch.func docs](https://pytorch.org/docs/stable/generated/torch.func.grad.html).
 
 

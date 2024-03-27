@@ -1,8 +1,9 @@
 # Extended Kalman filter for Premier League football
 
-In this example, we'll use `posteriors`' extended Kalman filter implementation to infer
-the skills of Premier League football teams. We'll use a simple Elo-style Bayesian model
-from  [Duffield et al](https://arxiv.org/abs/2308.02414) to model the outcome of matches.
+In this example, we'll use the extended Kalman filter implementation from `posteriors`
+to infer the skills of Premier League football teams. We'll use a simple Elo-style
+Bayesian model from [Duffield et al](https://arxiv.org/abs/2308.02414) to model the
+outcome of matches.
 
 ## Data
 
@@ -123,7 +124,7 @@ parameter from data too.
 
 
 ## Extended Kalman time!
-Now we'll run an extended Kalman filter to infer the skills of the teams, sequentially
+Now we'll run an extended Kalman filter to infer the skills of the teams sequentially
 over the matches.
 
 Because the matches are not equally spaced in time, we'll use a `transition_sd`
@@ -165,7 +166,7 @@ time step, so we can plot them. This is doable as there's only 20 teams in the P
 League.
 
 ## Plot the skills
-We initiated the skills of the teams to zero, which is not realistic, so we'll use the
+We initialized the skills of the teams to zero, which is not realistic, so we'll use the
 2021/22 season as a warm-up period and plot the skills of the teams in the 2022/23
 season.
 

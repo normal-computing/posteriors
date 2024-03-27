@@ -75,9 +75,10 @@ Again we have to take minibatches giving us the stochastic log posterior
 \log p(\theta \mid y_{1:n}, x_{1:n}) = \log p(\theta) +  \frac{N}{n} \sum_{i=1}^n \log p(y_{i} \mid x_i, \theta)
 \end{aligned}
 
-But the problem here is that this number will be very large in the realistic case $N$ 
-is very large. Thus instead we consider the mean stochastic log posterior which is 
-stable as either $N$ or $n$ grow really large.
+But the problem here is that the value of $\log p(\theta \mid y_{1:n}, x_{1:n})$ 
+will be very large in the realistic case when $N$ is very large. Instead we
+should consider the averaged stochastic log posterior which remains on the same scale as
+either $N$ or $n$ increaase.
 
 \begin{aligned}
 \frac{1}{N} \log p(\theta \mid y_{1:n}, x_{1:n}) = \frac1N \log p(\theta) + 
@@ -112,18 +113,12 @@ p(\theta)^{\frac1N} p(y_{1:N} \mid x_{1:N}, \theta)^{\frac1N}
 
 This tempered posterior is much less concentrated than the true posterior 
 $p(\theta \mid y_{1:N}, x_{1:N})$. To correct for this we can either supply our Bayesian
-inference algorithm with 
+inference algorithm with:
 ```py
 temperature=1/num_data
 ```
-in the case that it supports this argument (which is how we should approach it imo, 
-we should strive to make all code have a temperature argument at the highest level and 
-handle very small temperatures in a stable way). Note that with this support, the user 
-can also do MAP optimisation simply by setting temperature = 0.
-
-Or we do a simple adjustment to rescale the log posterior 
-`log_post = mean_log_post * num_data` but this might not scale well as `log_post` values 
-could be extremely large and the user might have to use an extremely small learning rate.
+Note that with this support, optimization can often be obtained by simply setting
+`temperature=0`.
 
 !!! example
     ```py
@@ -143,6 +138,10 @@ could be extremely large and the user might have to use an extremely small learn
     for batch in dataloader:
         vi_state = vi_transform.update(vi_state, batch)
     ```
+
+Alternatively, we can rescale the log posterior  `log_post = mean_log_post * num_data`
+but this may not scale well as `log_post` values become extremely large resulting
+in e.g. the need for an extremely small learning rate.
 
 
 ## Prior Hyperparameters

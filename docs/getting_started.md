@@ -10,7 +10,7 @@ that is designed to be easy to use, flexible and extensible. It is built on top
 of [PyTorch](https://pytorch.org/docs/stable/index.html) and provides a range of 
 tools for probabilistic modelling, Bayesian inference, and online learning.
 
-`posteriors` algorithms conform to a very general structure
+`posteriors` algorithms conform to a very general structure:
 
 ```py
 transform = posteriors_algorithm.build(**config_args)
@@ -20,7 +20,7 @@ state = transform.init(params)
 for batch in dataloader:
     state = transform.update(state, batch)
 ```
-where
+where:
 
 - `posteriors_algorithm` is a python module containing the `build`, `init`, and `update` 
 functions that together define the `posteriors` algorithm.
@@ -39,14 +39,14 @@ functions that together define the `posteriors` algorithm.
 ## PyTrees
 
 The internals of `posteriors` rely on [`optree`](https://optree.readthedocs.io/en/latest/) to
-apply functions to arbitrary PyTrees of tensors. For example
+apply functions to arbitrary PyTrees of tensors. For example:
 ```py
 params_squared = optree.tree_map(lambda x: x**2, params)
 ```
 will square all the tensors in the `params`, where `params` can be a 
 `dict`, `list`, `tuple`, or any other [PyTree](https://github.com/metaopt/optree?tab=readme-ov-file#built-in-pytree-node-types).
 
-`posteriors` also provides a [`posteriors.flexi_tree_map`][] function that allows for in-place support
+`posteriors` also provides a [`posteriors.flexi_tree_map`][] function that allows for in-place support:
 ```py
 params_squared = optree.flexi_tree_map(lambda x: x**2, params, inplace=True)
 ```
@@ -60,7 +60,7 @@ Instead of using `torch`'s more common `loss.backward()` style automatic differe
 approach is easier to test, composes better with other tools and importantly for `posteriors` 
 it makes for code that is closer to the mathematical notation.
 
-For example, the gradient of a function `f` with respect to `x` can be computed as
+For example, the gradient of a function `f` with respect to `x` can be computed as:
 ```py
 grad_f_x = torch.func.grad(f)(x)
 ```

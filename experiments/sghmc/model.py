@@ -2,7 +2,7 @@ from typing import Any, Dict
 import pytorch_lightning as pl
 import torch.nn.functional as F
 
-from uqlib.sgmcmc.sghmc import SGHMC
+from posteriors.sgmcmc.sghmc import SGHMC
 
 
 class SGHMCExample(pl.LightningModule):

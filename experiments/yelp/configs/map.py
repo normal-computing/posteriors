@@ -1,4 +1,4 @@
-import uqlib
+import posteriors
 import torchopt
 import torch
 
@@ -16,7 +16,7 @@ save_frequency = None
 
 n_epochs = 20
 
-method = uqlib.torchopt
+method = posteriors.torchopt
 config_args = {
     "optimizer": torchopt.adamw(lr=1e-5, maximize=True)
 }  # arguments for method.build (aside from log_posterior)

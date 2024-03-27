@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch.distributions import Categorical
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from uqlib import model_to_function
+from posteriors import model_to_function
 
 
 # From https://huggingface.co/docs/transformers/training#train-in-native-pytorch

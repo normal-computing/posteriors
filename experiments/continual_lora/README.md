@@ -7,7 +7,7 @@ setting. Continuing to apply gradient descent as new data arrives
 will result in catastrophic forgetting, where the model's performance on previous tasks 
 deteriorates as it learns new ones. Exact Bayesian updating would avoid this issue, but is 
 intractable. Instead, we investigate how an approximate Bayesian approach from 
-`uqlib` can be successfully used to mitigate catastrophic forgetting for language models.
+`posteriors` can be successfully used to mitigate catastrophic forgetting for language models.
 
 We observe that a applying diagonal Laplace approximation (details below) allows the model 
 to retain information from previous tasks, and maintain low loss on all tasks. This is 
@@ -29,7 +29,7 @@ The baseline method for our continual learning experiment is to fine-tune the mo
 Instead, we can approximate Bayesian updates at each episode, converting the posterior 
 from the previous episode $p(\theta | D_{1:n-1})$ after receiving the dataset 
 from the $n$ th episode to give a new posterior $p(\theta | D_{1:n}) \propto p(\theta | D_{1:n-1})p(D_n | \theta)$, for language model parameters $\theta$. The true Bayesian 
-posterior will be highly complex and intractable. The Laplace approximation approximates the posterior as a Gaussian distribution $p(\theta | D_{1:n}) \approx N(\theta | \mu_n, F^{-1}_n)$, with the mean, $\mu_n$, at the maximum a posteriori (MAP) estimate of the parameters and the covariance as the inverse of the empirical Fisher information, $F^{-1}_n$, which we take to be diagonal. Extensive details can be found in the [Laplace Redux paper](https://proceedings.neurips.cc/paper/2021/file/a7c9585703d275249f30a088cebba0ad-Paper.pdf). The Laplace updates are implemented in `uqlib` and are easily integrated into our PyTorch training loops!
+posterior will be highly complex and intractable. The Laplace approximation approximates the posterior as a Gaussian distribution $p(\theta | D_{1:n}) \approx N(\theta | \mu_n, F^{-1}_n)$, with the mean, $\mu_n$, at the maximum a posteriori (MAP) estimate of the parameters and the covariance as the inverse of the empirical Fisher information, $F^{-1}_n$, which we take to be diagonal. Extensive details can be found in the [Laplace Redux paper](https://proceedings.neurips.cc/paper/2021/file/a7c9585703d275249f30a088cebba0ad-Paper.pdf). The Laplace updates are implemented in `posteriors` and are easily integrated into our PyTorch training loops!
 
 The prior for the next episode is the posterior from the previous episode, becoming a quadratic penalty in the loss function during gradient descent. Whereas the original [catastrophic forgetting paper](https://www.pnas.org/doi/10.1073/pnas.1611835114) suggested using multiple penalties (incorporating data from all previous episodes into the prior), we use a single penalty following this [note](https://www.inference.vc/comment-on-overcoming-catastrophic-forgetting-in-nns-are-multiple-penalties-needed-2/) (we use only the last epsiode's posterior, reminiscent of exact Bayesian updates).
 
@@ -50,7 +50,7 @@ This experiment demonstrates the added control probabilistic methods provide in 
 (Laplace LoRA)
 - Fine-tune the LoRa model on the `N`th train data (using the previous posterior as the prior)
 - Validate the model on the `N`th test data **and** all previous test data. 
-- Update the posterior based on new MAP estimates of weights, and the latest Fisher information. (Handled by `uqlib`)
+- Update the posterior based on new MAP estimates of weights, and the latest Fisher information. (Handled by `posteriors`)
 
 We fine-tune the model using LoRA on the last decoder weights, as implemented in [PEFT](https://github.com/huggingface/peft/tree/main). We use `r=8` and `alpha=32`. By setting the sequential prior scaling parameter `lambda=0`, we recover the baseline SGD method, so only one script is necessary. We stride over the texts so that all tokens have 2048 context tokens.
 
@@ -61,7 +61,7 @@ We also report results on a static offline baseline that sees all data every epi
 ## Results 
 
 <p align="center">
-  <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/plot_A_uqlib_laplace.png" width=75%">
+  <img src="https://storage.googleapis.com/posteriors/plot_A_laplace.png" width=75%">
   <br>
   <em>Figure 1: Validation loss by episode.</em>
 </p>
@@ -70,7 +70,7 @@ Validation loss for each episode, over all four episodes. Vertical lines indicat
 
 
 <p align="center">
-  <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/plot_B_uqlib_laplace.png" width=75%">
+  <img src="https://storage.googleapis.com/posteriors/plot_B_laplace.png" width=75%">
   <br>
   <em>Figure 2: Average validation performance.</em>
 </p>

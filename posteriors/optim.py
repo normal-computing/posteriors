@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 
 
 @dataclass
@@ -60,13 +60,13 @@ def update(
         loss_fn: Function that takes the parameters and returns the loss.
             of the form `loss, aux = fn(params, batch)`.
         inplace: Whether to update the parameters in place.
-            inplace=False not supported for uqlib.optim
+            inplace=False not supported for posteriors.optim
 
     Returns:
         Updated OptimState.
     """
     if not inplace:
-        raise NotImplementedError("inplace=False not supported for uqlib.optim")
+        raise NotImplementedError("inplace=False not supported for posteriors.optim")
     state.optimizer.zero_grad()
     loss, aux = loss_fn(state.params, batch)
     loss.backward()
@@ -100,7 +100,7 @@ def build(
         **kwargs: Keyword arguments to pass to the optimizer class.
 
     Returns:
-        Optimizer transform (uqlib.types.Transform instance).
+        Optimizer transform (posteriors.types.Transform instance).
     """
     init_fn = partial(init, optimizer_cls=optimizer, **kwargs)
     update_fn = partial(update, loss_fn=loss_fn)

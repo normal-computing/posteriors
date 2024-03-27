@@ -1,4 +1,4 @@
-import uqlib
+import posteriors
 
 name = "sghmc"
 save_dir = "experiments/yelp/results/" + name
@@ -15,7 +15,7 @@ save_frequency = 200
 
 n_epochs = 100
 
-method = uqlib.sgmcmc.sghmc
+method = posteriors.sgmcmc.sghmc
 config_args = {
     "lr": 1e-1,
     "alpha": 1e-2,

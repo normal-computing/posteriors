@@ -1,7 +1,7 @@
 import torch
 import torchopt
 
-import uqlib
+import posteriors
 
 
 def test_torchopt_sgd():
@@ -10,7 +10,7 @@ def test_torchopt_sgd():
     def loss_fn(p, b):
         return torch.sum(p**2), torch.tensor([])
 
-    transform = uqlib.torchopt.build(loss_fn, optimizer)
+    transform = posteriors.torchopt.build(loss_fn, optimizer)
 
     # Test inplace=False
     params = torch.tensor([1.0], requires_grad=True)
@@ -41,7 +41,7 @@ def test_torchopt_adamw():
     def loss_fn(p, b):
         return torch.sum(p**2), torch.tensor([])
 
-    transform = uqlib.torchopt.build(loss_fn, optimizer)
+    transform = posteriors.torchopt.build(loss_fn, optimizer)
 
     # Test inplace=False
     params = torch.tensor([1.0], requires_grad=True)

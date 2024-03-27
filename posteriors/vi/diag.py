@@ -6,8 +6,8 @@ from optree import tree_map
 import torchopt
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
-from uqlib.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
 
 
 @dataclass
@@ -158,7 +158,7 @@ def build(
             Defaults to zero.
 
     Returns:
-        Diagonal VI transform (uqlib.types.Transform instance).
+        Diagonal VI transform (posteriors.types.Transform instance).
     """
     init_fn = partial(init, optimizer=optimizer, init_log_sds=init_log_sds)
     update_fn = partial(

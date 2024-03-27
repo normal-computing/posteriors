@@ -1,7 +1,7 @@
 from pytest import raises
 import torch
 
-import uqlib
+import posteriors
 
 
 def test_optim_sgd():
@@ -11,7 +11,7 @@ def test_optim_sgd():
     def loss_fn(p, b):
         return torch.sum(p**2), torch.tensor([])
 
-    transform = uqlib.optim.build(loss_fn, optimizer_cls, lr=lr)
+    transform = posteriors.optim.build(loss_fn, optimizer_cls, lr=lr)
 
     params = torch.tensor([1.0], requires_grad=True)
     state = transform.init(params)
@@ -33,7 +33,7 @@ def test_optim_adamw():
     def loss_fn(p, b):
         return torch.sum(p**2), torch.tensor([])
 
-    transform = uqlib.optim.build(loss_fn, optimizer_cls, lr=lr)
+    transform = posteriors.optim.build(loss_fn, optimizer_cls, lr=lr)
 
     params = torch.tensor([1.0], requires_grad=True)
     state = transform.init(params)

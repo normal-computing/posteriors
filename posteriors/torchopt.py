@@ -4,7 +4,7 @@ import torch
 import torchopt
 from dataclasses import dataclass
 
-from uqlib.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 
 
 @dataclass
@@ -99,7 +99,7 @@ def build(
             Make sure to use lower case like torchopt.adam()
 
     Returns:
-        Torchopt optimizer transform (uqlib.types.Transform instance).
+        Torchopt optimizer transform (posteriors.types.Transform instance).
     """
     init_fn = partial(init, optimizer=optimizer)
     update_fn = partial(update, optimizer=optimizer, loss_fn=loss_fn)

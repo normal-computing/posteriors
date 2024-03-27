@@ -17,8 +17,8 @@ namespace = registry.__GLOBAL_NAMESPACE
 
 @register_pytree_node_class(namespace=namespace)
 class TransformState:
-    """A uqlib state is a `dataclass` containing the required information for the
-    uqlib iterative algorithm defined by the `init` and `update` functions.
+    """A posteriors state is a `dataclass` containing the required information for the
+    posteriors iterative algorithm defined by the `init` and `update` functions.
     Inherit the `TransformState` class to define add the new `state` class to the optree
     PyNode registry to support functions like `optree.tree_map(lambda x: x**2, state)`.
 
@@ -49,7 +49,7 @@ class InitFn(Protocol):
     def __call__(
         params: TensorTree,
     ) -> TransformState:
-        """Initiate a uqlib state with unified API:
+        """Initiate a posteriors state with unified API:
 
         ```
         state = init(params)
@@ -57,10 +57,10 @@ class InitFn(Protocol):
 
         where params is a PyTree of parameters around which we want to
         quantify uncertainty. The produced `state` is a `dataclass` containing
-        the required information for the uqlib iterative algorithm
+        the required information for the posteriors iterative algorithm
         defined by the `init` and `update` functions.
 
-        See also uqlib.types.UpdateFn and uqlib.types.Transform.
+        See also posteriors.types.UpdateFn and posteriors.types.Transform.
 
         Args:
             params: PyTree containing initial value of parameters.
@@ -77,16 +77,16 @@ class UpdateFn(Protocol):
         batch: Any,
         inplace: bool = False,
     ) -> TransformState:
-        """Transform a uqlib state with unified API:
+        """Transform a posteriors state with unified API:
 
         ```
         state = update(state, batch, inplace=False)
         ```
 
         where state is a `dataclass` containing the required information for the
-        uqlib iterative algorithm defined by the `init` and `update` functions.
+        posteriors iterative algorithm defined by the `init` and `update` functions.
 
-        See also uqlib.types.InitFn and uqlib.types.Transform.
+        See also posteriors.types.InitFn and posteriors.types.Transform.
 
         Args:
             state: The state of the iterative algorithm.
@@ -102,7 +102,7 @@ class UpdateFn(Protocol):
 class Transform:
     """A transform contains init and update functions defining an iterative algorithm.
 
-    See also uqlib.types.InitFn and uqlib.types.UpdateFn.
+    See also posteriors.types.InitFn and posteriors.types.UpdateFn.
 
     Args:
         init: The init function.

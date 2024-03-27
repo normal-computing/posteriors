@@ -1,6 +1,6 @@
 # Transformer UQ with Yelp
 
-Here we demonstrate how to use `uqlib` methods in training a transformer model
+Here we demonstrate how to use `posteriors` methods in training a transformer model
  on the [Yelp dataset](https://huggingface.co/datasets/yelp_review_full).
 
 We demonstrate that Bayesian UQ techniques for the last layer of a transformer 
@@ -13,24 +13,24 @@ what it doesn't know in the face of out of distribution data.
 We start by fine-tuning the [bert-base-cased](https://huggingface.co/bert-base-cased) 
 model on a subset (1000 reviews) from the Yelp dataset (following the 
 [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#train-in-native-pytorch)). 
-We then use `uqlib` to get uncertainty quantification over the parameters of the last 
+We then use `posteriors` to get uncertainty quantification over the parameters of the last 
 layer and then investigate how this affects predictions. The methods we compare are:
 
 - **map**: Maximum a posteriori (MAP) estimate of the parameters. Simple optimization 
-using [AdamW](https://arxiv.org/abs/1711.05101) via `uqlib.torchopt`.
+using [AdamW](https://arxiv.org/abs/1711.05101) via `posteriors.torchopt`.
 - **sghmc**: [Stochastic gradient Hamiltonian Monte Carlo](https://proceedings.mlr.press/v32/cheni14.pdf) 
-using `uqlib.sgmcmc.sghmc`. SGHMC approximately simulates a trajectory that has the 
+using `posteriors.sgmcmc.sghmc`. SGHMC approximately simulates a trajectory that has the 
 Bayesian posterior as its stationary distribution, meaning that taking spaced samples 
 along the trajectory gives approximate samples from the posterior. We run for 100 epochs 
 and take 14 samples from the trajectory after a burnin.
-- **sghmc parallel**: Also with `uqlib.sgmcmc.sghmc` but this time we run 10 
+- **sghmc parallel**: Also with `posteriors.sgmcmc.sghmc` but this time we run 10 
 trajectories in parallel and take the last value from each as our approximate posterior 
 samples - [deep ensemble](https://arxiv.org/abs/1612.01474) style.
-- **vi**: Variational inference using `uqlib.vi.diag` to get a diagonal Gaussian 
+- **vi**: Variational inference using `posteriors.vi.diag` to get a diagonal Gaussian 
 approximation to the posterior. Test predictions are calculated by generating 10 samples
 from the approximate posterior running each through the last layer and then averaging.
-- **vi linearised**: Training is the same as above with `uqlib.vi.diag`, however 
-predictions use `uqlib.linearized_forward_diag` to get uncertainty directly in the logit
+- **vi linearised**: Training is the same as above with `posteriors.vi.diag`, however 
+predictions use `posteriors.linearized_forward_diag` to get uncertainty directly in the logit
 space, for more info on linearized neural networks see section 2 of 
 [Laplace Redux](https://arxiv.org/abs/2106.14806).
 Since the logit space is much smaller we can use a much larger 1000 samples .
@@ -45,7 +45,7 @@ the uncertainty methods are able to provide more robust predictions by averaging
 multiple plausible parameter configurations.
 
 <p align="center">
-  <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_loss.png" width=65%">
+  <img src="https://storage.googleapis.com/posteriors/yelp_loss.png" width=65%">
   <br>
   <em>Figure 1. Test loss on Yelp data (lower is better).</em>
 </p>
@@ -64,8 +64,8 @@ English ones.
 
 
 <p align="center">
-    <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_uncertainty.png" width=45%">
-    <img src="https://storage.googleapis.com/normal-blog-artifacts/uqlib/yelp_spanish_uncertainty.png" width=45%">
+    <img src="https://storage.googleapis.com/posteriors/yelp_uncertainty.png" width=45%">
+    <img src="https://storage.googleapis.com/posteriors/yelp_spanish_uncertainty.png" width=45%">
     <br>
     <em>Figure 2. Left: Uncertainty on English test data. Right: Uncertainty on Spanish test data (OOD). <br />
      We'd like low epistemic uncertainty on familiar topics e.g. English
@@ -102,7 +102,7 @@ training data on Spanish reviews.
 
 ### Laplace approximation?
 
-`uqlib` indeed also provides the tools to seamlessly apply a Laplace approximation using 
+`posteriors` indeed also provides the tools to seamlessly apply a Laplace approximation using 
 the empirical Fisher information matrix. However, in this smaller data, 
 overparameterized setting, the MAP estimate fits very well and essentially all of the 
 gradients in the training data are close to zero, that is 
@@ -112,7 +112,7 @@ information matrix, $\hat{F} = \sum_{n} \nabla_\theta \log p(y_n \mid x_n, \thet
 our case, all values of the diagonal empirical Fisher information matrix
 were less than $10^{-22}$. For more information on the empirical Fisher information 
 matrix and how its use is only advised in large data settings, see [Kunstner et al](https://arxiv.org/abs/1905.12558).
-Additionally, the [continual lora example](https://github.com/normal-computing/uqlib/tree/main/experiments/continual_lora)
+Additionally, the [continual lora example](https://github.com/normal-computing/posteriors/tree/main/experiments/continual_lora)
 provides an in depth example of how the empirical Fisher Laplace approximation can be 
 used in a practical continual learning setting.
 
@@ -134,8 +134,8 @@ the [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#tr
 ## Code structure
 
 - `load.py`: Functions to load the Yelp and Spanish reviews. As well as the model and an
-    associated `uqlib` log posterior function.
-- `train.py`: Small and general script for training the model using `uqlib` methods 
+    associated `posteriors` log posterior function.
+- `train.py`: Small and general script for training the model using `posteriors` methods 
     which can easily be swapped.
 - `configs/` : Configuration files (python files) for the different methods.
 - `combine_states.py`: Combines single parameter states (of the serial or parallel 

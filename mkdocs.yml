@@ -1,11 +1,11 @@
 # Site information
-site_name: uqlib
+site_name: posteriors
 site_author: Normal Computing
 site_description: Uncertainty Quantification with torch
 
 # Repository
-repo_name: normal-computing/uqlib
-repo_url: https://github.com/normal-computing/uqlib
+repo_name: normal-computing/posteriors
+repo_url: https://github.com/normal-computing/posteriors
 
 # Configuration
 theme:
@@ -16,6 +16,7 @@ theme:
     - scheme: default
       primary: custom
       accent: custom
+  logo: assets/logo_light.png
   icon:
     repo: fontawesome/brands/github
   features:

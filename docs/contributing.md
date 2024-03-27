@@ -1,14 +1,14 @@
 If you want to add a new algorithm, example, feature, report or fix a bug, please open 
-an [issue on GitHub](https://github.com/normal-computing/uqlib/issues). 
+an [issue on GitHub](https://github.com/normal-computing/posteriors/issues). 
 We'd love to have you involved in any capacity!
 
-If you are interested in contributing to `uqlib`, please follow these steps:
+If you are interested in contributing to `posteriors`, please follow these steps:
 
-1. [Fork the repo from GitHub](https://github.com/normal-computing/uqlib/fork)
+1. [Fork the repo from GitHub](https://github.com/normal-computing/posteriors/fork)
 and clone it locally:
 ```
-git clone git@github.com/YourUserName/uqlib.git
-cd uqlib
+git clone git@github.com/YourUserName/posteriors.git
+cd posteriors
 ```
 2. Install the development dependencies and pre-commit hooks:
 ```
@@ -22,7 +22,7 @@ python -m pytest
 pre-commit run --all-files
 ```
 5. Commit your changes and push your new branch to your fork.
-6. Open a [pull request on GitHub](https://github.com/normal-computing/uqlib/pulls).
+6. Open a [pull request on GitHub](https://github.com/normal-computing/posteriors/pulls).
 
 !!! note
     Feel free to open a draft PR to discuss changes or get feedback.

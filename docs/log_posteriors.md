@@ -1,12 +1,12 @@
 # Constructing Log Posteriors
 
 !!! abstract "TL;DR"
-    - `uqlib` enforces `log_posterior` or `log_likelihood` functions to have a
+    - `posteriors` enforces `log_posterior` or `log_likelihood` functions to have a
     `log_posterior(params, batch) -> log_prob, aux` signature, where the second element
     is a tensor valued `PyTree` containing any auxiliary information.
     - Define your `log_posterior` or `log_likelihood` to be averaged across the batch.
     - Set `temperature=1/num_data` for Bayesian methods such as 
-    [`uqlib.sgmcmc.sghmc`](/api/sgmcmc/sghmc/) and [`uqlib.vi.diag`](/api/vi/diag/).
+    [`posteriors.sgmcmc.sghmc`](/api/sgmcmc/sghmc/) and [`posteriors.vi.diag`](/api/vi/diag/).
     - This ensures that hyperparameters such as learning rate are consistent across 
     batchsizes.
 
@@ -14,13 +14,13 @@
 ## Auxiliary information
 
 Model calls can be expensive, and they might provide more information than just an output
-value (and gradient). In order to avoid, losing this information `uqlib` enforces the
+value (and gradient). In order to avoid, losing this information `posteriors` enforces the
 `log_posterior` or `log_likelihood` functions to have a
 `log_posterior(params, batch) -> log_prob, aux` signature, where the second element
 contains any auxiliary information, such as 
 predictions or alternative metrics.
 
-`uqlib` algorithms will store this information in `state.aux`.
+`posteriors` algorithms will store this information in `state.aux`.
 
 
 
@@ -86,11 +86,11 @@ stable as either $N$ or $n$ grow really large.
 
 !!! example "In code"
     ```py
-    import uqlib, torch
+    import posteriors, torch
     from optree import tree_map, tree_reduce
     from torch.distributions import Categorical
 
-    model_function = uqlib.model_to_function(model)
+    model_function = posteriors.model_to_function(model)
 
     def log_posterior(params, batch):
         logits = model_function(params, **batch)
@@ -132,7 +132,7 @@ could be extremely large and the user might have to use an extremely small learn
     # Load dataloader
     num_data = len(dataloader.dataset)
 
-    vi_transform = uqlib.vi.diag.build(
+    vi_transform = posteriors.vi.diag.build(
         log_posterior=log_posterior,
         optimizer = torchopt.adam(lr=1e-3),
         temperature=1/num_data
@@ -165,4 +165,4 @@ variance $\sigma^2$ quite large. As we can see if $\sigma^2$ is large then the p
 term becomes very small. We can ignore the normalising constant $Z(\sigma^2)$ because it
 does not depend on $\theta$, in fact this often recomended to keep the `log_posterior` 
 values on a nice scale comparable to loss functions we are accustomed to, this can be 
-achieved for a normal prior with [`uqlib.diag_normal_log_prob(x, normalize=False)`](/api/utils/#uqlib.utils.diag_normal_log_prob).
+achieved for a normal prior with [`posteriors.diag_normal_log_prob(x, normalize=False)`](/api/utils/#posteriors.utils.diag_normal_log_prob).

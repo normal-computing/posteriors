@@ -27,9 +27,9 @@ minimization of the NELBO. Also find `vi.diag.nelbo` for simply calculating the 
 with respect to a `log_posterior` and diagonal Gaussian distribution.
 
 ### Optim
-- [`optim`](/api/optim) wrapper for `torch.optim` optimizers within the unified `uqlib` 
+- [`optim`](/api/optim) wrapper for `torch.optim` optimizers within the unified `posteriors` 
 API that allows for easy swapping with UQ methods.
 
 ### TorchOpt
 - [`torchopt`](/api/torchopt) wrapper for `torchopt` optimizers within the unified
-`uqlib` API that allows for easy swapping with UQ methods.
+`posteriors` API that allows for easy swapping with UQ methods.

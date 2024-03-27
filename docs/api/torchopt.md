@@ -1,1 +1,1 @@
-::: uqlib.torchopt
+::: posteriors.torchopt

@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import torchopt
-import uqlib
+import posteriors
 
 torch.manual_seed(42)
 
@@ -14,7 +14,7 @@ def log_posterior(x, batch):
 
 
 # Variational inference
-vi_transform = uqlib.vi.diag.build(
+vi_transform = posteriors.vi.diag.build(
     log_posterior, optimizer=torchopt.adam(lr=1e-2), init_log_sds=-2.0
 )
 n_vi_steps = 2000
@@ -29,10 +29,11 @@ for _ in range(n_vi_steps):
 plt.plot(nelbos)
 plt.ylabel("NELBO")
 plt.tight_layout()
-
+plt.savefig("double_well_nelbo.png", dpi=300)
+plt.close()
 
 # SGHMC
-sghmc_transform = uqlib.sgmcmc.sghmc.build(log_posterior, lr=5e-2, alpha=1.0)
+sghmc_transform = posteriors.sgmcmc.sghmc.build(log_posterior, lr=5e-2, alpha=1.0)
 n_sghmc_steps = 10000
 sghmc_state = sghmc_transform.init(torch.zeros(2))
 
@@ -47,6 +48,8 @@ for _ in range(n_sghmc_steps):
 plt.plot(log_posts)
 plt.ylabel("SGHMC Log Posterior")
 plt.tight_layout()
+plt.savefig("double_well_sghmc_log_post.png", dpi=300)
+plt.close()
 
 # Plot the 2D multi-modal log posterior function
 lim = 4
@@ -74,3 +77,5 @@ plt.legend(handles=[vi_legend_line, sghmc_samps])
 plt.xlim(-lim, lim)
 plt.ylim(-lim, lim)
 plt.tight_layout()
+plt.savefig("double_well_compare.png", dpi=300)
+plt.close()

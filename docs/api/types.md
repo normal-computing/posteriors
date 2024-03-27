@@ -1,1 +1,1 @@
-::: uqlib.types
+::: posteriors.types

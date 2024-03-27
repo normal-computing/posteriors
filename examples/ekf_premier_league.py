@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import pandas as pd
-import uqlib
+import posteriors
 
 
 def download_data(start=21, end=23):
@@ -84,14 +84,14 @@ num_teams = len(players_id_to_name_dict)
 init_means = torch.zeros((num_teams,))
 init_sds = torch.ones((num_teams,))
 
-state = uqlib.ekf.diag_fisher.init(init_means, init_sds)
+state = posteriors.ekf.diag_fisher.init(init_means, init_sds)
 all_means = init_means.unsqueeze(0)
 all_sds = init_sds.unsqueeze(0)
 previous_time = 0.0
 for match in dataloader:
     match_time = match["match_times"]
 
-    state = uqlib.ekf.diag_fisher.update(
+    state = posteriors.ekf.diag_fisher.update(
         state,
         match,
         log_likelihood,

@@ -1,3 +1,3 @@
 # SGHMC
 
-::: uqlib.sgmcmc.sghmc
+::: posteriors.sgmcmc.sghmc

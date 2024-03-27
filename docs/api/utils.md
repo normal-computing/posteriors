@@ -1,1 +1,1 @@
-::: uqlib.utils
+::: posteriors.utils

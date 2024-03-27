@@ -1,6 +1,6 @@
 # Visualizing VI and SGHMC on a Multimodal Distribution
 
-In this example, we'll compare `uqlib.vi.diag` and `vi.sgmcmc.sghmc` for approximating
+In this example, we'll compare `posteriors.vi.diag` and `vi.sgmcmc.sghmc` for approximating
 a two dimensional distribution which we can visualize.
 
 ## Target distribution
@@ -12,7 +12,7 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import torchopt
-import uqlib
+import posteriors
 
 torch.manual_seed(42)
 
@@ -32,10 +32,10 @@ return an empty tensor.
 
 ## Variational Inference
 
-Now we'll fit a diagonal Gaussian variational distribution. This is easy with `uqlib`:
+Now we'll fit a diagonal Gaussian variational distribution. This is easy with `posteriors`:
 
 ```python
-vi_transform = uqlib.vi.diag.build(
+vi_transform = posteriors.vi.diag.build(
     log_posterior, optimizer=torchopt.adam(lr=1e-2), init_log_sds=-2.0
 )
 n_vi_steps = 2000
@@ -62,10 +62,10 @@ maybe a Gaussian isn't a great fit for our target distribution....
 
 ## SGHMC
 
-Let's generating samples with `uqlib.vi.sgmcmc.sghmc` instead:
+Let's generating samples with `posteriors.vi.sgmcmc.sghmc` instead:
 
 ```python
-sghmc_transform = uqlib.sgmcmc.sghmc.build(log_posterior, lr=5e-2, alpha=1.0)
+sghmc_transform = posteriors.sgmcmc.sghmc.build(log_posterior, lr=5e-2, alpha=1.0)
 n_sghmc_steps = 10000
 sghmc_state = sghmc_transform.init(torch.zeros(2))
 
@@ -126,5 +126,5 @@ We can see the variational Gaussian ignores the multiple modes,
 but SGHMC explores them well.
 
 !!! note
-    The raw code for this example can be found in the repo at [examples/double_well.py](https://github.com/normal-computing/uqlib/blob/main/examples/double_well.py).
+    The raw code for this example can be found in the repo at [examples/double_well.py](https://github.com/normal-computing/posteriors/blob/main/examples/double_well.py).
 

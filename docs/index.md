@@ -4,12 +4,20 @@ hide:
   - toc
 ---
 
+#
 
 <center>
-    <h1 class="title">uqlib</h1>
-    <h2 class="subtitle">Uncertainty Quantification with torch</h2>
 
-<div class="grid cards" markdown>
+
+<span style="font-size:8em; font-weight:bold; color:grey">
+<img style="vertical-align: middle;", src=assets/logo.png width=120>
+&nbsp;
+posteriors
+</span>
+
+<h2>Uncertainty Quantification with torch</h2>
+
+<div style="font-size:1.25em;" class="grid cards" markdown>
 - [**Getting Started**](getting_started.md)
 - [**Constructing Log Posteriors**](log_posteriors.md)
 - [**Gotchas**](gotchas.md)
@@ -20,3 +28,4 @@ hide:
 
 
 </center>
+

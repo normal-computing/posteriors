@@ -12,11 +12,10 @@ We'll use the [football-data.co.uk](https://www.football-data.co.uk/englandm.php
 
 ??? quote "Code to download Premier League data"
     ```python
-
     import torch
     import matplotlib.pyplot as plt
     import pandas as pd
-    import uqlib
+    import posteriors
 
 
     def download_data(start=21, end=23):
@@ -129,8 +128,8 @@ over the matches.
 
 Because the matches are not equally spaced in time, we'll use a `transition_sd`
 parameter that varies as we move through the matches. This means we can't use
-`uqlib.ekf.diag_fisher.build` since this would globally configure the `transition_sd`,
-luckily we can use `uqlib.ekf.diag_fisher.init` and `uqlib.ekf.diag_fisher.update`
+`posteriors.ekf.diag_fisher.build` since this would globally configure the `transition_sd`,
+luckily we can use `posteriors.ekf.diag_fisher.init` and `posteriors.ekf.diag_fisher.update`
 directly instead.
 
 ```python
@@ -140,13 +139,13 @@ num_teams = len(players_id_to_name_dict)
 init_means = torch.zeros((num_teams,))
 init_sds = torch.ones((num_teams,))
 
-state = uqlib.ekf.diag_fisher.init(init_means, init_sds)
+state = posteriors.ekf.diag_fisher.init(init_means, init_sds)
 all_means = init_means.unsqueeze(0)
 all_sds = init_sds.unsqueeze(0)
 previous_time = 0.0
 for match in dataloader:
     match_time = match["match_times"]
-    state = uqlib.ekf.diag_fisher.update(
+    state = posteriors.ekf.diag_fisher.update(
         state,
         match,
         log_likelihood,
@@ -215,7 +214,7 @@ increasing uncertainty as we move further from the last match. But as we observe
 matches, the uncertainty decreases.
 
 !!! note
-    The raw code for this example can be found in the repo at [examples/ekf_premier_league.py](https://github.com/normal-computing/uqlib/blob/main/examples/ekf_premier_league.py).
+    The raw code for this example can be found in the repo at [examples/ekf_premier_league.py](https://github.com/normal-computing/posteriors/blob/main/examples/ekf_premier_league.py).
 
 
 

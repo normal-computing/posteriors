@@ -1,1 +1,1 @@
-::: uqlib.optim
+::: posteriors.optim

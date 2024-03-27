@@ -1,19 +1,3 @@
-## Auxiliary information
-
-`uqlib` enforces `log_posterior` and `log_likelihood` functions to have a
-`log_posterior(params, batch) -> log_prob, aux` signature, where the second element
-contains any auxiliary information. If you don't have any auxiliary information, just
-return an empty tensor:
-
-```python
-def log_posterior(params, batch):
-    log_prob = ...
-    return log_prob, torch.tensor([])
-```
-
-More info in the [constructing log posteriors](log_posteriors.md) page.
-
-
 ## `torch.no_grad`
 
 If you find yourself running out of memory when using `torch.func.grad` and friends.
@@ -33,11 +17,11 @@ in the functional call. More info in the [torch.func docs](https://pytorch.org/d
 
 ## `validate_args=False` in `torch.distributions`
 
-`uqlib` uses `torch.vmap` internally to vectorize over functions, for cool things like
+`posteriors` uses `torch.vmap` internally to vectorize over functions, for cool things like
 [per-sample gradients](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
 The `validate_args=True` control flows in `torch.distributions` do not compose with the 
 control flows in `torch.vmap`. So it is recommended to set `validate_args=False` when 
-using `torch.distributions` in `uqlib`:
+using `torch.distributions` in `posteriors`:
 
 ```python
 import torch
@@ -51,3 +35,18 @@ torch.vmap(lambda x: Normal(0., 1.).log_prob(x))(torch.arange(3))
 torch.vmap(lambda x: Normal(0., 1., validate_args=False).log_prob(x))(torch.arange(3))
 # tensor([-0.9189, -1.4189, -2.9189])
 ```
+
+## Auxiliary information
+
+`posteriors` enforces `log_posterior` and `log_likelihood` functions to have a
+`log_posterior(params, batch) -> log_prob, aux` signature, where the second element
+contains any auxiliary information. If you don't have any auxiliary information, just
+return an empty tensor:
+
+```python
+def log_posterior(params, batch):
+    log_prob = ...
+    return log_prob, torch.tensor([])
+```
+
+More info in the [constructing log posteriors](log_posteriors.md) page.

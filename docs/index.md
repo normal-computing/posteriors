@@ -15,7 +15,7 @@ hide:
 posteriors
 </span>
 
-<h2>Uncertainty Quantification with torch</h2>
+<h2>Uncertainty quantification with torch</h2>
 
 <div style="font-size:1.25em;" class="grid cards" markdown>
 - [**Getting Started**](getting_started.md)

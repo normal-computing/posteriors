@@ -17,14 +17,15 @@ posteriors
 
 <h2>Uncertainty quantification with torch</h2>
 
-<!-- <div style="font-size:1.25em;" class="grid cards" markdown>
-- [**Getting Started**](getting_started.md)
-- [**Constructing Log Posteriors**](log_posteriors.md)
-- [**Gotchas**](gotchas.md)
-- [**Examples**](examples/index.md)
-- [**Contributing**](contributing.md)
-- [**API**](api/index.md)
-</div> -->
+<br>
+
+
+<span style="font-size:1.2em">
+[Get started](getting_started.md){ .md-button }
+[Examples](examples/index.md){ .md-button }
+[Contribute](contributing.md){ .md-button }
+[API](api/index.md){ .md-button }
+</span>
 
 
 </center>

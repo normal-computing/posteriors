@@ -13,7 +13,7 @@ tools for probabilistic modelling, Bayesian inference, and online learning.
 `posteriors` algorithms conform to a very general structure:
 
 ```py
-transform = posteriors_algorithm.build(**config_args)
+transform = algorithm.build(**config_args)
 
 state = transform.init(params)
 
@@ -22,24 +22,32 @@ for batch in dataloader:
 ```
 where:
 
-- `posteriors_algorithm` is a python module containing the `build`, `init`, and `update` 
+- `algorithm` is a python module[^1] containing the `build`, `init`, and `update` 
 functions that together define the `posteriors` algorithm.
 - `build` is a function that loads `config_args` into the `init` and `update` functions
- and stores them within the `transform` instance.
+ and stores them within the `transform` instance. The `init` and `update` 
+ functions then conform to a preset signature allowing for easy switching between algorithms.
 - `init` constructs the iteration-varying `state` based on the model parameters `params`.
 - `update` updates the `state` based on a new `batch` of data.
 
-!!! example "I want more!"
-    Our [API documentation](api/index.md) provide a detailed descriptions of the `posteriors`
-    algorithms and utilities.
 
-    Or check out our [examples](../examples) for some full walkthroughs!
+[^1]: E.g. `posteriors.laplace.diag_fisher` or `posteriors.sgmcmc.sghmc`
+
+
+!!! example "I want more!"
+
+    The [Visualizing VI and SGHMC](tutorials/visualizing_vi_sghmc.md) tutorial provides
+    a walkthrough for a simple example demonstrating how to use `posteriors` and easily
+    switch between algorithms.
+
+    Our [API documentation](api/index.md) provides detailed descriptions for all
+    of the `posteriors` algorithms and utilities.
 
 
 ## PyTrees
 
 The internals of `posteriors` rely on [`optree`](https://optree.readthedocs.io/en/latest/) to
-apply functions to arbitrary PyTrees of tensors. For example:
+apply functions across arbitrary PyTrees of tensors (i.e. TensorTrees). For example:
 ```py
 params_squared = optree.tree_map(lambda x: x**2, params)
 ```
@@ -50,7 +58,7 @@ will square all the tensors in the `params`, where `params` can be a
 ```py
 params_squared = optree.flexi_tree_map(lambda x: x**2, params, inplace=True)
 ```
-Here the tensors of params are modified in-place, without assigning extra memory.
+In this case, the tensors of params are modified in-place, without assigning extra memory.
 
 
 ## [`torch.func`](https://pytorch.org/docs/stable/func.html)

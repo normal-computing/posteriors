@@ -27,6 +27,21 @@ posteriors
 [API](api/index.md){ .md-button }
 </span>
 
+<br>
+
+**Composable**: Use with [`transformers`](https://huggingface.co/docs/transformers/en/index),
+[`lightning`](https://lightning.ai/),  
+[`torchopt`](https://github.com/metaopt/torchopt),
+[`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) and more!
+
+**Extensible**: Add new methods!
+
+**Functional**: Easier to test, closer to mathematics!
+
+**Scalable**: Big model? Big data? No problem!
+
+**Swappable**: Swap between algorithms with ease!
+
 
 </center>
 

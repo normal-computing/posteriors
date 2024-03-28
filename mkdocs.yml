@@ -1,7 +1,7 @@
 # Site information
 site_name: posteriors
 site_author: Normal Computing
-site_description: Uncertainty Quantification with torch
+site_description: Uncertainty Quantification with PyTorch
 
 # Repository
 repo_name: normal-computing/posteriors

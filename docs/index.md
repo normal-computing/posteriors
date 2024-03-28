@@ -15,7 +15,7 @@ hide:
 posteriors
 </span>
 
-<h2>Uncertainty quantification with torch</h2>
+<h2>Uncertainty quantification with PyTorch</h2>
 
 <br>
 

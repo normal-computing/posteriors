@@ -66,7 +66,7 @@ We also report results on a static offline baseline that sees all data every epi
   <em>Figure 1: Validation loss by episode.</em>
 </p>
 
-Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss in early tasks, whilst SGD forgets. For example, in the top row, the Laplace approximation stays low throughout training demonstrating that it continues to perform well on task 0 even though it is now being trained on data from tasks 1-3. In contrast, continuing applying to gradient descent quickly decreases the performance of the model on task 0. The dashed line shows an offline train with access to all four training datasets concurrently; the LoRA network's total learning capacity.
+Validation loss for each episode, over all four episodes. Vertical lines indicate episode breaks. Probabilistic methods (Laplace) maintain low loss in early tasks, whilst SGD forgets. For example, in the top row, the Laplace approximation stays low throughout training demonstrating that it continues to perform well on task 0 even though it is now being trained on data from tasks 1-3. In contrast, continuing applying to gradient descent quickly decreases the performance of the model on task 0. The horizontal dashed lines show an offline train with access to all four training datasets concurrently; the LoRA network's total learning capacity - although this is not feasible in a practical online setting as the number of books increase.
 
 
 <p align="center">

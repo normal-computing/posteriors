@@ -7,8 +7,8 @@ from torch.distributions import Categorical
 from optree import tree_map
 import posteriors
 
-from experiments.yelp.load import load_dataloaders, load_model, load_spanish_dataloader
-from experiments.yelp import utils
+from examples.yelp.load import load_dataloaders, load_model, load_spanish_dataloader
+from examples.yelp import utils
 
 # Get config path and device from user
 parser = argparse.ArgumentParser()

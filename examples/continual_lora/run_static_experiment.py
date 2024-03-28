@@ -11,9 +11,9 @@ from functools import partial
 
 import posteriors
 
-from experiments.continual_lora import utils
-from experiments.continual_lora.load_pg19 import load_pg19_dataloaders, DictDataset
-from experiments.continual_lora.load_model import load_lora
+from examples.continual_lora import utils
+from examples.continual_lora.load_pg19 import load_pg19_dataloaders, DictDataset
+from examples.continual_lora.load_model import load_lora
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

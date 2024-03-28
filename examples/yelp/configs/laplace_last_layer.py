@@ -3,9 +3,9 @@ import posteriors
 from optree import tree_map
 
 name = "laplace_last_layer"
-save_dir = "experiments/yelp/results/" + name
-params_dir = "experiments/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
-last_layer_params_dir = "experiments/yelp/results/map_last_layer/state.pkl"  # directory to load state containing initialisation params for last layer
+save_dir = "examples/yelp/results/" + name
+params_dir = "examples/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
+last_layer_params_dir = "examples/yelp/results/map_last_layer/state.pkl"  # directory to load state containing initialisation params for last layer
 
 prior_sd = torch.inf
 small_dataset = True

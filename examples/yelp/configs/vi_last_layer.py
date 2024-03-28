@@ -3,8 +3,8 @@ import torchopt
 from optree import tree_map
 
 name = "vi_last_layer"
-save_dir = "experiments/yelp/results/" + name
-params_dir = "experiments/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
+save_dir = "examples/yelp/results/" + name
+params_dir = "examples/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
 last_layer_params_dir = None
 
 

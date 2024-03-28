@@ -4,14 +4,16 @@ We list here a view small examples, that are easy to run locally on a CPU,
 to show how to use `posteriors`:
 
 
-- [Visualizing VI and SGHMC](visualizing_vi_sghmc.md) [<img style="float: right; width: 5em;" src="https://storage.googleapis.com/posteriors/double_well_compare.png">](visualizing_vi_sghmc.md)
-
-[<img style="float: right; width: 5em" src="https://em-content.zobj.net/source/telegram/386/soccer-ball_26bd.webp">](ekf_premier_league.md)
-
+- [Visualizing VI and SGHMC](visualizing_vi_sghmc.md)
+[<img style="float: right; width: 5em;" src="https://storage.googleapis.com/posteriors/double_well_compare.png">](visualizing_vi_sghmc.md)
+<br><br><br>
 - [EKF for Premier League football](ekf_premier_league.md)
+[<img style="float: right; width: 5em;" src="https://em-content.zobj.net/source/telegram/386/soccer-ball_26bd.webp">](ekf_premier_league.md)
+<br><br><br>
+- [Autoencoder with Lightning](lightning_autoencoder.md)
+[<img style="float: right; width: 7em" src="https://storage.googleapis.com/posteriors/lightning_posteriors.png">](lightning_autoencoder.md)
 
 
-&nbsp;
 
 
 Additionally, we provide more in depth examples in the [examples directory on GitHub](https://github.com/normal-computing/posteriors/tree/main/examples),
@@ -36,11 +38,11 @@ sentiment analysis task adapted from the [Hugging Face tutorial](https://hugging
 [Variational continual learning](https://arxiv.org/abs/1710.10628) notebook for a simple
 regression task that's easy to visualize.
 
-[<img style="float: right; width: 7em" src="https://storage.googleapis.com/posteriors/lightning_posteriors.png">](https://github.com/normal-computing/posteriors/blob/main/examples/lightning_autoencoder.py)
+<!-- [<img style="float: right; width: 7em" src="https://storage.googleapis.com/posteriors/lightning_posteriors.png">](https://github.com/normal-computing/posteriors/blob/main/examples/lightning_autoencoder.py)
 
 - [`lightning_autoencoder.py`](https://github.com/normal-computing/posteriors/blob/main/examples/lightning_autoencoder.py):
 Easily adapt the autoencoder example from the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html)
 to use UQ methods with `posteriors` and logging + device handling with `lightning`.
-
+ -->
 
 

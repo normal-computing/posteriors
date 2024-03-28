@@ -39,7 +39,7 @@ The prior for the next episode is the posterior from the previous episode, becom
 We use a subset of [pg19](https://huggingface.co/datasets/pg19), a large corpus of books. The data can easily be downloaded using the `datasets` library from Hugging Face. An episode is represented by a single book, and we hold out the last 15% of the book for testing.
 
 
-## Experiments
+## examples
 
 This experiment demonstrates the added control probabilistic methods provide in a setting where continued training is required. **In particular, we demonstrate the benefits of controlling the trade-off between learning new tasks and retaining old ones.** Our dataset (a subset of [pg19](https://huggingface.co/datasets/pg19)) is divided into `N` "episodes" of train and test data. In the results reported below, we use 1 book per episode, holding out the last 15% for testing. For each episode of data, we perform the following:
 
@@ -54,7 +54,7 @@ This experiment demonstrates the added control probabilistic methods provide in 
 
 We fine-tune the model using LoRA on the last decoder weights, as implemented in [PEFT](https://github.com/huggingface/peft/tree/main). We use `r=8` and `alpha=32`. By setting the sequential prior scaling parameter `lambda=0`, we recover the baseline SGD method, so only one script is necessary. We stride over the texts so that all tokens have 2048 context tokens.
 
-Hyperparameters for baseline and Laplace methods are set in `configs`. To run the experiment, use the following command: `PYTHONPATH=. python experiments/continual_lora/run_continual_experiment.py --base <path/to/config.yaml> --epochs <epochs> --device <cuda device> [optional]` from the root directory.
+Hyperparameters for baseline and Laplace methods are set in `configs`. To run the experiment, use the following command: `PYTHONPATH=. python examples/continual_lora/run_continual_experiment.py --base <path/to/config.yaml> --epochs <epochs> --device <cuda device> [optional]` from the root directory.
 
 We also report results on a static offline baseline that sees all data every episode. This represents the LoRA network's total capacity, but is computationally infeasible in practice as it requires all data to available at all times.
 

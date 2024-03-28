@@ -1,5 +1,5 @@
 # File dirs
-logs_dir: &logs_path "./experiments/runs/lora/"
+logs_dir: &logs_path "./examples/runs/lora/"
 
 experiment_name: "lora_sgd"
 num_tasks: 20
@@ -22,7 +22,7 @@ model_config: &model_params
     dropout: 0.
 
 # Dataset
-dataset_path: "./experiments/continual_lora/data/pg19-20.json"
+dataset_path: "./examples/continual_lora/data/pg19-20.json"
 train_batch_size: 2
 laplace_batch_size: 1
 drop_last: false

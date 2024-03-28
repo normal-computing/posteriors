@@ -7,8 +7,8 @@ from optree import tree_map
 import torch
 import posteriors
 
-from experiments.yelp.load import load_dataloaders, load_model
-from experiments.yelp import utils
+from examples.yelp.load import load_dataloaders, load_model
+from examples.yelp import utils
 
 # Get config path and device from user
 parser = argparse.ArgumentParser()

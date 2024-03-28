@@ -1,4 +1,3 @@
-from functools import partial
 import os
 from torch import nn, utils
 import torch
@@ -6,7 +5,7 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 import lightning as L
 import torchopt
-import optree
+from dataclasses import asdict
 
 import posteriors
 
@@ -22,16 +21,6 @@ encoder_function = posteriors.model_to_function(encoder)
 decoder_function = posteriors.model_to_function(decoder)
 
 
-def log_normal_prior(params):
-    all_vals = optree.tree_map(
-        lambda p: torch.distributions.Normal(0, 1, validate_args=False)
-        .log_prob(p)
-        .sum(),
-        params,
-    )
-    return optree.tree_reduce(torch.add, all_vals)
-
-
 def log_posterior(params, batch, num_data):
     x, y = batch
     x = x.view(x.size(0), -1)
@@ -43,33 +32,35 @@ def log_posterior(params, batch, num_data):
         .sum(-1)
         .mean()
     )
-    log_prior = log_normal_prior(params[0]) + log_normal_prior(params[1])
+    log_prior = posteriors.diag_normal_log_prob(
+        params[0]
+    ) + posteriors.diag_normal_log_prob(params[1])
     return log_lik + log_prior / num_data, x_hat
 
 
 # define the LightningModule
 class LitAutoEncoderUQ(L.LightningModule):
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, num_data=None):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
+        self.num_data = num_data
+
+    def log_posterior(self, params, batch):
+        return log_posterior(params, batch, self.num_data)
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
         # it is independent of forward
         self.state = self.transform.update(self.state, batch, inplace=True)
         # Logging to TensorBoard (if installed) by default
-        for k, v in self.state._asdict().items():
-            if isinstance(v, float):
+        for k, v in asdict(self.state).items():
+            if isinstance(v, float) or (isinstance(v, torch.Tensor) and v.numel() == 1):
                 self.log(k, v)
 
     def configure_optimizers(self):
-        pass
-
-    def on_train_start(self) -> None:
-        self.log_posterior = partial(
-            log_posterior, num_data=len(self.trainer.train_dataloader.dataset)
-        )
+        # We don't need to return optimizers here, as we are using the `transform` object
+        # rather than lightning's automatic optimization
         self.transform = method.build(self.log_posterior, **config_args)
         all_params = [
             dict(self.encoder.named_parameters()),
@@ -77,10 +68,16 @@ class LitAutoEncoderUQ(L.LightningModule):
         ]
         self.state = self.transform.init(all_params)
 
+    def on_train_start(self) -> None:
+        # Load the number of data points used for log_posterior
+        self.num_data = len(self.trainer.train_dataloader.dataset)
+
     def on_save_checkpoint(self, checkpoint):
+        # Save the state of the transform
         checkpoint["state"] = self.state
 
     def on_load_checkpoint(self, checkpoint):
+        # Load the state of the transform
         self.state = checkpoint["state"]
 
 
@@ -100,6 +97,5 @@ checkpoint = "./lightning_logs/version_0/checkpoints/epoch=0-step=100.ckpt"
 autoencoder = LitAutoEncoderUQ.load_from_checkpoint(
     checkpoint, encoder=encoder, decoder=decoder
 )
-
 
 assert hasattr(autoencoder, "state")

@@ -26,5 +26,5 @@ while len(subset) < num_subset:
     num_tried += 1
 
 # Save the subset to a JSON file
-with open(f"./experiments/continual_lora/data/pg19-{num_subset}.json", "w") as f:
+with open(f"./examples/continual_lora/data/pg19-{num_subset}.json", "w") as f:
     json.dump(subset, f)

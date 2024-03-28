@@ -4,10 +4,10 @@ import numpy as np
 import json
 
 configs_dirs = [
-    "experiments/yelp/configs/map_last_layer.py",
-    "experiments/yelp/configs/sghmc_last_layer.py",
-    "experiments/yelp/configs/sghmc_last_layer_parallel.py",
-    "experiments/yelp/configs/vi_last_layer.py",
+    "examples/yelp/configs/map_last_layer.py",
+    "examples/yelp/configs/sghmc_last_layer.py",
+    "examples/yelp/configs/sghmc_last_layer_parallel.py",
+    "examples/yelp/configs/vi_last_layer.py",
 ]
 
 spanish = False
@@ -29,7 +29,7 @@ if spanish:
         if hasattr(c.method, "sample")
     }
 
-    save_base = "experiments/yelp/results/spanish_"
+    save_base = "examples/yelp/results/spanish_"
 else:
     test_metrics = {
         c.name: json.load(open(c.test_save_dir + "/test.json")) for c in configs
@@ -42,7 +42,7 @@ else:
         if hasattr(c.method, "sample")
     }
 
-    save_base = "experiments/yelp/results/"
+    save_base = "examples/yelp/results/"
 
 test_metrics_mean = {
     k: {kk: np.mean(vv) for kk, vv in v.items()} for k, v in test_metrics.items()

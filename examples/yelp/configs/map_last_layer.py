@@ -1,16 +1,15 @@
 import posteriors
 import torchopt
-import torch
 
-name = "map"
-save_dir = "experiments/yelp/results/" + name
-params_dir = None  # directory to load state containing initialisation params
+name = "map_last_layer"
+save_dir = "examples/yelp/results/" + name
+params_dir = "examples/yelp/results/map/state.pkl"  # directory to load state containing initialisation params
 last_layer_params_dir = None
 
-prior_sd = torch.inf
+prior_sd = 1e3
 small_dataset = True
 batch_size = 32
-last_layer = False
+last_layer = True
 burnin = None
 save_frequency = None
 
@@ -18,7 +17,7 @@ n_epochs = 20
 
 method = posteriors.torchopt
 config_args = {
-    "optimizer": torchopt.adamw(lr=1e-5, maximize=True)
+    "optimizer": torchopt.adamw(lr=1e-2, maximize=True)
 }  # arguments for method.build (aside from log_posterior)
 log_metrics = {
     "log_post": "loss",

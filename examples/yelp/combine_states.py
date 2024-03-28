@@ -5,7 +5,7 @@ from optree import tree_map
 
 sghmc_parallel = True
 
-base = "experiments/yelp/results/"
+base = "examples/yelp/results/"
 
 if sghmc_parallel:
     # Get paths with sghmc_parallel_seed in them
@@ -15,14 +15,14 @@ if sghmc_parallel:
         if "sghmc_parallel_seed" in file
     ]
 
-    save_dir = "experiments/yelp/results/sghmc_parallel_combined"
+    save_dir = "examples/yelp/results/sghmc_parallel_combined"
 else:
     # Get paths with sghmc/stat_ in them
     load_paths = [
         base + file for file in os.listdir(base + "sghmc") if "state_" in file
     ]
 
-    save_dir = "experiments/yelp/results/sghmc"
+    save_dir = "examples/yelp/results/sghmc"
 
 load_paths.sort()
 

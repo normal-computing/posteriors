@@ -107,4 +107,4 @@ ENV/
 .mypy_cache/
 
 # Experiment runs
-experiments/runs/
+examples/runs/

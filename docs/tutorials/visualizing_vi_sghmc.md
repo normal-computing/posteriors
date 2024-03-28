@@ -1,7 +1,7 @@
 # Visualizing VI and SGHMC on a Multimodal Distribution
 
-In this example, we'll compare `posteriors.vi.diag` and `vi.sgmcmc.sghmc` for approximating
-a two dimensional distribution which we can visualize.
+In this example, we'll compare [`vi.diag`](/api/vi/diag) and [`sgmcmc.sghmc`](/api/sgmcmc/sghmc)
+for approximating a two dimensional distribution which we can visualize.
 
 ## Target distribution
 

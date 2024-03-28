@@ -1,4 +1,4 @@
-# Examples
+# Tutorials
 
 We list here a view small examples, that are easy to run locally on a CPU, 
 to show how to use the `posteriors`.

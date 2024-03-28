@@ -37,6 +37,7 @@ plugins:
 
 
 markdown_extensions:
+  - footnotes
   - admonition
   - attr_list
   - md_in_html
@@ -61,7 +62,7 @@ nav:
   - Getting Started: getting_started.md
   - Log Posteriors: log_posteriors.md
   - gotchas.md
-  - Examples: examples/index.md
+  - Tutorials: tutorials/index.md
   - contributing.md
   - API:
     - api/index.md

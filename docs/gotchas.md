@@ -50,3 +50,22 @@ def log_posterior(params, batch):
 ```
 
 More info in the [constructing log posteriors](log_posteriors.md) page.
+
+
+## `inplace`
+
+All `posteriors` algorithms have an `update` function with signature
+`update(state, batch, inplace=False) -> state`[^1]. The `inplace`
+argument can be set to `True` to update the `state` in-place and save memory. However,
+`posteriors` is functional first, so has `inplace=False` as the default. 
+
+[^1]: Assuming all other args and kwargs have been pre-configured with by the `build` function
+
+
+```python
+state2 = transform.update(state, batch)
+# state is not updated
+
+state2 = transform.update(state, batch, inplace=True)
+# state is updated and state2 is a pointer to state
+```

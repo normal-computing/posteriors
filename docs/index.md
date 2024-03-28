@@ -22,7 +22,7 @@ posteriors
 
 <span style="font-size:1.2em">
 [Get started](getting_started.md){ .md-button }
-[Examples](examples/index.md){ .md-button }
+[Tutorials](tutorials/index.md){ .md-button }
 [Contribute](contributing.md){ .md-button }
 [API](api/index.md){ .md-button }
 </span>

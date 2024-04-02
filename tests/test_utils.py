@@ -507,4 +507,8 @@ def test_CatchAuxError():
 
         assert "Auxiliary output not found" in str(e)
 
-    torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
+    with CatchAuxError():
+        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
+
+    with torch.no_grad(), CatchAuxError():
+        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))

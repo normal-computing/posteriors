@@ -506,9 +506,6 @@ def empirical_fisher(
 
 
 class CatchAuxError(contextlib.AbstractContextManager):
-    def __enter__(self):
-        pass
-
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
             if "should be a tuple: (output, aux) if has_aux is True" in str(exc_value):

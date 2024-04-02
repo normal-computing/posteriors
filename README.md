@@ -96,7 +96,7 @@ Interfaces seamlessly with:
 - [`lightning`](https://github.com/Lightning-AI/lightning) for convenient training and logging, see [examples/lightning_autoencoder.py](examples/lightning_autoencoder.py).
 
 The functional transform interface is strongly inspired by frameworks such as 
-[`optax`](https://github.com/google-deepmind/optax) and [`BlackJAX`](https://github.com/blackjax-devs/blackjax).
+[`optax`](https://github.com/google-deepmind/optax) and [`blackjax`](https://github.com/blackjax-devs/blackjax).
 
 
 ## Contributing

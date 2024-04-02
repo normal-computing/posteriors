@@ -6,7 +6,7 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.utils import flexi_tree_map, is_scalar
+from posteriors.utils import flexi_tree_map, is_scalar, CatchAuxError
 
 
 @dataclass
@@ -80,10 +80,10 @@ def update(
         Updated state
         (which are pointers to the inputted state tensors if inplace=True).
     """
-
-    grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
-        state.params, batch
-    )
+    with torch.no_grad(), CatchAuxError():
+        grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
+            state.params, batch
+        )
 
     def transform_params(p, m):
         return p + lr * m

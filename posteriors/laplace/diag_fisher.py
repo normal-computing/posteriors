@@ -6,7 +6,13 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
+from posteriors.utils import (
+    diag_normal_sample,
+    flexi_tree_map,
+    per_samplify,
+    is_scalar,
+    CatchAuxError,
+)
 
 
 @dataclass
@@ -77,7 +83,7 @@ def update(
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
 
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         jac, aux = jacrev(log_posterior, has_aux=True)(state.params, batch)
         batch_diag_score_sq = tree_map(lambda j: j.square().sum(0), jac)
 

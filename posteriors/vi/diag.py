@@ -7,7 +7,12 @@ import torchopt
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.utils import diag_normal_log_prob, diag_normal_sample, is_scalar
+from posteriors.utils import (
+    diag_normal_log_prob,
+    diag_normal_sample,
+    is_scalar,
+    CatchAuxError,
+)
 
 
 @dataclass
@@ -108,7 +113,7 @@ def update(
         sd_diag = tree_map(torch.exp, lsd)
         return nelbo(m, sd_diag, batch, log_posterior, temperature, n_samples, stl)
 
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         nelbo_grads, (nelbo_val, aux) = grad_and_value(
             nelbo_log_sd, argnums=(0, 1), has_aux=True
         )(state.params, state.log_sd_diag)

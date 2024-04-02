@@ -1,3 +1,4 @@
+import pytest
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
@@ -24,6 +25,7 @@ from posteriors import (
     per_samplify,
     is_scalar,
     empirical_fisher,
+    CatchAuxError,
 )
 
 
@@ -484,3 +486,25 @@ def test_empirical_fisher():
         expected_fisher += torch.outer(g, g)
 
     assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
+
+
+def test_CatchAuxError():
+    def func(x):
+        return x**2
+
+    def func_aux(x):
+        return x**2, None
+
+    with pytest.raises(RuntimeError) as e:
+        with CatchAuxError():
+            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+
+        assert "Auxiliary output not found" in str(e)
+
+    with pytest.raises(RuntimeError) as e:
+        with torch.no_grad(), CatchAuxError():
+            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+
+        assert "Auxiliary output not found" in str(e)
+
+    torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))

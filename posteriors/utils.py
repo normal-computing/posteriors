@@ -1,5 +1,6 @@
 from typing import Callable, Any, Tuple
 from functools import partial
+import contextlib
 import torch
 from torch.func import grad, jvp, functional_call, jacrev
 from torch.distributions import Normal
@@ -53,7 +54,7 @@ def linearized_forward_diag(
     """
     forward_vals, aux = forward_func(params, batch)
 
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         jac, _ = jacrev(forward_func, has_aux=True)(params, batch)
 
     # Convert Jacobian to be flat in parameter dimension
@@ -502,3 +503,20 @@ def empirical_fisher(
     jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
 
     return jac.T @ jac, aux
+
+
+class CatchAuxError(contextlib.AbstractContextManager):
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            if "should be a tuple: (output, aux) if has_aux is True" in str(exc_value):
+                raise RuntimeError(
+                    "Auxiliary output not found. Perhaps you have forgotten to return "
+                    "the aux output?\n"
+                    "\tIf you don't have any auxiliary info, simply amend to e.g. "
+                    "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
+                    "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
+                )
+        return False

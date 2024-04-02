@@ -24,6 +24,7 @@ from posteriors.utils import flexi_tree_map
 from posteriors.utils import per_samplify
 from posteriors.utils import is_scalar
 from posteriors.utils import empirical_fisher
+from posteriors.utils import CatchAuxError
 
 
 import logging

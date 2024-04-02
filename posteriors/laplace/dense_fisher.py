@@ -6,7 +6,13 @@ from optree import tree_map
 from optree.integration.torch import tree_ravel
 
 from posteriors.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
-from posteriors.utils import per_samplify, tree_size, empirical_fisher, is_scalar
+from posteriors.utils import (
+    per_samplify,
+    tree_size,
+    empirical_fisher,
+    is_scalar,
+    CatchAuxError,
+)
 
 
 @dataclass
@@ -78,7 +84,7 @@ def update(
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
 
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         fisher, aux = empirical_fisher(log_posterior, state.params, batch)
 
     if inplace:

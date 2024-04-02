@@ -5,6 +5,7 @@ import torchopt
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.utils import CatchAuxError
 
 
 @dataclass
@@ -64,7 +65,7 @@ def update(
     """
     params = state.params
     opt_state = state.opt_state
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         grads, (loss, aux) = torch.func.grad_and_value(loss_fn, has_aux=True)(
             params, batch
         )

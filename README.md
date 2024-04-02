@@ -1,10 +1,21 @@
-# posteriors
+<div align="center">
+<img src="https://storage.googleapis.com/posteriors/logo_with_text.png" alt="logo"></img>
+</div>
 
+[**Friends**](#friends)
+| [**Contributing**](#contributing)
+| [**Documentation**](https://normal-computing.github.io/posteriors/)
 
-General purpose python library for **U**ncertainy **Q**uantification with [`torch`](https://github.com/pytorch/pytorch).
+## What is `posteriors`?
+
+General purpose python library for **U**ncertainy **Q**uantification with [`PyTorch`](https://github.com/pytorch/pytorch).
 
 `posteriors` is functional first and aims to be easy to use and extend. Iterative `posteriors` algorithms take the following unified form
 ```python
+# Load model
+# Load dataloader
+# Define config arguments for chosen algorithm
+transform = algorithm.build(**config)
 state = transform.init(dict(model.named_parameters()))
 
 for batch in dataloader:
@@ -21,7 +32,7 @@ def log_posterior(params, batch):
     log_posterior = -loss_fn(predictions, batch) + prior(params) / num_data
     return log_posterior, predictions
 
-optimizer = partial(torchopt.Adam, lr=1e-3)
+optimizer = torchopt.adam(lr=1e-3)
 transform = posteriors.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)
 ```
 
@@ -33,8 +44,10 @@ Further the output of `log_posterior` is a tuple containing the evaluation
 (single-element Tensor) and an additional argument (TensorTree) containing any 
 auxiliary information we'd like to retain from the model call, here the model predictions.
 If you have no auxiliary information, you can simply return `torch.tensor([])` as
-the second element. For more info see e.g. [`torch.func.grad`](https://pytorch.org/docs/stable/generated/torch.func.grad.html) 
-(with `has_aux=True`).
+the second element. For more info see [`torch.func.grad`](https://pytorch.org/docs/stable/generated/torch.func.grad.html) 
+(with `has_aux=True`) or the [posteriors documentation](https://normal-computing.github.io/posteriors/log_posteriors).
+
+Check out the [tutorials](https://normal-computing.github.io/posteriors/tutorials) for more detailed usage!
 
 ## Friends
 
@@ -55,17 +68,4 @@ The functional transform interface is strongly inspired by frameworks such as
 
 You can report a bug or request a feature by [creating a new issue on GitHub](https://github.com/normal-computing/posteriors/issues).
 
-Pull requests are welcomed! Please go through the following steps:
-
-1. Create a new branch from `main`.
-2. Run `pip install -e .` to install the package in editable mode.
-3. Add your code and tests (`tests` has the same structure as `posteriors`).
-4. Run `pre-commit run --all-files` to check your code lints
-(or your can run `pre-commit install` in the repo to make `pre-commit` 
-run automatically on `git commit`).
-5. Run `python -m pytest` to check that all tests pass.
-6. Commit your changes and push your branch to GitHub.
-7. Create pull request into the `main` branch.
-
-Feel free to open a draft PR to discuss changes or get feedback.
-
+If you want to contribute code, please check the [contributing guide](https://normal-computing.github.io/posteriors/contributing).

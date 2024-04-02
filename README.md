@@ -2,13 +2,33 @@
 <img src="https://storage.googleapis.com/posteriors/logo_with_text.png" alt="logo"></img>
 </div>
 
-[**Friends**](#friends)
+[**Installation**](#installation)
+| [**Quickstart**](#quickstart)
+| [**Methods**](#methods)
+| [**Friends**](#friends)
 | [**Contributing**](#contributing)
 | [**Documentation**](https://normal-computing.github.io/posteriors/)
 
 ## What is `posteriors`?
 
-General purpose python library for **U**ncertainy **Q**uantification with [`PyTorch`](https://github.com/pytorch/pytorch).
+General purpose python library for uncertainy quantification with [`PyTorch`](https://github.com/pytorch/pytorch).
+
+- [x] **Composable**: Use with [`transformers`](https://huggingface.co/docs/transformers/en/index), [`lightning`](https://lightning.ai/), [`torchopt`](https://github.com/metaopt/torchopt), [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) and more!
+- [x] **Extensible**: Add new methods!
+- [x] **Functional**: Easier to test, closer to mathematics!
+- [x] **Scalable**: Big model? Big data? No problem!
+- [x] **Swappable**: Swap between algorithms with ease!
+
+
+## Installation
+
+`posteriors` is available on [PyPI](https://pypi.org/project/posteriors/) and can be installed via `pip`:
+
+```bash
+pip install posteriors
+```
+
+## Quickstart
 
 `posteriors` is functional first and aims to be easy to use and extend. Iterative `posteriors` algorithms take the following unified form
 ```python
@@ -40,14 +60,29 @@ Observe that `posteriors` recommends specifying `log_posterior` and `temperature
 `log_posterior` remains on the same scale for different batch sizes. `posteriors` 
 algorithms are designed to be stable as `temperature` goes to zero.
 
-Further the output of `log_posterior` is a tuple containing the evaluation 
+Further, the output of `log_posterior` is a tuple containing the evaluation 
 (single-element Tensor) and an additional argument (TensorTree) containing any 
 auxiliary information we'd like to retain from the model call, here the model predictions.
 If you have no auxiliary information, you can simply return `torch.tensor([])` as
 the second element. For more info see [`torch.func.grad`](https://pytorch.org/docs/stable/generated/torch.func.grad.html) 
-(with `has_aux=True`) or the [posteriors documentation](https://normal-computing.github.io/posteriors/log_posteriors).
+(with `has_aux=True`) or the [documentation](https://normal-computing.github.io/posteriors/log_posteriors).
 
 Check out the [tutorials](https://normal-computing.github.io/posteriors/tutorials) for more detailed usage!
+
+## Methods
+
+`posteriors` supports a variety of methods for uncertainty quantification, including:
+
+- [**Extended Kalman filter**](posteriors/ekf/)
+- [**Laplace approximation**](posteriors/laplace/)
+- [**Stochastic gradient MCMC**](posteriors/sgmcmc/)
+- [**Variational inference**](posteriors/vi/)
+
+With full details available in the [API documentation](https://normal-computing.github.io/posteriors/api).
+
+`posteriors` is designed to be easily extensible, if you're favorite method is not listed above,
+[raise an issue]((https://github.com/normal-computing/posteriors/issues)) and we'll see what we can do!
+
 
 ## Friends
 

@@ -9,7 +9,7 @@ hide:
 
 
 <span style="font-size:8em; font-weight:bold; color:grey">
-<img style="vertical-align: middle;", src=assets/logo.png width=120>
+<img style="vertical-align: middle;", src=https://storage.googleapis.com/posteriors/logo.png width=120>
 &nbsp;
 posteriors
 </span>

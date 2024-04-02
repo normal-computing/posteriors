@@ -16,7 +16,7 @@ theme:
     - scheme: default
       primary: custom
       accent: custom
-  logo: assets/logo_light.png
+  logo: https://storage.googleapis.com/posteriors/logo_light.png
   icon:
     repo: fontawesome/brands/github
   features:

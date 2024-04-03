@@ -156,7 +156,7 @@ p(\theta) = e^{\frac{1}{\sigma^2}\gamma(\theta)} / Z(\sigma^2)
 $$
 (such as a normal distribution). The mean log posterior becomes
 \begin{aligned}
-\frac{1}{N} \log p(\theta \mid y_{1:n}, x_{1:n}) = \frac{1}{N\sigma^2} \log \gamma(\theta) +  \frac{1}{n} \sum_{i=1}^n \log p(y_{i} \mid x_i, \theta)
+\frac{1}{N} \log p(\theta \mid y_{1:n}, x_{1:n}) = \frac{1}{N\sigma^2} \gamma(\theta) +  \frac{1}{n} \sum_{i=1}^n \log p(y_{i} \mid x_i, \theta)
 \end{aligned}
 We are free to choose $\sigma^2$ and indeed it controls the strength of the prior vs the
 likelihood. In most cases we probably want the prior to be quite weak and therefore the 

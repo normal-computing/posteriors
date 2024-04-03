@@ -30,30 +30,43 @@ pip install posteriors
 
 ## Quickstart
 
-`posteriors` is functional first and aims to be easy to use and extend. Iterative `posteriors` algorithms take the following unified form
+`posteriors` is functional first and aims to be easy to use and extend. Let's try it out
+by training a simple model with variational inference:
 ```python
-# Load model
-# Load dataloader
-# Define config arguments for chosen algorithm
-transform = algorithm.build(**config)
-state = transform.init(dict(model.named_parameters()))
+from torchvision.datasets import MNIST
+from torchvision.transforms import ToTensor
+from torch import nn, utils, func
+import torchopt
+import posteriors
 
-for batch in dataloader:
-    state = transform.update(state, batch)
-```
+dataset = MNIST(root="./data", transform=ToTensor())
+train_loader = utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
+num_data = len(dataset)
 
-`transform` is an algorithm kernel that is pre-built with all the necessary configuration arguments. For example:
-```python
-num_data = len(dataloader.dataset)
-functional_model = posteriors.model_to_function(model)
+classifier = nn.Sequential(nn.Linear(28 * 28, 64), nn.ReLU(), nn.Linear(64, 10))
+params = dict(classifier.named_parameters())
+
 
 def log_posterior(params, batch):
-    predictions = functional_model(params, batch)
-    log_posterior = -loss_fn(predictions, batch) + prior(params) / num_data
-    return log_posterior, predictions
+    images, labels = batch
+    images = images.view(images.size(0), -1)
+    output = func.functional_call(classifier, params, images)
+    log_post_val = (
+        -nn.functional.cross_entropy(output, labels)
+        + posteriors.diag_normal_log_prob(params) / num_data
+    )
+    return log_post_val, output
 
-optimizer = torchopt.adam(lr=1e-3)
-transform = posteriors.vi.diag.build(log_posterior, optimizer, temperature=1/num_data)
+
+transform = posteriors.vi.diag.build(
+    log_posterior, torchopt.adam(), temperature=1 / num_data
+)  # Can swap out for any posteriors algorithm
+
+state = transform.init(params)
+
+for batch in train_loader:
+    state = transform.update(state, batch)
+
 ```
 
 Observe that `posteriors` recommends specifying `log_posterior` and `temperature` such that 

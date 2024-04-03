@@ -69,3 +69,24 @@ state2 = transform.update(state, batch)
 state2 = transform.update(state, batch, inplace=True)
 # state is updated and state2 is a pointer to state
 ```
+
+
+## `torch.tensor` with autograd
+
+As specified in the [documentation](https://pytorch.org/docs/stable/generated/torch.tensor.html),
+`torch.tensor` does not preserve autograd history. If you want to construct a tensor
+within a differentiable function, use [`torch.stack`](https://pytorch.org/docs/stable/generated/torch.stack.html) instead:
+
+```python
+def f_with_tensor(x):
+    return torch.tensor([x**2, x**3]).sum()
+
+torch.func.grad(f_with_tensor)(torch.tensor(2.))
+# tensor(0.)
+
+def f_with_stack(x):
+    return torch.stack([x**2, x**3]).sum()
+
+torch.func.grad(f_with_stack)(torch.tensor(2.))
+# tensor(16.)
+```

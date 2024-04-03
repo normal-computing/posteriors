@@ -11,8 +11,8 @@ with torch.no_grad():
 ```
 
 Don't worry, `torch.no_grad` won't prevent the gradients being calculated correctly
-in the functional call. More info in the [torch.func docs](https://pytorch.org/docs/stable/generated/torch.func.grad.html).
-
+in the functional call. However, `torch.inference_mode` will turn autograd off
+altogether. More info in the [torch.func docs](https://pytorch.org/docs/stable/generated/torch.func.grad.html).
 
 
 ## `validate_args=False` in `torch.distributions`

@@ -11,7 +11,7 @@
 
 ## What is `posteriors`?
 
-General purpose python library for uncertainy quantification with [`PyTorch`](https://github.com/pytorch/pytorch).
+General purpose python library for uncertainty quantification with [`PyTorch`](https://github.com/pytorch/pytorch).
 
 - [x] **Composable**: Use with [`transformers`](https://huggingface.co/docs/transformers/en/index), [`lightning`](https://lightning.ai/), [`torchopt`](https://github.com/metaopt/torchopt), [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) and more!
 - [x] **Extensible**: Add new methods! Add new models!

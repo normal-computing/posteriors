@@ -7,6 +7,7 @@ from posteriors import (
     model_to_function,
     linearized_forward_diag,
     hvp,
+    fvp,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -124,20 +125,26 @@ def test_hvp():
 
 def test_fvp():
     def func(x):
-        return (x**5).sum()
+        return torch.stack([(x**5).sum(), (x**3).sum()])
 
     x = torch.arange(1.0, 6.0)
     v = torch.ones_like(x)
 
-    _, Jv = torch.func.jvp(func, (x,), (v,))
-    _, f_vjp = torch.func.vjp(func, v)
-    fvp_result = f_vjp(Jv)[0]
+    output, fvp_result = fvp(func, (x,), (v,))
 
     jac = torch.func.jacrev(func)(x)
-    jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
-    fisher = jac @ jac.T
+    fisher = jac.T @ jac
     expected = fisher @ v
     assert torch.allclose(fvp_result, expected)
+    assert torch.allclose(output, func(x))
+
+    def func_aux(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()]), x
+
+    output_aux, fvp_aux_result, aux = fvp(func_aux, (x,), (v,), has_aux=True)
+    assert torch.allclose(fvp_aux_result, expected)
+    assert torch.allclose(output_aux, func(x))
+    assert torch.allclose(aux, x)
 
 
 def test_diag_normal_log_prob():

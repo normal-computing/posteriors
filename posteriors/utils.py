@@ -99,9 +99,9 @@ def fvp(
     primals: tuple,
     tangents: tuple,
     has_aux: bool = False,
-    lmbda: float = 0.0,
+    damping: float = 0.0,
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
-    """Fisher vector product.
+    """Empirical Fisher vector product.
 
     F(primals) @ tangents
 
@@ -109,22 +109,22 @@ def fvp(
     Follows API from https://pytorch.org/docs/stable/generated/torch.func.jvp.html
 
     Args:
-        f: A function with scalar output.
-        primals: Tuple of e.g. tensor or dict with tensor values to evalute f at.
+        f: A function with (batched) scalar output.
+        primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
         tangents: Tuple matching structure of primals.
         has_aux: Whether f returns auxiliary information.
-        lmbda: Damping factor.
+        damping: Damping factor, to compute (F(primals) + damping * I) @ tangents.
+            Defaults to 0.0.
 
     Returns:
-        Returns a (gradient, fvp_out) tuple containing the gradient of func evaluated at
+        Returns a (output, fvp_out) tuple containing the output of func evaluated at
         primals and the Fisher-vector product. If has_aux is True, then instead
-        returns a (gradient, fvp_out, aux) tuple.
+        returns a (output, fvp_out, aux) tuple.
     """
-    # J v
-    _, Jv = jvp(f, (primals,), (tangents,))
-    # (J v)^T J = v^T (J^T J)
-    _, f_vjp, aux = vjp(f, primals, has_aux=has_aux)
-    return f_vjp(Jv)[0], aux
+    jvp_output = jvp(f, primals, tangents, has_aux=has_aux)
+    Jv = jvp_output[1]
+    f_vjp = vjp(f, *primals, has_aux=has_aux)[1]
+    return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
 
 
 def diag_normal_log_prob(

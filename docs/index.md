@@ -33,7 +33,7 @@ posteriors
 [`torchopt`](https://github.com/metaopt/torchopt),
 [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) and more!
 
-**Extensible**: Add new methods!
+**Extensible**: Add new methods! Add new models!
 
 **Functional**: Easier to test, closer to mathematics!
 

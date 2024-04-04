@@ -8,7 +8,6 @@ from posteriors import (
     linearized_forward_diag,
     hvp,
     fvp,
-    tree_mvp_dampen,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -146,13 +145,6 @@ def test_fvp():
     assert torch.allclose(fvp_aux_result, expected)
     assert torch.allclose(output_aux, func(x))
     assert torch.allclose(aux, x)
-
-    def mvp(v):
-        return fvp(func, (x,), (v,))[1]
-
-    fvp_result = tree_mvp_dampen(mvp, damping=1)(v)
-    expected = fisher @ v + v
-    assert torch.allclose(fvp_result, expected)
 
 
 def test_diag_normal_log_prob():

@@ -124,23 +124,6 @@ def fvp(
     return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
 
 
-def tree_mvp_dampen(
-    mvp: Callable[[TensorTree], TensorTree], damping: float
-) -> Callable[[TensorTree], TensorTree]:
-    """
-    Dampen the mvp function by adding a multiple of the input vector to the output.
-    Acts as a regularizer for the mvp function.
-    """
-
-    def dampen_fcn(mvp_, v_):
-        return mvp_ + damping * v_
-
-    def damp_mvp(v):
-        return tree_map(dampen_fcn, mvp(v), v)
-
-    return damp_mvp
-
-
 def diag_normal_log_prob(
     x: TensorTree,
     mean: float | TensorTree = 0.0,

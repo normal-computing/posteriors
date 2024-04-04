@@ -18,7 +18,7 @@ class VIDiagState(TransformState):
         params: Mean of the variational distribution.
         log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.
-        optimizer_state: torchopt state storing optimizer data for updating the
+        opt_state: torchopt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
         aux: Auxiliary information from the log_posterior call.
@@ -26,7 +26,7 @@ class VIDiagState(TransformState):
 
     params: TensorTree
     log_sd_diag: TensorTree
-    optimizer_state: tuple
+    opt_state: torchopt.typing.OptState
     nelbo: torch.tensor = None
     aux: Any = None
 
@@ -67,8 +67,8 @@ def init(
             params,
         )
 
-    optimizer_state = optimizer.init([params, init_log_sds])
-    return VIDiagState(params, init_log_sds, optimizer_state)
+    opt_state = optimizer.init([params, init_log_sds])
+    return VIDiagState(params, init_log_sds, opt_state)
 
 
 def update(
@@ -113,9 +113,9 @@ def update(
             nelbo_log_sd, argnums=(0, 1), has_aux=True
         )(state.params, state.log_sd_diag)
 
-    updates, optimizer_state = optimizer.update(
+    updates, opt_state = optimizer.update(
         nelbo_grads,
-        state.optimizer_state,
+        state.opt_state,
         params=[state.params, state.log_sd_diag],
         inplace=inplace,
     )
@@ -127,7 +127,7 @@ def update(
         state.nelbo = nelbo_val.detach()
         state.aux = aux
         return state
-    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.detach(), aux)
+    return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach(), aux)
 
 
 def build(

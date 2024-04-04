@@ -8,7 +8,6 @@ from posteriors import optim
 from posteriors.utils import model_to_function
 from posteriors.utils import linearized_forward_diag
 from posteriors.utils import hvp
-from posteriors.utils import fvp
 from posteriors.utils import diag_normal_log_prob
 from posteriors.utils import diag_normal_sample
 from posteriors.utils import tree_size

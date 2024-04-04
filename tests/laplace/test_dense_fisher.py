@@ -58,9 +58,7 @@ def test_dense_fisher_vmap():
         x = x.unsqueeze(0)
         y = y.unsqueeze(0)
         with torch.no_grad():
-            fisher = empirical_fisher(
-                lambda p: log_posterior_per_sample(p, (x, y)), has_aux=True
-            )(params)[0]
+            fisher = empirical_fisher(log_posterior_per_sample, params, (x, y))[0]
 
         expected += fisher
 

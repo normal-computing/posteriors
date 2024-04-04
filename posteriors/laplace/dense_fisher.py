@@ -79,9 +79,7 @@ def update(
         log_posterior = per_samplify(log_posterior)
 
     with torch.no_grad():
-        fisher, aux = empirical_fisher(lambda p: log_posterior(p, batch), has_aux=True)(
-            state.params
-        )
+        fisher, aux = empirical_fisher(log_posterior, state.params, batch)
 
     if inplace:
         state.prec += fisher

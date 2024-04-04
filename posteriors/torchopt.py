@@ -19,7 +19,7 @@ class TorchOptState(TransformState):
     """
 
     params: TensorTree
-    opt_state: torchopt.typing.OptState
+    opt_state: torch.optim.Optimizer
     loss: torch.tensor = None
     aux: Any = None
 

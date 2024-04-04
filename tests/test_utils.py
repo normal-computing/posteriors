@@ -4,11 +4,12 @@ from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
 
 from tests.scenarios import TestModel, TestLanguageModel
-
 from posteriors import (
     model_to_function,
     linearized_forward_diag,
     hvp,
+    fvp,
+    empirical_fisher,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -24,7 +25,6 @@ from posteriors import (
     flexi_tree_map,
     per_samplify,
     is_scalar,
-    empirical_fisher,
     CatchAuxError,
 )
 
@@ -123,6 +123,78 @@ def test_hvp():
     assert torch.allclose(hvp_result_aux[0], torch.func.grad(func)(x))
     assert torch.allclose(hvp_result_aux[1], expected)
     assert torch.allclose(hvp_result_aux[2], x**2)
+
+
+def test_fvp():
+    def func(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()])
+
+    x = torch.arange(1.0, 6.0)
+    v = torch.ones_like(x)
+
+    output, fvp_result = fvp(func, (x,), (v,))
+
+    jac = torch.func.jacrev(func)(x)
+    fisher = jac.T @ jac
+    expected = fisher @ v
+    assert torch.allclose(fvp_result, expected)
+    assert torch.allclose(output, func(x))
+
+    def func_aux(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()]), x
+
+    output_aux, fvp_aux_result, aux = fvp(func_aux, (x,), (v,), has_aux=True)
+    assert torch.allclose(fvp_aux_result, expected)
+    assert torch.allclose(output_aux, func(x))
+    assert torch.allclose(aux, x)
+
+
+def test_empirical_fisher():
+    # Test no aux
+    def f(params, batch):
+        return torch.squeeze(batch[1] - batch[0] @ params["weights"] - params["bias"])
+
+    f_per_sample = torch.vmap(f, in_dims=(None, 0))
+
+    num_samples = 2
+    num_features = 4
+
+    x = torch.randn(num_samples, num_features)
+    y = torch.randn(
+        num_samples,
+    )
+    params = {
+        "weights": torch.randn(num_features, 1, requires_grad=True),
+        "bias": torch.randn(1, requires_grad=True),
+    }
+
+    batch = (x, y)
+    fisher = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
+    expected_fisher = torch.zeros((num_features + 1, num_features + 1))
+    for xs, ys in zip(x, y):
+        g = torch.func.grad(f)(params, (xs, ys))
+        g = tree_ravel(g)[0]
+        expected_fisher += torch.outer(g, g)
+
+    assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
+
+    # Test aux
+    def f_aux(params, batch):
+        return f(params, batch), params
+
+    f_aux_per_sample = torch.vmap(f_aux, in_dims=(None, 0))
+
+    fisher_aux, _ = empirical_fisher(
+        lambda p: f_aux_per_sample(p, batch), has_aux=True
+    )(params)
+    assert torch.allclose(fisher_aux, expected_fisher, rtol=1e-5)
+
+    # Test matches fvp
+    v = tree_map(lambda x: torch.randn_like(x), params)
+    fvp_result = fvp(lambda p: f_per_sample(p, batch), (params,), (v,))[1]
+    fvp_result = tree_ravel(fvp_result)[0]
+    fisher_fvp = fisher @ tree_ravel(v)[0]
+    assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
 
 
 def test_diag_normal_log_prob():
@@ -454,38 +526,6 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
-
-
-def test_empirical_fisher():
-    def f(params, batch):
-        return torch.squeeze(
-            batch[1] - batch[0] @ params["weights"] - params["bias"]
-        ), params
-
-    f_per_sample = torch.vmap(f, in_dims=(None, 0))
-
-    num_samples = 2
-    num_features = 4
-
-    x = torch.randn(num_samples, num_features)
-    y = torch.randn(
-        num_samples,
-    )
-    params = {
-        "weights": torch.randn(num_features, 1, requires_grad=True),
-        "bias": torch.randn(1, requires_grad=True),
-    }
-
-    batch = (x, y)
-    fisher, _ = empirical_fisher(f_per_sample, params, batch)
-
-    expected_fisher = torch.zeros((num_features + 1, num_features + 1))
-    for xs, ys in zip(x, y):
-        g = torch.func.grad(f, has_aux=True)(params, (xs, ys))[0]
-        g = tree_ravel(g)[0]
-        expected_fisher += torch.outer(g, g)
-
-    assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
 
 
 def test_CatchAuxError():

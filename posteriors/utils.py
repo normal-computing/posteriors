@@ -99,7 +99,6 @@ def fvp(
     primals: tuple,
     tangents: tuple,
     has_aux: bool = False,
-    damping: float = 0.0,
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Empirical Fisher vector product.
 
@@ -113,8 +112,6 @@ def fvp(
         primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
         tangents: Tuple matching structure of primals.
         has_aux: Whether f returns auxiliary information.
-        damping: Damping factor, to compute (F(primals) + damping * I) @ tangents.
-            Defaults to 0.0.
 
     Returns:
         Returns a (output, fvp_out) tuple containing the output of func evaluated at
@@ -125,6 +122,23 @@ def fvp(
     Jv = jvp_output[1]
     f_vjp = vjp(f, *primals, has_aux=has_aux)[1]
     return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
+
+
+def tree_mvp_dampen(
+    mvp: Callable[[TensorTree], TensorTree], damping: float
+) -> Callable[[TensorTree], TensorTree]:
+    """
+    Dampen the mvp function by adding a multiple of the input vector to the output.
+    Acts as a regularizer for the mvp function.
+    """
+
+    def dampen_fcn(mvp_, v_):
+        return mvp_ + damping * v_
+
+    def damp_mvp(v):
+        return tree_map(dampen_fcn, mvp(v), v)
+
+    return damp_mvp
 
 
 def diag_normal_log_prob(

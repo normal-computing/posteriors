@@ -5,6 +5,16 @@ Install from [PyPI](https://pypi.org/project/posteriors/) with `pip`:
 pip install posteriors
 ```
 
+## Why UQ?
+
+Uncertainty quantification allows for informed decision making by averaging over
+multiple plausible model configurations rather than relying on a single point estimate.
+Thus providing a coherent framework for detecting [**out of distribution**](https://github.com/normal-computing/posteriors/tree/main/examples/yelp)
+inputs and [**continual learning**](https://github.com/normal-computing/posteriors/tree/main/examples/continual_lora).
+
+For more info on the utility of UQ, check out our [blog post introducing `posteriors`](https://blog.normalcomputing.ai/)!
+
+
 ## Quick Start
 
 `posteriors` is a Python library for uncertainty quantification and machine learning 

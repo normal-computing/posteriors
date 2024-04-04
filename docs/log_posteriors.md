@@ -13,15 +13,14 @@
 
 ## Auxiliary information
 
-Model calls can be expensive, and they might provide more information than just an output
-value (and gradient). In order to avoid, losing this information `posteriors` enforces the
-`log_posterior` or `log_likelihood` functions to have a
+Model calls can be expensive, and they might provide more information than just an
+output value (and gradient). In order to avoid, losing this information `posteriors`
+enforces the `log_posterior` or `log_likelihood` functions to have a
 `log_posterior(params, batch) -> log_prob, aux` signature, where the second element
 contains any auxiliary information, such as 
 predictions or alternative metrics.
 
 `posteriors` algorithms will store this information in `state.aux`.
-
 
 
 ## Gradient Ascent
@@ -51,6 +50,7 @@ logits from the model (i.e. neural network) for input $x_i$ and parameters $\the
     from torch.distributions import Categorical
     mean_log_lik = Categorical(logits=logits, validate_args=False).log_prob(labels).mean()
     ```
+
 
 ## Going Bayesian
 

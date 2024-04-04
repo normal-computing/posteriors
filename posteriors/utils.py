@@ -548,7 +548,7 @@ def is_scalar(x: Any) -> bool:
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
 
-  
+
 class CatchAuxError(contextlib.AbstractContextManager):
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:

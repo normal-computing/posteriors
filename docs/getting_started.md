@@ -58,7 +58,9 @@ Here:
 - `update` updates the `state` based on a new `batch` of data.
 
 
-[^1]: E.g. `posteriors.laplace.diag_fisher` or `posteriors.sgmcmc.sghmc`
+We've here used `posteriors.vi.diag` but we could easily swap to any of the other
+`posteriors` algorithms such as `posteriors.laplace.diag_fisher` or
+`posteriors.sgmcmc.sghmc`
 
 
 !!! example "I want more!"
@@ -104,4 +106,21 @@ grad_f_x = torch.func.grad(f)(x)
 ```
 where `f` is a function that takes `x` as input and returns a scalar output. Again, 
 `x` can be a `dict`, `list`, `tuple`, or any other PyTree with `torch.Tensor` leaves.
+
+
+## Friends
+
+Compose `posteriors` with wonderful tools from the `torch` ecosystem
+
+- Define priors and likelihoods with [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html).  
+    Remember to set [`validate_args=False`](gotchas.md#validate_argsfalse-in-torchdistributions)
+    and [construct the log posterior](log_posteriors.md) accordingly.
+- [`torchopt`](https://github.com/metaopt/torchopt) for functional optimizers.
+- [`transfomers`](https://huggingface.co/docs/transformers/en/index) for open source models.
+- [`lightning`](https://pytorch-lightning.readthedocs.io/en/latest/) for logging and device management.  
+    Check out the [`lightning` integration tutorial](tutorials/lightning_autoencoder.md).
+
+Additionally, the functional transform interface used in `posteriors` is strongly
+inspired by frameworks such as [`optax`](https://github.com/google-deepmind/optax) and
+[`blackjax`](https://github.com/blackjax-devs/blackjax).
 

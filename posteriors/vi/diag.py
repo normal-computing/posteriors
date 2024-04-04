@@ -18,7 +18,7 @@ class VIDiagState(TransformState):
         params: Mean of the variational distribution.
         log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.
-        optimizer_state: torchopt state storing optimizer data for updating the
+        opt_state: TorchOpt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
         aux: Auxiliary information from the log_posterior call.
@@ -26,7 +26,7 @@ class VIDiagState(TransformState):
 
     params: TensorTree
     log_sd_diag: TensorTree
-    optimizer_state: tuple
+    opt_state: torchopt.typing.OptState
     nelbo: torch.tensor = None
     aux: Any = None
 
@@ -39,7 +39,7 @@ def init(
     """Initialise diagonal Normal variational distribution over parameters.
 
     optimizer.init will be called on flattened variational parameters so hyperparameters
-    such as learning rate need to pre-specified through torchopt's functional API:
+    such as learning rate need to pre-specified through TorchOpt's functional API:
 
     ```
     import torchopt
@@ -52,8 +52,9 @@ def init(
 
     Args:
         params: Initial mean of the variational distribution.
-        optimizer: torchopt functional optimizer for updating the variational
+        optimizer: TorchOpt functional optimizer for updating the variational
             parameters.
+            Make sure to use lower case like torchopt.adam().
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
             of the variational distribution. Can be tree like params or scalar.
             Defaults to zero.
@@ -67,8 +68,8 @@ def init(
             params,
         )
 
-    optimizer_state = optimizer.init([params, init_log_sds])
-    return VIDiagState(params, init_log_sds, optimizer_state)
+    opt_state = optimizer.init([params, init_log_sds])
+    return VIDiagState(params, init_log_sds, opt_state)
 
 
 def update(
@@ -89,7 +90,7 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        optimizer: torchopt functional optimizer for updating the variational
+        optimizer: TorchOpt functional optimizer for updating the variational
             parameters.
         temperature: Temperature to rescale (divide) log_posterior.
             Defaults to 1.
@@ -113,9 +114,9 @@ def update(
             nelbo_log_sd, argnums=(0, 1), has_aux=True
         )(state.params, state.log_sd_diag)
 
-    updates, optimizer_state = optimizer.update(
+    updates, opt_state = optimizer.update(
         nelbo_grads,
-        state.optimizer_state,
+        state.opt_state,
         params=[state.params, state.log_sd_diag],
         inplace=inplace,
     )
@@ -127,7 +128,7 @@ def update(
         state.nelbo = nelbo_val.detach()
         state.aux = aux
         return state
-    return VIDiagState(mean, log_sd_diag, optimizer_state, nelbo_val.detach(), aux)
+    return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach(), aux)
 
 
 def build(
@@ -144,8 +145,9 @@ def build(
     Args:
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
-        optimizer: torchopt functional optimizer for updating the variational
+        optimizer: TorchOpt functional optimizer for updating the variational
             parameters.
+            Make sure to use lower case like torchopt.adam()
         temperature: Temperature to rescale (divide) log_posterior.
             Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.

@@ -1,3 +1,14 @@
+# Autoencoder with Lightning
+
+In this example, we'll adapt the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html)
+to use UQ methods with `posteriors` and logging + device handling with `lightning`.
+
+
+
+## PyTorch model
+We begin by defining the PyTorch model. This is unchanged from the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html):
+
+```python
 import os
 from torch import nn, utils
 import torch
@@ -9,18 +20,24 @@ from dataclasses import asdict
 
 import posteriors
 
-# Example from https://lightning.ai/docs/pytorch/stable/starter/introduction.html
-
-method, config_args = posteriors.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
-# method, config_args = posteriors.sgmcmc.sghmc, {"lr": 1e-3}
-
 encoder = nn.Sequential(nn.Linear(28 * 28, 64), nn.ReLU(), nn.Linear(64, 3))
 decoder = nn.Sequential(nn.Linear(3, 64), nn.ReLU(), nn.Linear(64, 28 * 28))
 
 encoder_function = posteriors.model_to_function(encoder)
 decoder_function = posteriors.model_to_function(decoder)
+```
 
 
+## Log posterior
+
+As mentioned in the [constructing log posteriors](../log_posteriors.md) page,
+the `log_posterior` function depends on the amount of data we have in the training set,
+`num_data`. We don't know that yet so we'll define it later.
+
+Otherwise, the negative log likelihood is the same reconstruction loss as in the
+[Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html):
+
+```python
 def log_posterior(params, batch, num_data):
     x, y = batch
     x = x.view(x.size(0), -1)
@@ -36,9 +53,38 @@ def log_posterior(params, batch, num_data):
         params[0]
     ) + posteriors.diag_normal_log_prob(params[1])
     return log_lik + log_prior / num_data, x_hat
+```
 
 
-# define the LightningModule
+## `posteriors` method
+
+We can now define the `posteriors` method. For example, we could us [`vi.diag`](../api/vi/diag.md)
+```python
+method, config_args = posteriors.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
+```
+or [`sgmcmc.sghmc`](../api/sgmcmc/sghmc.md):
+```python
+method, config_args = posteriors.sgmcmc.sghmc, {"lr": 1e-3}
+```
+We can easily swap methods using `posteriors`'s unified interface.
+
+
+## Lightning module
+
+The `LightningModule` is the same as in the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html),
+with a few minor modifications:
+
+- We add a `num_data` attribute to the class, as well as a `log_posterior` method that
+depends on it.
+- The training step now simply calls `update` and logs the float attributes.
+- We use `configure_optimizers` to build the `transform` object and the `state`.
+We do not return optimizers, as we do not want lightning's automatic optimization.
+- We load the number of data points in the training set in `on_train_start`, when
+the module has `train_dataloader` available.
+- We save and load the state of the transform in `on_save_checkpoint` and
+`on_load_checkpoint` so that we can resume training if needed.
+
+```python
 class LitAutoEncoderUQ(L.LightningModule):
     def __init__(self, encoder, decoder):
         super().__init__()
@@ -79,10 +125,16 @@ class LitAutoEncoderUQ(L.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         # Load the state of the transform
         self.state = checkpoint["state"]
+```
 
 
+## Load dataset and train!
+
+Just as in the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html):
+
+```python
+# init the autoencoder
 autoencoderuq = LitAutoEncoderUQ(encoder, decoder)
-
 
 # setup data
 dataset = MNIST(os.getcwd(), download=True, transform=ToTensor())
@@ -91,11 +143,4 @@ train_loader = utils.data.DataLoader(dataset)
 # train the model
 trainer = L.Trainer(limit_train_batches=100, max_epochs=1)
 trainer.fit(model=autoencoderuq, train_dataloaders=train_loader)
-
-
-checkpoint = "./lightning_logs/version_0/checkpoints/epoch=0-step=100.ckpt"
-autoencoder = LitAutoEncoderUQ.load_from_checkpoint(
-    checkpoint, encoder=encoder, decoder=decoder
-)
-
-assert hasattr(autoencoder, "state")
+```

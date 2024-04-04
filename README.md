@@ -120,4 +120,5 @@ As well as other UQ libraries [`fortuna`](https://github.com/awslabs/fortuna),
 
 You can report a bug or request a feature by [creating a new issue on GitHub](https://github.com/normal-computing/posteriors/issues).
 
+
 If you want to contribute code, please check the [contributing guide](https://normal-computing.github.io/posteriors/contributing).

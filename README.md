@@ -111,6 +111,10 @@ Interfaces seamlessly with:
 The functional transform interface is strongly inspired by frameworks such as 
 [`optax`](https://github.com/google-deepmind/optax) and [`blackjax`](https://github.com/blackjax-devs/blackjax).
 
+As well as other UQ libraries [`fortuna`](https://github.com/awslabs/fortuna),
+[`laplace`](https://github.com/aleximmer/Laplace), [`numpyro`](https://github.com/pyro-ppl/numpyro),
+[`pymc`](https://github.com/pymc-devs/pymc) and [`uncertainty-baselines`](https://github.com/google/uncertainty-baselines).
+
 
 ## Contributing
 

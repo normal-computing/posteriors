@@ -93,7 +93,7 @@ def build(
         state = transform.update(state, batch)
     ```
 
-    Args:
+    Arg:
         loss_fn: Function that takes the parameters and returns the loss.
             of the form `loss, aux = fn(params, batch)`.
         optimizer: Optimizer class from torch.optim.

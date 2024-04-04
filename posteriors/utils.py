@@ -1,4 +1,4 @@
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Tuple, Sequence
 from functools import partial
 import torch
 from torch.func import grad, jvp, vjp, functional_call, jacrev
@@ -6,7 +6,7 @@ from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
 from optree.integration.torch import tree_ravel
 
-from posteriors.types import TensorTree, ForwardFn, Tensor
+from posteriors.types import TensorTree, ForwardFn
 
 
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
@@ -122,6 +122,46 @@ def fvp(
     Jv = jvp_output[1]
     f_vjp = vjp(f, *primals, has_aux=has_aux)[1]
     return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
+
+
+def empirical_fisher(
+    f: Callable,
+    argnums: int | Sequence[int] = 0,
+    has_aux: bool = False,
+) -> Callable:
+    """
+    Constructs function to compute the empirical Fisher information matrix of a function
+    f with respect to its parameters, defined as:
+
+    F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ) ∇_θ f_θ(xᵢ, yᵢ)ᵀ
+
+    Follows API from https://pytorch.org/functorch/stable/generated/functorch.jacrev.html
+
+    Args:
+        f:  A Python function that takes one or more arguments, one of which must be a
+            Tensor, and returns one or more Tensors
+        argnums: Optional, integer or sequence of integers. Specifies which
+            positional argument(s) to differentiate with respect to. Defaults to 0.
+        has_aux: Whether f returns auxiliary information.
+
+    Returns:
+        A function with the same arguments as f that returns the empirical Fisher, F.
+        If has_aux is True, then the function instead returns a tuple of (F, aux).
+    """
+
+    def fisher(*args, **kwargs):
+        jac_output = jacrev(f, argnums=argnums, has_aux=has_aux)(*args, **kwargs)
+        jac = jac_output[0] if has_aux else jac_output
+
+        # Convert Jacobian to be flat in parameter dimension
+        jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
+
+        if has_aux:
+            return jac.T @ jac, jac_output[1]
+        else:
+            return jac.T @ jac
+
+    return fisher
 
 
 def diag_normal_log_prob(
@@ -506,29 +546,3 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
-
-
-def empirical_fisher(
-    f: Callable[[TensorTree, TensorTree], Any], params: TensorTree, batch: Any
-) -> Tuple[Tensor, Any]:
-    """
-    Compute the empirical Fisher information matrix of a function f with respect to its
-    parameters, defined as:
-
-    F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ)^T ∇_θ f_θ(xᵢ, yᵢ)
-
-    Args:
-        f: A function that takes params and batch and returns a 1D vector
-            with length equal to batch size.
-        params: PyTree of tensors.
-        batch: Input data to f, of the form (x, y).
-
-    Returns:
-        The empirical Fisher information matrix.
-    """
-    jac, aux = jacrev(f, has_aux=True)(params, batch)
-
-    # Convert Jacobian to be flat in parameter dimension
-    jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
-
-    return jac.T @ jac, aux

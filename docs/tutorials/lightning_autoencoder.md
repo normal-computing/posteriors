@@ -30,7 +30,7 @@ decoder_function = posteriors.model_to_function(decoder)
 
 ## Log posterior
 
-As mentioned in the [constructing log posteriors](/log_posteriors.md) page,
+As mentioned in the [constructing log posteriors](../log_posteriors.md) page,
 the `log_posterior` function depends on the amount of data we have in the training set,
 `num_data`. We don't know that yet so we'll define it later.
 
@@ -58,11 +58,11 @@ def log_posterior(params, batch, num_data):
 
 ## `posteriors` method
 
-We can now define the `posteriors` method. For example, we could us [`vi.diag`](/api/vi/diag)
+We can now define the `posteriors` method. For example, we could us [`vi.diag`](../api/vi/diag.md)
 ```python
 method, config_args = posteriors.vi.diag, {"optimizer": torchopt.adam(lr=1e-3)}
 ```
-or [`sgmcmc.sghmc`](/api/sgmcmc/sghmc):
+or [`sgmcmc.sghmc`](../api/sgmcmc/sghmc.md):
 ```python
 method, config_args = posteriors.sgmcmc.sghmc, {"lr": 1e-3}
 ```

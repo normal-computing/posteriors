@@ -22,7 +22,7 @@ many of which use larger models that require a GPU to run:
 [<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/plot_B_laplace.png">](https://github.com/normal-computing/posteriors/tree/main/examples/continual_lora)
 
 - [`continual_lora`](https://github.com/normal-computing/posteriors/tree/main/examples/continual_lora):
-Uses [`posteriors.laplace.diag_fisher`](/api/laplace/diag_fisher) to avoid catastrophic forgetting in fine-tuning
+Uses [`posteriors.laplace.diag_fisher`](../api/laplace/diag_fisher.md) to avoid catastrophic forgetting in fine-tuning
 [Llama-2-7b](https://huggingface.co/meta-llama/Llama-2-7b-hf)
 on a series of books from the [pg19](https://huggingface.co/datasets/pg19) dataset.
 

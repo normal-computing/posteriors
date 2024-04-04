@@ -3,11 +3,11 @@ from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
 
 from tests.scenarios import TestModel, TestLanguageModel
-
 from posteriors import (
     model_to_function,
     linearized_forward_diag,
     hvp,
+    fvp,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -121,6 +121,30 @@ def test_hvp():
     assert torch.allclose(hvp_result_aux[0], torch.func.grad(func)(x))
     assert torch.allclose(hvp_result_aux[1], expected)
     assert torch.allclose(hvp_result_aux[2], x**2)
+
+
+def test_fvp():
+    def func(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()])
+
+    x = torch.arange(1.0, 6.0)
+    v = torch.ones_like(x)
+
+    output, fvp_result = fvp(func, (x,), (v,))
+
+    jac = torch.func.jacrev(func)(x)
+    fisher = jac.T @ jac
+    expected = fisher @ v
+    assert torch.allclose(fvp_result, expected)
+    assert torch.allclose(output, func(x))
+
+    def func_aux(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()]), x
+
+    output_aux, fvp_aux_result, aux = fvp(func_aux, (x,), (v,), has_aux=True)
+    assert torch.allclose(fvp_aux_result, expected)
+    assert torch.allclose(output_aux, func(x))
+    assert torch.allclose(aux, x)
 
 
 def test_diag_normal_log_prob():

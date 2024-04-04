@@ -1,7 +1,7 @@
 from typing import Callable, Any, Tuple
 from functools import partial
 import torch
-from torch.func import grad, jvp, functional_call, jacrev
+from torch.func import grad, jvp, vjp, functional_call, jacrev
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten
 from optree.integration.torch import tree_ravel
@@ -92,6 +92,36 @@ def hvp(
         returns a (gradient, hvp_out, aux) tuple.
     """
     return jvp(grad(f, has_aux=has_aux), primals, tangents, has_aux=has_aux)
+
+
+def fvp(
+    f: Callable,
+    primals: tuple,
+    tangents: tuple,
+    has_aux: bool = False,
+) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
+    """Empirical Fisher vector product.
+
+    F(primals) @ tangents
+
+    Adapted from https://gebob19.github.io/natural-gradient/
+    Follows API from https://pytorch.org/docs/stable/generated/torch.func.jvp.html
+
+    Args:
+        f: A function with (batched) scalar output.
+        primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
+        tangents: Tuple matching structure of primals.
+        has_aux: Whether f returns auxiliary information.
+
+    Returns:
+        Returns a (output, fvp_out) tuple containing the output of func evaluated at
+        primals and the Fisher-vector product. If has_aux is True, then instead
+        returns a (output, fvp_out, aux) tuple.
+    """
+    jvp_output = jvp(f, primals, tangents, has_aux=has_aux)
+    Jv = jvp_output[1]
+    f_vjp = vjp(f, *primals, has_aux=has_aux)[1]
+    return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
 
 
 def diag_normal_log_prob(

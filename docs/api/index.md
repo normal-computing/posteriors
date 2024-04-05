@@ -15,6 +15,8 @@ uses the diagonal empirical Fisher information matrix instead.
 
 
 ### Stochastic gradient Markov chain Monte Carlo (SGMCMC)
+- [`sgmcmc.sgld`](sgmcmc/sgld.md) implements stochastic gradient Langevin dynamics
+(SGLD) from [Welling and Teh](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf).
 - [`sgmcmc.sghmc`](sgmcmc/sghmc.md) implements the stochastic gradient Hamiltonian
 Monte Carlo (SGHMC) algorithm from [Chen et al](https://arxiv.org/abs/1402.4102)
 (without momenta resampling).

@@ -4,6 +4,7 @@ from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
 
 from posteriors import (
+    CatchAuxError,
     model_to_function,
     linearized_forward_diag,
     hvp,
@@ -24,10 +25,42 @@ from posteriors import (
     flexi_tree_map,
     per_samplify,
     is_scalar,
-    CatchAuxError,
 )
 from posteriors.utils import AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
+
+
+def test_CatchAuxError():
+    def func(x):
+        return x**2
+
+    def func_aux(x):
+        return x**2, None
+
+    # Check AUX_ERROR_MSG is correct
+    try:
+        torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+    except Exception as e:
+        print(str(e))
+        assert AUX_ERROR_MSG in str(e)
+
+    with pytest.raises(RuntimeError) as e:
+        with CatchAuxError():
+            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+
+        assert "Auxiliary output not found" in str(e)
+
+    with pytest.raises(RuntimeError) as e:
+        with torch.no_grad(), CatchAuxError():
+            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+
+        assert "Auxiliary output not found" in str(e)
+
+    with CatchAuxError():
+        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
+
+    with torch.no_grad(), CatchAuxError():
+        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
 
 
 def test_model_to_function():
@@ -527,36 +560,3 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
-
-
-def test_CatchAuxError():
-    def func(x):
-        return x**2
-
-    def func_aux(x):
-        return x**2, None
-
-    # Check AUX_ERROR_MSG is correct
-    try:
-        torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
-    except Exception as e:
-        print(str(e))
-        assert AUX_ERROR_MSG in str(e)
-
-    with pytest.raises(RuntimeError) as e:
-        with CatchAuxError():
-            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
-
-        assert "Auxiliary output not found" in str(e)
-
-    with pytest.raises(RuntimeError) as e:
-        with torch.no_grad(), CatchAuxError():
-            torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
-
-        assert "Auxiliary output not found" in str(e)
-
-    with CatchAuxError():
-        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
-
-    with torch.no_grad(), CatchAuxError():
-        torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))

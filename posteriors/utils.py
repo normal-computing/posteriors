@@ -10,6 +10,9 @@ from optree.integration.torch import tree_ravel
 from posteriors.types import TensorTree, ForwardFn
 
 
+AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
+
+
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
     """Converts a model into a function that maps parameters and inputs to outputs.
 
@@ -550,9 +553,11 @@ def is_scalar(x: Any) -> bool:
 
 
 class CatchAuxError(contextlib.AbstractContextManager):
+    """Context manager to catch errors when auxiliary output is not found."""
+
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
-            if "should be a tuple: (output, aux) if has_aux is True" in str(exc_value):
+            if AUX_ERROR_MSG in str(exc_value):
                 raise RuntimeError(
                     "Auxiliary output not found. Perhaps you have forgotten to return "
                     "the aux output?\n"

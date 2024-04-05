@@ -3,7 +3,6 @@ import torch
 from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
 
-from tests.scenarios import TestModel, TestLanguageModel
 from posteriors import (
     model_to_function,
     linearized_forward_diag,
@@ -27,6 +26,8 @@ from posteriors import (
     is_scalar,
     CatchAuxError,
 )
+from posteriors.utils import AUX_ERROR_MSG
+from tests.scenarios import TestModel, TestLanguageModel
 
 
 def test_model_to_function():
@@ -534,6 +535,13 @@ def test_CatchAuxError():
 
     def func_aux(x):
         return x**2, None
+
+    # Check AUX_ERROR_MSG is correct
+    try:
+        torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
+    except Exception as e:
+        print(str(e))
+        assert AUX_ERROR_MSG in str(e)
 
     with pytest.raises(RuntimeError) as e:
         with CatchAuxError():

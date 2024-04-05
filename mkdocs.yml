@@ -72,6 +72,7 @@ nav:
       - Dense Fisher: api/laplace/dense_fisher.md
       - Diag Fisher: api/laplace/diag_fisher.md
     - SGMCMC:
+      - api/sgmcmc/sgld.md
       - api/sgmcmc/sghmc.md
     - VI:
       - Diag: api/vi/diag.md

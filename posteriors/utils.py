@@ -13,6 +13,22 @@ from posteriors.types import TensorTree, ForwardFn
 AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
 
 
+class CatchAuxError(contextlib.AbstractContextManager):
+    """Context manager to catch errors when auxiliary output is not found."""
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            if AUX_ERROR_MSG in str(exc_value):
+                raise RuntimeError(
+                    "Auxiliary output not found. Perhaps you have forgotten to return "
+                    "the aux output?\n"
+                    "\tIf you don't have any auxiliary info, simply amend to e.g. "
+                    "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
+                    "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
+                )
+        return False
+
+
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
     """Converts a model into a function that maps parameters and inputs to outputs.
 
@@ -550,19 +566,3 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
-
-
-class CatchAuxError(contextlib.AbstractContextManager):
-    """Context manager to catch errors when auxiliary output is not found."""
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is not None:
-            if AUX_ERROR_MSG in str(exc_value):
-                raise RuntimeError(
-                    "Auxiliary output not found. Perhaps you have forgotten to return "
-                    "the aux output?\n"
-                    "\tIf you don't have any auxiliary info, simply amend to e.g. "
-                    "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
-                    "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
-                )
-        return False

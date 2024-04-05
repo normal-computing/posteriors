@@ -4,7 +4,7 @@ from posteriors import sgmcmc
 from posteriors import types
 from posteriors import optim
 
-
+from posteriors.utils import CatchAuxError
 from posteriors.utils import model_to_function
 from posteriors.utils import linearized_forward_diag
 from posteriors.utils import hvp
@@ -25,8 +25,6 @@ from posteriors.utils import flexi_tree_map
 from posteriors.utils import per_samplify
 from posteriors.utils import is_scalar
 from posteriors.utils import empirical_fisher
-from posteriors.utils import CatchAuxError
-
 
 import logging
 

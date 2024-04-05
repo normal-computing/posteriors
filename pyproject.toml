@@ -1,7 +1,7 @@
 [project]
 name = "posteriors"
 version = "0.0.1"
-description = "Uncertainty Quantification Library for PyTorch"
+description = "Uncertainty quantification with PyTorch"
 readme = "README.md"
 requires-python =">=3.9"
 license = {text = "Apache-2.0"}
@@ -17,7 +17,8 @@ classifiers = [
 dependencies = ["torch>=2.0.0", "torchopt>=0.7.3", "optree>=0.10.0"]
 
 [project.optional-dependencies]
-test = ["pre-commit", "pytest-cov"]
+test = ["pre-commit", "pytest-cov", "ruff"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [tool.setuptools]
 packages = ["posteriors"]

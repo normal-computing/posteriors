@@ -6,7 +6,13 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.utils import diag_normal_sample, flexi_tree_map, per_samplify, is_scalar
+from posteriors.utils import (
+    diag_normal_sample,
+    flexi_tree_map,
+    per_samplify,
+    is_scalar,
+    CatchAuxError,
+)
 
 
 @dataclass
@@ -98,7 +104,7 @@ def update(
     predict_sd_diag = flexi_tree_map(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
     )
-    with torch.no_grad():
+    with torch.no_grad(), CatchAuxError():
         log_liks, aux = log_likelihood(state.params, batch)
         jac, _ = jacrev(log_likelihood, has_aux=True)(state.params, batch)
         grad = tree_map(lambda x: x.mean(0), jac)

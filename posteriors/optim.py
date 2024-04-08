@@ -4,6 +4,7 @@ import torch
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.utils import CatchAuxError
 
 
 @dataclass
@@ -68,7 +69,8 @@ def update(
     if not inplace:
         raise NotImplementedError("inplace=False not supported for posteriors.optim")
     state.optimizer.zero_grad()
-    loss, aux = loss_fn(state.params, batch)
+    with CatchAuxError():
+        loss, aux = loss_fn(state.params, batch)
     loss.backward()
     state.optimizer.step()
     state.loss = loss

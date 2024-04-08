@@ -41,7 +41,6 @@ def test_CatchAuxError():
     try:
         torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
     except Exception as e:
-        print(str(e))
         assert AUX_ERROR_MSG in str(e)
 
     with pytest.raises(RuntimeError) as e:

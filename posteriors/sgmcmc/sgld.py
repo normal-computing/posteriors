@@ -47,6 +47,10 @@ def update(
 ) -> SGLDState:
     """Updates parameters for SGLD.
 
+    SGLD update rule:
+        θ = θ + lr * ∇ log p(θ, batch) + ε,
+            ε ~ N(0, lr * (2 - lr * β) * temperature)
+
     Args:
         state: SGLDState containing params.
         batch: Data batch to be send to log_posterior.

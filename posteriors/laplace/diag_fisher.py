@@ -15,6 +15,35 @@ from posteriors.utils import (
 )
 
 
+def build(
+    log_posterior: LogProbFn,
+    per_sample: bool = False,
+    init_prec_diag: TensorTree | float = 0.0,
+) -> Transform:
+    """Builds a transform for diagonal empirical Fisher information
+    Laplace approximation.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
+        per_sample: If True, then log_posterior is assumed to return a vector of
+            log posteriors for each sample in the batch. If False, then log_posterior
+            is assumed to return a scalar log posterior for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_posterior to be per sample.
+        init_prec_diag: Initial diagonal precision matrix.
+            Can be tree like params or scalar. Defaults to zero.
+
+    Returns:
+        Diagonal empirical Fisher information Laplace approximation transform
+        (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, init_prec_diag=init_prec_diag)
+    update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class DiagLaplaceState(TransformState):
     """State encoding a diagonal Normal distribution over parameters.
@@ -98,35 +127,6 @@ def update(
         state.aux = aux
         return state
     return DiagLaplaceState(state.params, prec_diag, aux)
-
-
-def build(
-    log_posterior: LogProbFn,
-    per_sample: bool = False,
-    init_prec_diag: TensorTree | float = 0.0,
-) -> Transform:
-    """Builds a transform for diagonal empirical Fisher information
-    Laplace approximation.
-
-    Args:
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
-        per_sample: If True, then log_posterior is assumed to return a vector of
-            log posteriors for each sample in the batch. If False, then log_posterior
-            is assumed to return a scalar log posterior for the whole batch, in this
-            case torch.func.vmap will be called, this is typically slower than
-            directly writing log_posterior to be per sample.
-        init_prec_diag: Initial diagonal precision matrix.
-            Can be tree like params or scalar. Defaults to zero.
-
-    Returns:
-        Diagonal empirical Fisher information Laplace approximation transform
-        (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, init_prec_diag=init_prec_diag)
-    update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
-    return Transform(init_fn, update_fn)
 
 
 def sample(

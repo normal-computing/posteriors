@@ -8,6 +8,35 @@ from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 from posteriors.utils import CatchAuxError
 
 
+def build(
+    loss_fn: LogProbFn,
+    optimizer: torchopt.base.GradientTransformation,
+) -> Transform:
+    """Build a TorchOpt optimizer transformation.
+
+    Example usage:
+
+    ```
+    transform = build(loss_fn, torchopt.adam(lr=0.1))
+    state = transform.init(params)
+
+    for batch in dataloader:
+        state = transform.update(state, batch)
+    ```
+
+    Args:
+        loss_fn: Loss function.
+        optimizer: TorchOpt functional optimizer.
+            Make sure to use lower case like torchopt.adam()
+
+    Returns:
+        Torchopt optimizer transform (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, optimizer=optimizer)
+    update_fn = partial(update, optimizer=optimizer, loss_fn=loss_fn)
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class TorchOptState(TransformState):
     """State of a TorchOpt optimizer.
@@ -76,32 +105,3 @@ def update(
         state.aux = aux
         return state
     return TorchOptState(params, opt_state, loss, aux)
-
-
-def build(
-    loss_fn: LogProbFn,
-    optimizer: torchopt.base.GradientTransformation,
-) -> Transform:
-    """Build a TorchOpt optimizer transformation.
-
-    Example usage:
-
-    ```
-    transform = build(loss_fn, torchopt.adam(lr=0.1))
-    state = transform.init(params)
-
-    for batch in dataloader:
-        state = transform.update(state, batch)
-    ```
-
-    Args:
-        loss_fn: Loss function.
-        optimizer: TorchOpt functional optimizer.
-            Make sure to use lower case like torchopt.adam()
-
-    Returns:
-        Torchopt optimizer transform (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, optimizer=optimizer)
-    update_fn = partial(update, optimizer=optimizer, loss_fn=loss_fn)
-    return Transform(init_fn, update_fn)

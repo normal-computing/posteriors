@@ -15,6 +15,49 @@ from posteriors.utils import (
 )
 
 
+def build(
+    log_posterior: Callable[[TensorTree, Any], float],
+    optimizer: torchopt.base.GradientTransformation,
+    temperature: float = 1.0,
+    n_samples: int = 1,
+    stl: bool = True,
+    init_log_sds: TensorTree | float = 0.0,
+) -> Transform:
+    """Builds a transform for variational inference with a diagonal Normal
+    distribution over parameters.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior (which can be unnormalised).
+        optimizer: TorchOpt functional optimizer for updating the variational
+            parameters.
+            Make sure to use lower case like torchopt.adam()
+        temperature: Temperature to rescale (divide) log_posterior.
+            Defaults to 1.
+        n_samples: Number of samples to use for Monte Carlo estimate.
+            Defaults to 1.
+        stl: Whether to use the `stick-the-landing` estimator
+            https://arxiv.org/abs/1703.09194.
+            Defaults to True.
+        init_log_sds: Initial log of the square-root diagonal of the covariance matrix
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to zero.
+
+    Returns:
+        Diagonal VI transform (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, optimizer=optimizer, init_log_sds=init_log_sds)
+    update_fn = partial(
+        update,
+        log_posterior=log_posterior,
+        optimizer=optimizer,
+        temperature=temperature,
+        n_samples=n_samples,
+        stl=stl,
+    )
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class VIDiagState(TransformState):
     """State encoding a diagonal Normal variational distribution over parameters.
@@ -134,49 +177,6 @@ def update(
         state.aux = aux
         return state
     return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach(), aux)
-
-
-def build(
-    log_posterior: Callable[[TensorTree, Any], float],
-    optimizer: torchopt.base.GradientTransformation,
-    temperature: float = 1.0,
-    n_samples: int = 1,
-    stl: bool = True,
-    init_log_sds: TensorTree | float = 0.0,
-) -> Transform:
-    """Builds a transform for variational inference with a diagonal Normal
-    distribution over parameters.
-
-    Args:
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior (which can be unnormalised).
-        optimizer: TorchOpt functional optimizer for updating the variational
-            parameters.
-            Make sure to use lower case like torchopt.adam()
-        temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.
-        n_samples: Number of samples to use for Monte Carlo estimate.
-            Defaults to 1.
-        stl: Whether to use the `stick-the-landing` estimator
-            https://arxiv.org/abs/1703.09194.
-            Defaults to True.
-        init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to zero.
-
-    Returns:
-        Diagonal VI transform (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, optimizer=optimizer, init_log_sds=init_log_sds)
-    update_fn = partial(
-        update,
-        log_posterior=log_posterior,
-        optimizer=optimizer,
-        temperature=temperature,
-        n_samples=n_samples,
-        stl=stl,
-    )
-    return Transform(init_fn, update_fn)
 
 
 def nelbo(

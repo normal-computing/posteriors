@@ -15,6 +15,47 @@ from posteriors.utils import (
 )
 
 
+def build(
+    log_likelihood: LogProbFn,
+    lr: float,
+    transition_sd: float = 0.0,
+    per_sample: bool = False,
+    init_sds: TensorTree | float = 1.0,
+) -> Transform:
+    """Builds a transform for variational inference with a diagonal Normal
+    distribution over parameters.
+
+    Args:
+        log_likelihood: Function that takes parameters and input batch and
+            returns the log-likelihood value as well as auxiliary information,
+            e.g. from the model call.
+        lr: Inverse temperature of the update, which behaves like a learning rate.
+            see https://arxiv.org/abs/1703.00209 for details.
+        transition_sd: Standard deviation of the transition noise, to additively
+            inflate the diagonal covariance before the update. Defaults to zero.
+        per_sample: If True, then log_likelihood is assumed to return a vector of
+            log likelihoods for each sample in the batch. If False, then log_likelihood
+            is assumed to return a scalar log likelihood for the whole batch, in this
+            case torch.func.vmap will be called, this is typically slower than
+            directly writing log_likelihood to be per sample.
+        init_sds: Initial square-root diagonal of the covariance matrix
+            of the variational distribution. Can be tree like params or scalar.
+            Defaults to ones.
+
+    Returns:
+        Diagonal EKF transform (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, init_sds=init_sds)
+    update_fn = partial(
+        update,
+        log_likelihood=log_likelihood,
+        lr=lr,
+        transition_sd=transition_sd,
+        per_sample=per_sample,
+    )
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class EKFDiagState(TransformState):
     """State encoding a diagonal Normal distribution over parameters.
@@ -129,47 +170,6 @@ def update(
         state.aux = aux
         return state
     return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
-
-
-def build(
-    log_likelihood: LogProbFn,
-    lr: float,
-    transition_sd: float = 0.0,
-    per_sample: bool = False,
-    init_sds: TensorTree | float = 1.0,
-) -> Transform:
-    """Builds a transform for variational inference with a diagonal Normal
-    distribution over parameters.
-
-    Args:
-        log_likelihood: Function that takes parameters and input batch and
-            returns the log-likelihood value as well as auxiliary information,
-            e.g. from the model call.
-        lr: Inverse temperature of the update, which behaves like a learning rate.
-            see https://arxiv.org/abs/1703.00209 for details.
-        transition_sd: Standard deviation of the transition noise, to additively
-            inflate the diagonal covariance before the update. Defaults to zero.
-        per_sample: If True, then log_likelihood is assumed to return a vector of
-            log likelihoods for each sample in the batch. If False, then log_likelihood
-            is assumed to return a scalar log likelihood for the whole batch, in this
-            case torch.func.vmap will be called, this is typically slower than
-            directly writing log_likelihood to be per sample.
-        init_sds: Initial square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to ones.
-
-    Returns:
-        Diagonal EKF transform (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, init_sds=init_sds)
-    update_fn = partial(
-        update,
-        log_likelihood=log_likelihood,
-        lr=lr,
-        transition_sd=transition_sd,
-        per_sample=per_sample,
-    )
-    return Transform(init_fn, update_fn)
 
 
 def sample(

@@ -9,6 +9,42 @@ from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 from posteriors.utils import flexi_tree_map, is_scalar, CatchAuxError
 
 
+def build(
+    log_posterior: LogProbFn,
+    lr: float,
+    alpha: float = 0.01,
+    beta: float = 0.0,
+    temperature: float = 1.0,
+    momenta: TensorTree | float | None = None,
+) -> Transform:
+    """Builds SGHMC transform.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
+        lr: Learning rate.
+        alpha: Friction coefficient.
+        beta: Gradient noise coefficient (estimated variance).
+        temperature: Temperature of the joint parameter + momenta distribution.
+        momenta: Initial momenta. Can be tree like params or scalar.
+            Defaults to random iid samples from N(0, 1).
+
+    Returns:
+        SGHMC transform (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, momenta=momenta)
+    update_fn = partial(
+        update,
+        log_posterior=log_posterior,
+        lr=lr,
+        alpha=alpha,
+        beta=beta,
+        temperature=temperature,
+    )
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class SGHMCState(TransformState):
     """State encoding params and momenta for SGHMC.
@@ -107,39 +143,3 @@ def update(
         state.aux = aux
         return state
     return SGHMCState(params, momenta, log_post.detach(), aux)
-
-
-def build(
-    log_posterior: LogProbFn,
-    lr: float,
-    alpha: float = 0.01,
-    beta: float = 0.0,
-    temperature: float = 1.0,
-    momenta: TensorTree | float | None = None,
-) -> Transform:
-    """Builds SGHMC transform.
-
-    Args:
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
-        alpha: Friction coefficient.
-        beta: Gradient noise coefficient (estimated variance).
-        temperature: Temperature of the joint parameter + momenta distribution.
-        momenta: Initial momenta. Can be tree like params or scalar.
-            Defaults to random iid samples from N(0, 1).
-
-    Returns:
-        SGHMC transform (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, momenta=momenta)
-    update_fn = partial(
-        update,
-        log_posterior=log_posterior,
-        lr=lr,
-        alpha=alpha,
-        beta=beta,
-        temperature=temperature,
-    )
-    return Transform(init_fn, update_fn)

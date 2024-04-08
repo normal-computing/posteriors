@@ -7,6 +7,37 @@ from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 from posteriors.utils import CatchAuxError
 
 
+def build(
+    loss_fn: LogProbFn,
+    optimizer: Type[torch.optim.Optimizer],
+    **kwargs: Any,
+) -> Transform:
+    """Builds an optimizer transform from torch.optim.
+
+    Example usage:
+
+    ```
+    transform = build(loss_fn, torch.optim.Adam, lr=0.1)
+    state = transform.init(params)
+
+    for batch in dataloader:
+        state = transform.update(state, batch)
+    ```
+
+    Args:
+        loss_fn: Function that takes the parameters and returns the loss.
+            of the form `loss, aux = fn(params, batch)`.
+        optimizer: Optimizer class from torch.optim.
+        **kwargs: Keyword arguments to pass to the optimizer class.
+
+    Returns:
+        Optimizer transform (posteriors.types.Transform instance).
+    """
+    init_fn = partial(init, optimizer_cls=optimizer, **kwargs)
+    update_fn = partial(update, loss_fn=loss_fn)
+    return Transform(init_fn, update_fn)
+
+
 @dataclass
 class OptimState(TransformState):
     """State of an optimizer.
@@ -76,34 +107,3 @@ def update(
     state.loss = loss
     state.aux = aux
     return state
-
-
-def build(
-    loss_fn: LogProbFn,
-    optimizer: Type[torch.optim.Optimizer],
-    **kwargs: Any,
-) -> Transform:
-    """Builds an optimizer transform from torch.optim.
-
-    Example usage:
-
-    ```
-    transform = build(loss_fn, torch.optim.Adam, lr=0.1)
-    state = transform.init(params)
-
-    for batch in dataloader:
-        state = transform.update(state, batch)
-    ```
-
-    Arg:
-        loss_fn: Function that takes the parameters and returns the loss.
-            of the form `loss, aux = fn(params, batch)`.
-        optimizer: Optimizer class from torch.optim.
-        **kwargs: Keyword arguments to pass to the optimizer class.
-
-    Returns:
-        Optimizer transform (posteriors.types.Transform instance).
-    """
-    init_fn = partial(init, optimizer_cls=optimizer, **kwargs)
-    update_fn = partial(update, loss_fn=loss_fn)
-    return Transform(init_fn, update_fn)

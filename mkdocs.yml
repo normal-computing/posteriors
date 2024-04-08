@@ -32,6 +32,7 @@ plugins:
         python:
           options:
             members_order: source
+            group_by_category: false
             show_root_toc_entry: false
             show_root_members_full_path: true
 

@@ -8,6 +8,35 @@ from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 from posteriors.utils import flexi_tree_map, CatchAuxError
 
 
+def build(
+    log_posterior: LogProbFn,
+    lr: float,
+    beta: float = 0.0,
+    temperature: float = 1.0,
+) -> Transform:
+    """Builds SGLD transform.
+
+    Args:
+        log_posterior: Function that takes parameters and input batch and
+            returns the log posterior value (which can be unnormalised)
+            as well as auxiliary information, e.g. from the model call.
+        lr: Learning rate.
+        beta: Gradient noise coefficient (estimated variance).
+        temperature: Temperature of the sampling distribution.
+
+    Returns:
+        SGLD transform (posteriors.types.Transform instance).
+    """
+    update_fn = partial(
+        update,
+        log_posterior=log_posterior,
+        lr=lr,
+        beta=beta,
+        temperature=temperature,
+    )
+    return Transform(init, update_fn)
+
+
 @dataclass
 class SGLDState(TransformState):
     """State encoding params for SGLD.
@@ -85,32 +114,3 @@ def update(
         state.aux = aux
         return state
     return SGLDState(params, log_post.detach(), aux)
-
-
-def build(
-    log_posterior: LogProbFn,
-    lr: float,
-    beta: float = 0.0,
-    temperature: float = 1.0,
-) -> Transform:
-    """Builds SGLD transform.
-
-    Args:
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
-        beta: Gradient noise coefficient (estimated variance).
-        temperature: Temperature of the sampling distribution.
-
-    Returns:
-        SGLD transform (posteriors.types.Transform instance).
-    """
-    update_fn = partial(
-        update,
-        log_posterior=log_posterior,
-        lr=lr,
-        beta=beta,
-        temperature=temperature,
-    )
-    return Transform(init, update_fn)

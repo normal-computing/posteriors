@@ -15,7 +15,9 @@ cd posteriors
 pip install -e '.[test, docs]'
 pre-commit install
 ```
-3. **Add your code. Add your tests. Update the docs if needed. Party on!**
+3. **Add your code. Add your tests. Update the docs if needed. Party on!**  
+    New methods should list `build`, `state`, `init` and `update`
+    at the top of the module in order.
 4. Make sure to run the tests and linter:
 ```
 python -m pytest

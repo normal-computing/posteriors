@@ -64,6 +64,8 @@ Here:
 - `build` is a function that loads `config_args` into the `init` and `update` functions
  and stores them within the `transform` instance. The `init` and `update` 
  functions then conform to a preset signature allowing for easy switching between algorithms.
+- `state` is a [`dataclass`](https://docs.python.org/3/library/dataclasses.html)
+    encoding the state of the algorithm, including `params` and `aux` attributes.
 - `init` constructs the iteration-varying `state` based on the model parameters `params`.
 - `update` updates the `state` based on a new `batch` of data.
 

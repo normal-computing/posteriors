@@ -18,11 +18,11 @@ def build(
 
     Algorithm from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf):
     $$
-    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \mathbb{I})
+    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \\mathbb{I})
     $$
-    for learning rate $\epsilon$ and temperature $T$.
+    for learning rate $\\epsilon$ and temperature $T$.
 
-    Targets $p_T(θ) \propto \exp( \\log p(θ) / T)$ with temperature $T$.
+    Targets $p_T(θ) \\propto \\exp( \\log p(θ) / T)$ with temperature $T$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
     to ensure robust scaling for a large amount of data.
@@ -89,9 +89,9 @@ def update(
 
     Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf):
     $$
-    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \mathbb{I})
+    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \\mathbb{I})
     $$
-    for lr $\epsilon$ and temperature $T$.
+    for lr $\\epsilon$ and temperature $T$.
 
     Args:
         state: SGLDState containing params.

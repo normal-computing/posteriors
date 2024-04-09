@@ -321,8 +321,8 @@ def tree_insert(
 
     Args:
         f: A function that takes a PyTree element and returns True or False.
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A PyTree with sub_tree inserted into full_tree.
@@ -342,8 +342,8 @@ def tree_insert_(
 
     Args:
         f: A function that takes a PyTree element and returns True or False.
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A pointer to full_tree with sub_tree inserted.
@@ -373,8 +373,8 @@ def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorT
     Both PyTrees must have the same structure.
 
     Args:
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A PyTree with sub_tree inserted into full_tree.
@@ -383,12 +383,12 @@ def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorT
 
 
 def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
-    """Inserts sub_pytree into full_tree in-place where full_tree tensors requires_grad.
+    """Inserts sub_tree into full_tree in-place where full_tree tensors requires_grad.
     Both PyTrees must have the same structure.
 
     Args:
-        full_pytree: A PyTree to insert sub_tree into.
-        sub_pytree: A PyTree to insert into full_tree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A pointer to full_tree with sub_tree inserted.
@@ -570,7 +570,7 @@ def per_samplify(
 
     Args:
         f: A function that takes params and batch and averages over the batch in its
-        output.
+            output.
 
     Returns:
         A new function that provides an output for each batch sample.

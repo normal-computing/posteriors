@@ -23,13 +23,13 @@ def build(
 
     \\begin{align}
     θ_{t+1} &= θ_t + ε m_t \\\\
-    m_{t+1} &= m_t + ε \\nabla \log p(θ_t, \\text{batch}) - ε α m_t
-    + N(0, ε T (2 α - ε β) T \mathbb{I})\\
-    \end{align}
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε α m_t
+    + N(0, ε T (2 α - ε β) T \\mathbb{I})\\
+    \\end{align}
     
-    for learning rate $\epsilon$ and temperature $T$
+    for learning rate $\\epsilon$ and temperature $T$
 
-    Targets $p_T(θ, m) \propto \exp( (\log p(θ) - \\frac12 m^Tm) / T)$
+    Targets $p_T(θ, m) \\propto \\exp( (\\log p(θ) - \\frac12 m^Tm) / T)$
     with temperature $T$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
@@ -119,11 +119,11 @@ def update(
 
     \\begin{align}
     θ_{t+1} &= θ_t + ε m_t \\\\
-    m_{t+1} &= m_t + ε \\nabla \log p(θ_t, \\text{batch}) - ε α m_t
-    + N(0, ε T (2 α - ε β) T \mathbb{I})\\
-    \end{align}
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε α m_t
+    + N(0, ε T (2 α - ε β) T \\mathbb{I})\\
+    \\end{align}
     
-    for learning rate $\epsilon$ and temperature $T$
+    for learning rate $\\epsilon$ and temperature $T$
 
     Args:
         state: SGHMCState containing params and momenta.

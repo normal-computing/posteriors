@@ -27,7 +27,7 @@ def build(
     distribution over parameters.
 
     Find $\\mu$ and diagonal $\\Sigma$ that mimimize $\\text{KL}(N(θ| \\mu, \\Sigma) || p_T(θ))$
-    where $p_T(θ) \\propto \exp( \\log p(θ) / T)$ with temperature $T$.
+    where $p_T(θ) \\propto \\exp( \\log p(θ) / T)$ with temperature $T$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
     to ensure robust scaling for a large amount of data.

@@ -23,6 +23,17 @@ def build(
     """Builds a transform for diagonal empirical Fisher information
     Laplace approximation.
 
+    The empirical Fisher is defined here as:
+    $$
+    F(θ) = \\sum_i ∇_θ \\log p(y_i, θ | x_i) ∇_θ \\log p(y_i, θ | x_i)^T
+    $$
+    where $p(y_i, θ | x_i)$ is the joint model distribution (equivalent to the posterior
+    up to proportionality) with parameters $θ$, inputs $x_i$ and labels $y_i$.
+
+    More info on empirical Fisher matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf) and
+    their use within a Laplace approximation in [Daxberger et al, 2021](https://arxiv.org/abs/2106.14806).
+
     Args:
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
@@ -33,11 +44,10 @@ def build(
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_posterior to be per sample.
         init_prec_diag: Initial diagonal precision matrix.
-            Can be tree like params or scalar. Defaults to zero.
+            Can be tree like params or scalar.
 
     Returns:
-        Diagonal empirical Fisher information Laplace approximation transform
-        (posteriors.types.Transform instance).
+        Diagonal empirical Fisher information Laplace approximation transform instance.
     """
     init_fn = partial(init, init_prec_diag=init_prec_diag)
     update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
@@ -68,7 +78,7 @@ def init(
     Args:
         params: Mean of the Normal distribution.
         init_prec_diag: Initial diagonal precision matrix.
-            Can be tree like params or scalar. Defaults to zero.
+            Can be tree like params or scalar.
 
     Returns:
         Initial DiagLaplaceState.

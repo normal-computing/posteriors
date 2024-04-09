@@ -16,6 +16,17 @@ def build(
 ) -> Transform:
     """Builds SGLD transform.
 
+    Algorithm from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf):
+    $$
+    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \mathbb{I})
+    $$
+    for learning rate $\epsilon$ and temperature $T$.
+
+    Targets $p_T(θ) \propto \exp( \\log p(θ) / T)$ with temperature $T$.
+
+    The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
+    to ensure robust scaling for a large amount of data.
+
     Args:
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
@@ -76,9 +87,11 @@ def update(
 ) -> SGLDState:
     """Updates parameters for SGLD.
 
-    SGLD update rule:
-        θ = θ + lr * ∇ log p(θ, batch) + ε,
-            ε ~ N(0, lr * (2 - lr * β) * temperature)
+    Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf):
+    $$
+    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \mathbb{I})
+    $$
+    for lr $\epsilon$ and temperature $T$.
 
     Args:
         state: SGLDState containing params.

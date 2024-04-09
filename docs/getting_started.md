@@ -31,7 +31,7 @@ from torch import nn, utils, func
 import torchopt
 import posteriors
 
-dataset = MNIST(root="./data", transform=ToTensor())
+dataset = MNIST(root="./data", transform=ToTensor(), download=True)
 train_loader = utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
 num_data = len(dataset)
 

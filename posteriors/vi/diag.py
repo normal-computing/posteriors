@@ -26,25 +26,28 @@ def build(
     """Builds a transform for variational inference with a diagonal Normal
     distribution over parameters.
 
+    Find $\\mu$ and diagonal $\\Sigma$ that mimimize $\\text{KL}(N(θ| \\mu, \\Sigma) || p_T(θ))$
+    where $p_T(θ) \\propto \\exp( \\log p(θ) / T)$ with temperature $T$.
+
+    The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
+    to ensure robust scaling for a large amount of data.
+
+    For more information on variational inference see [Blei et al, 2017](https://arxiv.org/abs/1601.00670).
+
     Args:
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
         optimizer: TorchOpt functional optimizer for updating the variational
-            parameters.
-            Make sure to use lower case like torchopt.adam()
+            parameters. Make sure to use lower case like torchopt.adam()
         temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
-            Defaults to 1.
-        stl: Whether to use the `stick-the-landing` estimator
-            https://arxiv.org/abs/1703.09194.
-            Defaults to True.
+        stl: Whether to use the stick-the-landing estimator
+            from (Roeder et al](https://arxiv.org/abs/1703.09194).
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to zero.
+            of the variational distribution. Can be a tree matching params or scalar.
 
     Returns:
-        Diagonal VI transform (posteriors.types.Transform instance).
+        Diagonal VI transform instance.
     """
     init_fn = partial(init, optimizer=optimizer, init_log_sds=init_log_sds)
     update_fn = partial(
@@ -101,11 +104,9 @@ def init(
     Args:
         params: Initial mean of the variational distribution.
         optimizer: TorchOpt functional optimizer for updating the variational
-            parameters.
-            Make sure to use lower case like torchopt.adam().
+            parameters. Make sure to use lower case like torchopt.adam()
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to zero.
+            of the variational distribution. Can be a tree matching params or scalar.
 
     Returns:
         Initial DiagVIState.
@@ -136,17 +137,13 @@ def update(
         state: Current state.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
+            returns the log posterior (which can be unnormalised).
         optimizer: TorchOpt functional optimizer for updating the variational
-            parameters.
+            parameters. Make sure to use lower case like torchopt.adam()
         temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
-            Defaults to 1.
-        stl: Whether to use the `stick-the-landing` estimator
-            https://arxiv.org/abs/1703.09194.
-            Defaults to True.
+        stl: Whether to use the stick-the-landing estimator
+            from (Roeder et al](https://arxiv.org/abs/1703.09194).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -207,15 +204,11 @@ def nelbo(
             variational distribution.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
+            returns the log posterior (which can be unnormalised).
         temperature: Temperature to rescale (divide) log_posterior.
-            Defaults to 1.
         n_samples: Number of samples to use for Monte Carlo estimate.
-            Defaults to 1.
-        stl: Whether to use the `stick-the-landing` estimator
-            https://arxiv.org/abs/1703.09194.
-            Defaults to True.
+        stl: Whether to use the stick-the-landing estimator
+            from (Roeder et al](https://arxiv.org/abs/1703.09194).
 
     Returns:
         The sampled approximate NELBO averaged over the batch.
@@ -238,7 +231,7 @@ def sample(state: VIDiagState, sample_shape: torch.Size = torch.Size([])) -> Ten
         sample_shape: Shape of the desired samples.
 
     Returns:
-        Sample from Normal distribution.
+        Sample(s) from Normal distribution.
     """
     sd_diag = tree_map(torch.exp, state.log_sd_diag)
     return diag_normal_sample(state.params, sd_diag, sample_shape=sample_shape)

@@ -12,9 +12,9 @@ def build(
     loss_fn: LogProbFn,
     optimizer: torchopt.base.GradientTransformation,
 ) -> Transform:
-    """Build a TorchOpt optimizer transformation.
+    """Build a [TorchOpt](https://github.com/metaopt/torchopt) optimizer transformation.
 
-    Example usage:
+    Make sure to use the lower case functional optimizers e.g. `torchopt.adam()`.
 
     ```
     transform = build(loss_fn, torchopt.adam(lr=0.1))
@@ -27,10 +27,10 @@ def build(
     Args:
         loss_fn: Loss function.
         optimizer: TorchOpt functional optimizer.
-            Make sure to use lower case like torchopt.adam()
+            Make sure to use lower case e.g. torchopt.adam()
 
     Returns:
-        Torchopt optimizer transform (posteriors.types.Transform instance).
+        Torchopt optimizer transform instance.
     """
     init_fn = partial(init, optimizer=optimizer)
     update_fn = partial(update, optimizer=optimizer, loss_fn=loss_fn)
@@ -39,7 +39,10 @@ def build(
 
 @dataclass
 class TorchOptState(TransformState):
-    """State of a TorchOpt optimizer.
+    """State of a [TorchOpt](https://github.com/metaopt/torchopt) optimizer.
+
+    Contains the parameters, the optimizer state for the TorchOpt optimizer,
+    loss value, and auxiliary information.
 
     Args:
         params: Parameters to be optimized.
@@ -58,12 +61,14 @@ def init(
     params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
 ) -> TorchOptState:
-    """Initialise a TorchOpt optimizer.
+    """Initialise a [TorchOpt](https://github.com/metaopt/torchopt) optimizer.
+
+    Make sure to use the lower case functional optimizers e.g. `torchopt.adam()`.
 
     Args:
         params: Parameters to be optimized.
         optimizer: TorchOpt functional optimizer.
-            Make sure to use lower case like torchopt.adam()
+            Make sure to use lower case e.g. torchopt.adam()
 
     Returns:
         Initial TorchOptState.
@@ -79,7 +84,9 @@ def update(
     optimizer: torchopt.base.GradientTransformation,
     inplace: bool = True,
 ) -> TorchOptState:
-    """Update the optimizer state.
+    """Update the [TorchOpt](https://github.com/metaopt/torchopt) optimizer state.
+
+    Make sure to use the lower case functional optimizers e.g. `torchopt.adam()`.
 
     Args:
         state: Current state.
@@ -90,7 +97,7 @@ def update(
         inplace: Whether to update the state in place.
 
     Returns:
-        Updated state.
+        Updated TorchOptState.
     """
     params = state.params
     opt_state = state.opt_state

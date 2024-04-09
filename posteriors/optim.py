@@ -12,9 +12,7 @@ def build(
     optimizer: Type[torch.optim.Optimizer],
     **kwargs: Any,
 ) -> Transform:
-    """Builds an optimizer transform from torch.optim.
-
-    Example usage:
+    """Builds an optimizer transform from [torch.optim](https://pytorch.org/docs/stable/optim.html)
 
     ```
     transform = build(loss_fn, torch.optim.Adam, lr=0.1)
@@ -31,7 +29,7 @@ def build(
         **kwargs: Keyword arguments to pass to the optimizer class.
 
     Returns:
-        Optimizer transform (posteriors.types.Transform instance).
+        `torch.optim` transform instance.
     """
     init_fn = partial(init, optimizer_cls=optimizer, **kwargs)
     update_fn = partial(update, loss_fn=loss_fn)
@@ -40,7 +38,7 @@ def build(
 
 @dataclass
 class OptimState(TransformState):
-    """State of an optimizer.
+    """State of an optimizer from [torch.optim](https://pytorch.org/docs/stable/optim.html).
 
     Args:
         params: Parameters to be optimized.
@@ -61,7 +59,8 @@ def init(
     *args: Any,
     **kwargs: Any,
 ) -> OptimState:
-    """Initialise an optimizer.
+    """Initialise a [torch.optim](https://pytorch.org/docs/stable/optim.html) optimizer
+    state.
 
     Args:
         params: Parameters to be optimized.
@@ -84,7 +83,8 @@ def update(
     loss_fn: LogProbFn,
     inplace: bool = True,
 ) -> OptimState:
-    """Perform a single update step of the optimizer.
+    """Perform a single update step of a [torch.optim](https://pytorch.org/docs/stable/optim.html)
+    optimizer.
 
     Args:
         state: Current optimizer state.

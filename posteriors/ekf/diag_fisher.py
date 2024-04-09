@@ -22,28 +22,40 @@ def build(
     per_sample: bool = False,
     init_sds: TensorTree | float = 1.0,
 ) -> Transform:
-    """Builds a transform for variational inference with a diagonal Normal
-    distribution over parameters.
+    """Builds a transform to implement an extended Kalman Filter update.
+
+    EKF applies an online update to a (diagonal) Gaussian posterior over the parameters.
+
+    The approximate Bayesian update is based on the linearization
+    $$
+    \\log p(θ | y) ≈ \\log p(θ) +  ε g(μ)ᵀ(θ - μ) +  \\frac12 ε (θ - μ)^T F_d(μ) (θ - μ)
+    $$
+    where $μ$ is the mean of the prior distribution, $ε$ is the learning rate
+    (or equivalently the likelihood inverse temperature),
+    $g(μ)$ is the gradient of the log likelihood at μ and $F_d(μ)$ is the diagonal
+    empirical Fisher information matrix at $μ$ for data $y$. Completing the square
+    regains a diagonal Normal distribution over the parameters.
+
+    For more information on extended Kalman filtering as well as an equivalence
+    to (online) natural gradient descent see [Ollivier, 2019](https://arxiv.org/abs/1703.00209).
 
     Args:
         log_likelihood: Function that takes parameters and input batch and
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
-            see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
-            inflate the diagonal covariance before the update. Defaults to zero.
+            inflate the diagonal covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
             log likelihoods for each sample in the batch. If False, then log_likelihood
             is assumed to return a scalar log likelihood for the whole batch, in this
             case torch.func.vmap will be called, this is typically slower than
             directly writing log_likelihood to be per sample.
         init_sds: Initial square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to ones.
+            of the Normal distribution. Can be tree like params or scalar.
 
     Returns:
-        Diagonal EKF transform (posteriors.types.Transform instance).
+        Diagonal EKF transform instance.
     """
     init_fn = partial(init, init_sds=init_sds)
     update_fn = partial(
@@ -81,10 +93,9 @@ def init(
     """Initialise diagonal Normal distribution over parameters.
 
     Args:
-        params: Initial mean of the variational distribution.
+        params: Initial mean of the Normal distribution.
         init_sds: Initial square-root diagonal of the covariance matrix
-            of the variational distribution. Can be tree like params or scalar.
-            Defaults to one.
+            of the Normal distribution. Can be tree like params or scalar.
 
     Returns:
         Initial EKFDiagState.
@@ -108,15 +119,15 @@ def update(
     inplace: bool = False,
 ) -> EKFDiagState:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
-    The update is first order, i.e. the likelihood is approximated by a
-
-    log p(y | x, p) ≈ log p(y | x, μ) + lr * g(μ)ᵀ(p - μ)
-        + lr * 1/2 (p - μ)ᵀ F_d(μ) (p - μ) T⁻¹
-
-    where μ is the mean of the variational distribution, lr is the learning rate
-    (likelihood inverse temperature), whilst g(μ) is the gradient and F_d(μ) the
-    negative diagonal empirical Fisher of the log-likelihood with respect to the
-    parameters.
+    The approximate Bayesian update is based on the linearization
+    $$
+    \\log p(θ | y) ≈ \\log p(θ) +  ε g(μ)ᵀ(θ - μ) +  \\frac12 ε (θ - μ)^T F_d(μ) (θ - μ)
+    $$
+    where $μ$ is the mean of the prior distribution, $ε$ is the learning rate
+    (or equivalently the likelihood inverse temperature),
+    $g(μ)$ is the gradient of the log likelihood at μ and $F_d(μ)$ is the diagonal
+    empirical Fisher information matrix at $μ$ for data $y$. Completing the square
+    regains a diagonal Normal distribution over the parameters.
 
     Args:
         state: Current state.
@@ -125,9 +136,8 @@ def update(
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
-            see https://arxiv.org/abs/1703.00209 for details.
         transition_sd: Standard deviation of the transition noise, to additively
-            inflate the diagonal covariance before the update. Defaults to zero.
+            inflate the diagonal covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
             log likelihoods for each sample in the batch. If False, then log_likelihood
             is assumed to return a scalar log likelihood for the whole batch, in this
@@ -182,6 +192,6 @@ def sample(
         sample_shape: Shape of the desired samples.
 
     Returns:
-        Sample from Normal distribution.
+        Sample(s) from Normal distribution.
     """
     return diag_normal_sample(state.params, state.sd_diag, sample_shape=sample_shape)

@@ -45,7 +45,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - toc:
-      permalink: "𝞡"  # Adds a clickable permalink to each section heading
+      permalink: "𝞡"
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.emoji:
@@ -53,11 +53,11 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 extra_javascript:
-  - javascripts/mathjax.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 
+# Navigation structure
 nav:
   - Home: index.md
   - Getting Started: getting_started.md
@@ -78,9 +78,11 @@ nav:
     - VI:
       - Diag: api/vi/diag.md
     - api/optim.md
-    - api/torchopt.md
+    - TorchOpt: api/torchopt.md
     - api/types.md
     - api/utils.md
 
+
+# Customization
 extra_css:
   - stylesheets/extra.css

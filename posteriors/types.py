@@ -5,28 +5,30 @@ from optree import register_pytree_node_class, tree_flatten, tree_unflatten
 from optree import registry
 from torch import Tensor
 
-TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
-
+TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)  # type: ignore
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
-
 
 namespace = registry.__GLOBAL_NAMESPACE
 
 
 @register_pytree_node_class(namespace=namespace)
 class TransformState:
-    """A posteriors state is a `dataclass` containing the required information for the
-    posteriors iterative algorithm defined by the `init` and `update` functions.
-    Inherit the `TransformState` class to define add the new `state` class to the optree
+    """A `posteriors` transform state is a `dataclass` containing the required
+    information for the posteriors iterative algorithm defined by the `init` and
+    `update` functions.
+
+    Inherit the `TransformState` class to add the new `state` class to the optree
     PyNode registry to support functions like `optree.tree_map(lambda x: x**2, state)`.
 
+    ```
     @dataclass
     class AlgorithmState(TransformState):
         params: TensorTree
         algorithm_info: Any
         aux: Any
+    ```
     """
 
     params: TensorTree
@@ -55,12 +57,13 @@ class InitFn(Protocol):
         state = init(params)
         ```
 
-        where params is a PyTree of parameters around which we want to
-        quantify uncertainty. The produced `state` is a `dataclass` containing
-        the required information for the posteriors iterative algorithm
-        defined by the `init` and `update` functions.
+        where params is a PyTree of parameters. The produced `state` is a
+        `TransformState` (and `dataclass`) containing the required information for the
+        posteriors iterative algorithm defined by the `init` and `update` functions.
 
-        See also posteriors.types.UpdateFn and posteriors.types.Transform.
+        Note that this represents the `init` function as stored in a `Transform`
+        returned by an algorithm's `build` function, the internal `init` function in
+        the algorithm module can and likely will have additional arguments.
 
         Args:
             params: PyTree containing initial value of parameters.
@@ -86,7 +89,9 @@ class UpdateFn(Protocol):
         where state is a `dataclass` containing the required information for the
         posteriors iterative algorithm defined by the `init` and `update` functions.
 
-        See also posteriors.types.InitFn and posteriors.types.Transform.
+        Note that this represents the `update` function as stored in a `Transform`
+        returned by an algorithm's `build` function, the internal `update` function in
+        the algorithm module can and likely will have additional arguments.
 
         Args:
             state: The state of the iterative algorithm.
@@ -100,17 +105,24 @@ class UpdateFn(Protocol):
 
 @dataclass(frozen=True)
 class Transform:
-    """A transform contains init and update functions defining an iterative algorithm.
+    """A transform contains `init` and `update` functions defining an iterative
+        algorithm.
 
-    See also posteriors.types.InitFn and posteriors.types.UpdateFn.
+    Within the `Transform` all algorithm specific arguments are predefined, so that the
+    `init` and `update` functions have a unified API:
+    ```
+    state = transform.init(params)
+    state = transform.update(state, batch, inplace=False)
+    ```
+
+    Note that this represents the `Transform` function is returned by an algorithm's
+    `build` function, the internal `init` and `update` functions in the
+    algorithm module can and likely will have additional arguments.
 
     Args:
         init: The init function.
         update: The update function.
 
-    Returns:
-        A transform (frozen, i.e. immutable, `dataclass`
-        containing `init` and `update` functions).
     """
 
     init: InitFn

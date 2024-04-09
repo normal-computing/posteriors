@@ -32,12 +32,14 @@ class CatchAuxError(contextlib.AbstractContextManager):
 def model_to_function(model: torch.nn.Module) -> Callable[[TensorTree, Any], Any]:
     """Converts a model into a function that maps parameters and inputs to outputs.
 
+    Convenience wrapper around [torch.functional_call](https://pytorch.org/docs/stable/generated/torch.func.functional_call.html).
+
     Args:
         model: torch.nn.Module with parameters stored in .named_parameters().
 
     Returns:
         Function that takes a PyTree of parameters as well as any input
-        arg or kwargs and returns the output of the model.
+            arg or kwargs and returns the output of the model.
     """
 
     def func_model(p_dict, *args, **kwargs):
@@ -52,10 +54,14 @@ def linearized_forward_diag(
     """Compute the linearized forward mean and its square root covariance, assuming
     posterior covariance over parameters is diagonal.
 
-    f(x | θ) ~ N(f(x | θₘ), J(x | θₘ) @ Σ @ J(x | θₘ)^T)
+    $$
+    f(x | θ) \\sim N(x | f(x | θₘ), J(x | θₘ) \\Sigma J(x | θₘ)^T)
+    $$
+    where $θₘ$ is the MAP estimate, $\\Sigma$ is the diagonal covariance approximation
+    at the MAP and $J(x | θₘ)$ is the Jacobian of the forward function $f(x | θₘ)$ with
+    respect to $θₘ$.
 
-    where θₘ is the MAP estimate, Σ is the diagonal covariance approximation at the MAP
-    and J(x | θₘ) is the Jacobian of the forward function f(x | θₘ) with respect to θₘ.
+    For more info on linearized models see [Foong et al, 2019](https://arxiv.org/abs/1906.11537).
 
     Args:
         forward_func: A function that takes params and batch and returns the forward
@@ -67,8 +73,8 @@ def linearized_forward_diag(
 
     Returns:
         A tuple of (forward_vals, chol, aux) where forward_vals is the output of the
-        forward function (mean), chol is the tensor square root of the covariance matrix
-        (non-diagonal) and aux is auxiliary info from the forward function.
+            forward function (mean), chol is the tensor square root of the covariance
+            matrix (non-diagonal) and aux is auxiliary info from the forward function.
     """
     forward_vals, aux = forward_func(params, batch)
 
@@ -94,10 +100,12 @@ def hvp(
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Hessian vector product.
 
-    H_f(primals) @ tangents
+    H(primals) @ tangents
 
-    Taken from https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html
-    Follows API from https://pytorch.org/docs/stable/generated/torch.func.jvp.html
+    where H(primals) is the Hessian of f evaluated at primals.
+
+    Taken from [jacobians_hessians.html](https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html).
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
 
     Args:
         f: A function with scalar output.
@@ -107,8 +115,8 @@ def hvp(
 
     Returns:
         Returns a (gradient, hvp_out) tuple containing the gradient of func evaluated at
-        primals and the Hessian-vector product. If has_aux is True, then instead
-        returns a (gradient, hvp_out, aux) tuple.
+            primals and the Hessian-vector product. If has_aux is True, then instead
+            returns a (gradient, hvp_out, aux) tuple.
     """
     return jvp(grad(f, has_aux=has_aux), primals, tangents, has_aux=has_aux)
 
@@ -123,19 +131,30 @@ def fvp(
 
     F(primals) @ tangents
 
-    Adapted from https://gebob19.github.io/natural-gradient/
-    Follows API from https://pytorch.org/docs/stable/generated/torch.func.jvp.html
+    where F(primals) is the empirical Fisher of f evaluated at primals.
+
+    The empirical Fisher is defined as:
+    $$
+    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    $$
+    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
+    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
+
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
+
+    More info on empirical Fisher matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
     Args:
-        f: A function with (batched) scalar output.
+        f: A function with batched scalar output.
         primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
         tangents: Tuple matching structure of primals.
         has_aux: Whether f returns auxiliary information.
 
     Returns:
         Returns a (output, fvp_out) tuple containing the output of func evaluated at
-        primals and the Fisher-vector product. If has_aux is True, then instead
-        returns a (output, fvp_out, aux) tuple.
+            primals and the empirical Fisher-vector product. If has_aux is True, then
+            instead returns a (output, fvp_out, aux) tuple.
     """
     jvp_output = jvp(f, primals, tangents, has_aux=has_aux)
     Jv = jvp_output[1]
@@ -151,10 +170,16 @@ def empirical_fisher(
     """
     Constructs function to compute the empirical Fisher information matrix of a function
     f with respect to its parameters, defined as:
+    $$
+    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    $$
+    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
+    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
 
-    F(θ) = ∑ᵢ ∇_θ f_θ(xᵢ, yᵢ) ∇_θ f_θ(xᵢ, yᵢ)ᵀ
+    Follows API from (torch.func.jacrev)[https://pytorch.org/functorch/stable/generated/functorch.jacrev.html]
 
-    Follows API from https://pytorch.org/functorch/stable/generated/functorch.jacrev.html
+    More info on empirical Fisher matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
     Args:
         f:  A Python function that takes one or more arguments, one of which must be a
@@ -165,7 +190,7 @@ def empirical_fisher(
 
     Returns:
         A function with the same arguments as f that returns the empirical Fisher, F.
-        If has_aux is True, then the function instead returns a tuple of (F, aux).
+            If has_aux is True, then the function instead returns a tuple of (F, aux).
     """
 
     def fisher(*args, **kwargs):
@@ -191,18 +216,18 @@ def diag_normal_log_prob(
 ) -> float:
     """Evaluate multivariate normal log probability for a diagonal covariance matrix.
 
-    If either mean or sd_diag are scalars, it will be broadcasted to the same shape as x
+    If either mean or sd_diag are scalars, they will be broadcast to the same shape as x
     (in a memory efficient manner).
 
     Args:
         x: Value to evaluate log probability at.
-        mean: Mean of the distribution. Defaults to 0.0.
-        sd_diag: Square-root diagonal of the covariance matrix. Defaults to 1.0.
-        normalize: Whether to use normalized log probability.
+        mean: Mean of the distribution.
+        sd_diag: Square-root diagonal of the covariance matrix.
+        normalize: Whether to compute normalized log probability.
             If False the elementwise log prob is -0.5 * ((x - mean) / sd_diag)**2.
 
     Returns:
-        Log probability.
+        Scalar log probability.
     """
     if tree_size(mean) == 1:
         mean = tree_map(lambda t: torch.tensor(mean, device=t.device), x)
@@ -235,7 +260,7 @@ def diag_normal_sample(
 ) -> dict:
     """Sample from multivariate normal with diagonal covariance matrix.
 
-    If sd_diag is scalar, it will be broadcasted to the same shape as mean
+    If sd_diag is scalar, it will be broadcast to the same shape as mean
     (in a memory efficient manner).
 
     Args:
@@ -258,7 +283,8 @@ def diag_normal_sample(
 
 def tree_size(tree: TensorTree) -> int:
     """Returns the total number of elements in a PyTree.
-    Not the number of leaves, but the total sum of the number of elements in each tensor.
+    Not the number of leaves, but the total number of elements for all tensors in the
+    tree.
 
     Args:
         tree: A PyTree of tensors.
@@ -295,8 +321,8 @@ def tree_insert(
 
     Args:
         f: A function that takes a PyTree element and returns True or False.
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A PyTree with sub_tree inserted into full_tree.
@@ -316,8 +342,8 @@ def tree_insert_(
 
     Args:
         f: A function that takes a PyTree element and returns True or False.
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A pointer to full_tree with sub_tree inserted.
@@ -347,8 +373,8 @@ def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorT
     Both PyTrees must have the same structure.
 
     Args:
-        full_pytree: A PyTree to insert sub_pytree into.
-        sub_pytree: A PyTree to insert into full_pytree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A PyTree with sub_tree inserted into full_tree.
@@ -357,12 +383,12 @@ def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorT
 
 
 def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
-    """Inserts sub_pytree into full_tree in-place where full_tree tensors requires_grad.
+    """Inserts sub_tree into full_tree in-place where full_tree tensors requires_grad.
     Both PyTrees must have the same structure.
 
     Args:
-        full_pytree: A PyTree to insert sub_tree into.
-        sub_pytree: A PyTree to insert into full_tree.
+        full_tree: A PyTree to insert sub_tree into.
+        sub_tree: A PyTree to insert into full_tree.
 
     Returns:
         A pointer to full_tree with sub_tree inserted.
@@ -385,7 +411,7 @@ def extract_requires_grad_and_func(
 
     Returns:
         A PyTree of tensors that require gradients and a modified func that takes the
-        subtree structure rather than full tree in its first argument.
+            subtree structure rather than full tree in its first argument.
     """
     subtree = extract_requires_grad(tree)
 
@@ -399,7 +425,7 @@ def extract_requires_grad_and_func(
 
 def inplacify(func: Callable) -> Callable:
     """Converts a function that takes a tensor as its first argument
-    into one that takes the same arguments but modifies the first arguent
+    into one that takes the same arguments but modifies the first argument
     tensor in-place with the output of the function.
 
     Args:
@@ -408,7 +434,7 @@ def inplacify(func: Callable) -> Callable:
 
     Returns:
         A function that takes a tensor as its first argument and modifies it
-        in-place.
+            in-place.
     """
 
     def func_(tens, *args, **kwargs):
@@ -428,9 +454,9 @@ def tree_map_inplacify_(
 ) -> TensorTree:
     """Applies a pure function to each tensor in a PyTree in-place.
 
-    Like optree.tree_map_ but takes a pure function as input
-    (and takes replaces its first argument with its output in-place)
-    rather than a side-effect function.
+    Like [optree.tree_map_](https://optree.readthedocs.io/en/latest/ops.html#optree.tree_map_)
+    but takes a pure function as input (and takes replaces its first argument with its
+    output in-place) rather than a side-effect function.
 
     Args:
         func: A function that takes a tensor as its first argument and a returns
@@ -439,21 +465,23 @@ def tree_map_inplacify_(
             positional argument to function ``func``.
         rests (tuple of pytree): A tuple of pytrees, each of which has the same
             structure as ``tree`` or has ``tree`` as a prefix.
-        is_leaf (callable, optional): An optionally specified function that will be called at each
-            flattening step. It should return a boolean, with :data:`True` stopping the traversal
-            and the whole subtree being treated as a leaf, and :data:`False` indicating the
-            flattening should traverse the current object.
-        none_is_leaf (bool, optional): Whether to treat :data:`None` as a leaf. If :data:`False`,
-            :data:`None` is a non-leaf node with arity 0. Thus :data:`None` is contained in the
-            treespec rather than in the leaves list and :data:`None` will be remain in the result
-            pytree. (default: :data:`False`)
-        namespace (str, optional): The registry namespace used for custom pytree node types.
-            (default: :const:`''`, i.e., the global namespace)
+        is_leaf (callable, optional): An optionally specified function that will be
+            called at each flattening step. It should return a boolean, with
+            `True` stopping the traversal and the whole subtree being treated as a
+            leaf, and `False` indicating the flattening should traverse the
+            current object.
+        none_is_leaf (bool, optional): Whether to treat `None` as a leaf. If
+            `False`, `None` is a non-leaf node with arity 0. Thus `None` is contained in
+            the treespec rather than in the leaves list and `None` will be remain in the
+            result pytree. (default: `False`)
+        namespace (str, optional): The registry namespace used for custom pytree node
+            types. (default: :const:`''`, i.e., the global namespace)
 
     Returns:
-        The original ``tree`` with the value at each leaf is given by the side-effect of function
-        ``func(x, *xs)`` (not the return value) where ``x`` is the value at the corresponding leaf
-        in ``tree`` and ``xs`` is the tuple of values at values at corresponding nodes in ``rests``.
+        The original ``tree`` with the value at each leaf is given by the side-effect of
+            function ``func(x, *xs)`` (not the return value) where ``x`` is the value at
+            the corresponding leaf in ``tree`` and ``xs`` is the tuple of values at
+            values at corresponding nodes in ``rests``.
     """
     return tree_map_(
         inplacify(func),
@@ -487,8 +515,10 @@ def flexi_tree_map(
     out_tree = func(tree, *rests, inplace=True)
     ```
 
-    will return `out_tree` a pointer to the original `tree` with leaves (tensors) modified in place.
-    If `inplace=False`, `flexi_tree_map` is equivalent to `optree.tree_map` and returns a new tree.
+    will return `out_tree` a pointer to the original `tree` with leaves (tensors)
+    modified in place.
+    If `inplace=False`, `flexi_tree_map` is equivalent to [`optree.tree_map`](https://optree.readthedocs.io/en/latest/ops.html#optree.tree_map)
+    and returns a new tree.
 
     Args:
         func: A pure function that takes a tensor as its first argument and a returns
@@ -498,20 +528,20 @@ def flexi_tree_map(
         rests (tuple of pytree): A tuple of pytrees, each of which has the same
             structure as ``tree`` or has ``tree`` as a prefix.
         inplace (bool, optional): Whether to modify the tree in-place or not.
-        is_leaf (callable, optional): An optionally specified function that will be called at each
-            flattening step. It should return a boolean, with :data:`True` stopping the traversal
-            and the whole subtree being treated as a leaf, and :data:`False` indicating the
-            flattening should traverse the current object.
-        none_is_leaf (bool, optional): Whether to treat :data:`None` as a leaf. If :data:`False`,
-            :data:`None` is a non-leaf node with arity 0. Thus :data:`None` is contained in the
-            treespec rather than in the leaves list and :data:`None` will be remain in the result
-            pytree. (default: :data:`False`)
-        namespace (str, optional): The registry namespace used for custom pytree node types.
-            (default: :const:`''`, i.e., the global namespace)
+        is_leaf (callable, optional): An optionally specified function that will be
+            called at each flattening step. It should return a boolean, with `True`
+            stopping the traversal and the whole subtree being treated as a leaf, and
+            `False` indicating the flattening should traverse the current object.
+        none_is_leaf (bool, optional): Whether to treat `None` as a leaf. If `False`,
+            `None` is a non-leaf node with arity 0. Thus `None` is contained in the
+            treespec rather than in the leaves list and `None` will be remain in the
+            result pytree. (default: `False`)
+        namespace (str, optional): The registry namespace used for custom pytree node
+            types. (default: :const:`''`, i.e., the global namespace)
 
     Returns:
-        Either the original tree modified in-place or a new tree depending on the `inplace`
-        argument.
+        Either the original tree modified in-place or a new tree depending on the
+            `inplace` argument.
     """
     tm = tree_map_inplacify_ if inplace else tree_map
     return tm(
@@ -536,11 +566,11 @@ def per_samplify(
     per_sample_output = per_samplify(f)(params, batch)
     ```
 
-    for more info see https://pytorch.org/tutorials/intermediate/per_sample_grads.html
+    For more info see [per_sample_grads.html](https://pytorch.org/tutorials/intermediate/per_sample_grads.html)
 
     Args:
         f: A function that takes params and batch and averages over the batch in its
-        output.
+            output.
 
     Returns:
         A new function that provides an output for each batch sample.

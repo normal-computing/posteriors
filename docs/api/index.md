@@ -1,10 +1,10 @@
 # API
 
 ### Extended Kalman filter (EKF)
-- [`ekf.diag_fisher`](ekf/diag_fisher.md) applies a sequential Bayesian update based 
+- [`ekf.diag_fisher`](ekf/diag_fisher.md) applies an online Bayesian update based 
 on a Taylor approximation of the log-likelihood. Uses the diagonal empirical Fisher
 information matrix as a positive-definite alternative to the Hessian.
-Natural gradient descent equivalence following [Ollivier 2019](https://arxiv.org/abs/1901.00696).
+Natural gradient descent equivalence following [Ollivier, 2019](https://arxiv.org/abs/1703.00209).
 
 ### Laplace approximation
 - [`laplace.dense_fisher`](laplace/dense_fisher.md) calculates the empirical Fisher
@@ -13,13 +13,17 @@ approximation](https://arxiv.org/abs/2106.14806), without modification to parame
 - [`laplace.diag_fisher`](laplace/diag_fisher.md) same as `laplace.dense_fisher` but
 uses the diagonal empirical Fisher information matrix instead.
 
+Comprehensive details on Laplace approximations can be found in [Daxberger et al, 2021](https://arxiv.org/abs/2106.14806).
+
 
 ### Stochastic gradient Markov chain Monte Carlo (SGMCMC)
 - [`sgmcmc.sgld`](sgmcmc/sgld.md) implements stochastic gradient Langevin dynamics
-(SGLD) from [Welling and Teh](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf).
+(SGLD) from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf).
 - [`sgmcmc.sghmc`](sgmcmc/sghmc.md) implements the stochastic gradient Hamiltonian
-Monte Carlo (SGHMC) algorithm from [Chen et al](https://arxiv.org/abs/1402.4102)
+Monte Carlo (SGHMC) algorithm from [Chen et al, 2014](https://arxiv.org/abs/1402.4102)
 (without momenta resampling).
+
+For an overview and unifying framework for SGMCMC methods, see [Ma et al, 2015](https://arxiv.org/abs/1506.04696).
 
 
 ### Variational inference (VI)
@@ -28,10 +32,15 @@ Expects a [`torchopt`](https://github.com/metaopt/torchopt) optimizer for handli
 minimization of the NELBO. Also find `vi.diag.nelbo` for simply calculating the NELBO 
 with respect to a `log_posterior` and diagonal Gaussian distribution.
 
+A review of variational inference can be found in [Blei et al, 2017](https://arxiv.org/abs/1601.00670).
+
+
 ### Optim
 - [`optim`](optim.md) wrapper for `torch.optim` optimizers within the unified `posteriors` 
 API that allows for easy swapping with UQ methods.
 
 ### TorchOpt
-- [`torchopt`](torchopt.md) wrapper for `torchopt` optimizers within the unified
-`posteriors` API that allows for easy swapping with UQ methods.
+- [`torchopt`](torchopt.md) wrapper for [`torchopt`](https://github.com/metaopt/torchopt)
+optimizers within the unified `posteriors` API that allows for easy swapping with UQ
+methods.
+

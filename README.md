@@ -103,8 +103,7 @@ Interfaces seamlessly with:
 
 - [`torch`](https://github.com/pytorch/pytorch) and in particular [`torch.func`](https://pytorch.org/docs/stable/func.html).
 - [`torch.distributions`](https://pytorch.org/docs/stable/distributions.html) for distributions and sampling, (note that it's typically required to set `validate_args=False` to conform with the control flows in [`torch.func`](https://pytorch.org/docs/stable/func.html)).
-- Functional and flexible torch optimizers from [`torchopt`](https://github.com/metaopt/torchopt), 
-    (which is the default for [`posteriors.vi`](posteriors/vi/) but `torch.optim` also interfaces easily).
+- Functional and flexible torch optimizers from [`torchopt`](https://github.com/metaopt/torchopt).
 - [`transformers`](https://github.com/huggingface/transformers) for pre-trained models.
 - [`lightning`](https://github.com/Lightning-AI/lightning) for convenient training and logging, see [examples/lightning_autoencoder.py](examples/lightning_autoencoder.py).
 

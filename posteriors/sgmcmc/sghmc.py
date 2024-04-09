@@ -19,6 +19,22 @@ def build(
 ) -> Transform:
     """Builds SGHMC transform.
 
+    Algorithm from [Chen et al, 2014](https://arxiv.org/abs/1402.4102):
+
+    \\begin{align}
+    θ_{t+1} &= θ_t + ε m_t \\\\
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε α m_t
+    + N(0, ε T (2 α - ε β) T \\mathbb{I})\\
+    \\end{align}
+    
+    for learning rate $\\epsilon$ and temperature $T$
+
+    Targets $p_T(θ, m) \\propto \\exp( (\\log p(θ) - \\frac12 m^Tm) / T)$
+    with temperature $T$.
+
+    The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
+    to ensure robust scaling for a large amount of data.
+
     Args:
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
@@ -31,7 +47,7 @@ def build(
             Defaults to random iid samples from N(0, 1).
 
     Returns:
-        SGHMC transform (posteriors.types.Transform instance).
+        SGHMC transform instance.
     """
     init_fn = partial(init, momenta=momenta)
     update_fn = partial(
@@ -98,6 +114,16 @@ def update(
     inplace: bool = False,
 ) -> SGHMCState:
     """Updates parameters and momenta for SGHMC.
+    
+    Update rule from [Chen et al, 2014](https://arxiv.org/abs/1402.4102):
+
+    \\begin{align}
+    θ_{t+1} &= θ_t + ε m_t \\\\
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε α m_t
+    + N(0, ε T (2 α - ε β) T \\mathbb{I})\\
+    \\end{align}
+    
+    for learning rate $\\epsilon$ and temperature $T$
 
     Args:
         state: SGHMCState containing params and momenta.
@@ -109,7 +135,6 @@ def update(
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the joint parameter + momenta distribution.
-        params: Values of parameters, not used for SGHMC update.
         inplace: Whether to modify state in place.
 
     Returns:

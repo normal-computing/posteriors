@@ -141,13 +141,17 @@ def fvp(
     where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
     model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
 
-    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
+    If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
+    (i.e. batchsize).
+
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
     Args:
-        f: A function with batched scalar output.
+        f: A function with tensor output.
+            Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
         tangents: Tuple matching structure of primals.
         has_aux: Whether f returns auxiliary information.
@@ -178,14 +182,17 @@ def empirical_fisher(
 ) -> Callable:
     """
     Constructs function to compute the empirical Fisher information matrix of a function
-    f with respect to its parameters, defined as:
+    f with respect to its parameters, defined as (unnormalized):
     $$
     F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
     $$
     where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
     model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
 
-    Follows API from (torch.func.jacrev)[https://pytorch.org/functorch/stable/generated/functorch.jacrev.html]
+    If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
+    (i.e. batchsize).
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
@@ -193,6 +200,7 @@ def empirical_fisher(
     Args:
         f:  A Python function that takes one or more arguments, one of which must be a
             Tensor, and returns one or more Tensors.
+            Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         argnums: Optional, integer or sequence of integers. Specifies which
             positional argument(s) to differentiate with respect to. Defaults to 0.
         has_aux: Whether f returns auxiliary information.

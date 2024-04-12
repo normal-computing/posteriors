@@ -165,7 +165,8 @@ def test_fvp():
     x = torch.arange(1.0, 6.0)
     v = torch.ones_like(x)
 
-    output, fvp_result = fvp(func, (x,), (v,))
+    # Test not normalized
+    output, fvp_result = fvp(func, (x,), (v,), normalize=False)
 
     jac = torch.func.jacrev(func)(x)
     fisher = jac.T @ jac
@@ -173,13 +174,29 @@ def test_fvp():
     assert torch.allclose(fvp_result, expected)
     assert torch.allclose(output, func(x))
 
+    # Test normalize
+    output_norm, fvp_result_norm = fvp(func, (x,), (v,))
+    assert torch.allclose(fvp_result_norm, expected / 2)
+    assert torch.allclose(output_norm, func(x))
+
+    # Test aux, not normalized
     def func_aux(x):
         return torch.stack([(x**5).sum(), (x**3).sum()]), x
 
-    output_aux, fvp_aux_result, aux = fvp(func_aux, (x,), (v,), has_aux=True)
+    output_aux, fvp_aux_result, aux = fvp(
+        func_aux, (x,), (v,), has_aux=True, normalize=False
+    )
     assert torch.allclose(fvp_aux_result, expected)
     assert torch.allclose(output_aux, func(x))
     assert torch.allclose(aux, x)
+
+    # Test aux, normalized
+    output_aux_norm, fvp_aux_result_norm, aux_norm = fvp(
+        func_aux, (x,), (v,), has_aux=True, normalize=True
+    )
+    assert torch.allclose(fvp_aux_result_norm, expected / 2)
+    assert torch.allclose(output_aux_norm, func(x))
+    assert torch.allclose(aux_norm, x)
 
 
 def test_empirical_fisher():
@@ -201,8 +218,9 @@ def test_empirical_fisher():
         "bias": torch.randn(1, requires_grad=True),
     }
 
+    # Test not normalized
     batch = (x, y)
-    fisher = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
+    fisher = empirical_fisher(lambda p: f_per_sample(p, batch), normalize=False)(params)
     expected_fisher = torch.zeros((num_features + 1, num_features + 1))
     for xs, ys in zip(x, y):
         g = torch.func.grad(f)(params, (xs, ys))
@@ -211,20 +229,32 @@ def test_empirical_fisher():
 
     assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
 
-    # Test aux
+    # Test normalized
+    fisher_norm = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
+    assert torch.allclose(fisher_norm, expected_fisher / num_samples, rtol=1e-5)
+
+    # Test aux, not normalized
     def f_aux(params, batch):
         return f(params, batch), params
 
     f_aux_per_sample = torch.vmap(f_aux, in_dims=(None, 0))
 
     fisher_aux, _ = empirical_fisher(
-        lambda p: f_aux_per_sample(p, batch), has_aux=True
+        lambda p: f_aux_per_sample(p, batch), has_aux=True, normalize=False
     )(params)
     assert torch.allclose(fisher_aux, expected_fisher, rtol=1e-5)
 
+    # Test aux, normalized
+    fisher_aux_norm, _ = empirical_fisher(
+        lambda p: f_aux_per_sample(p, batch), has_aux=True, normalize=True
+    )(params)
+    assert torch.allclose(fisher_aux_norm, expected_fisher / num_samples, rtol=1e-5)
+
     # Test matches fvp
     v = tree_map(lambda x: torch.randn_like(x), params)
-    fvp_result = fvp(lambda p: f_per_sample(p, batch), (params,), (v,))[1]
+    fvp_result = fvp(
+        lambda p: f_per_sample(p, batch), (params,), (v,), normalize=False
+    )[1]
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)

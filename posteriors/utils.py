@@ -126,6 +126,7 @@ def fvp(
     primals: tuple,
     tangents: tuple,
     has_aux: bool = False,
+    normalize: bool = True,
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Empirical Fisher vector product.
 
@@ -140,16 +141,21 @@ def fvp(
     where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
     model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
 
-    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
+    If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
+    (i.e. batchsize).
+
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
     Args:
-        f: A function with batched scalar output.
+        f: A function with tensor output.
+            Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
         tangents: Tuple matching structure of primals.
         has_aux: Whether f returns auxiliary information.
+        normalize: Whether to normalize, divide by the dimension of the output from f.
 
     Returns:
         Returns a (output, fvp_out) tuple containing the output of func evaluated at
@@ -159,34 +165,46 @@ def fvp(
     jvp_output = jvp(f, primals, tangents, has_aux=has_aux)
     Jv = jvp_output[1]
     f_vjp = vjp(f, *primals, has_aux=has_aux)[1]
-    return jvp_output[0], f_vjp(Jv)[0], *jvp_output[2:]
+    Fv = f_vjp(Jv)[0]
+
+    if normalize:
+        output_dim = tree_flatten(jvp_output[0])[0][0].shape[0]
+        Fv = tree_map(lambda x: x / output_dim, Fv)
+
+    return jvp_output[0], Fv, *jvp_output[2:]
 
 
 def empirical_fisher(
     f: Callable,
     argnums: int | Sequence[int] = 0,
     has_aux: bool = False,
+    normalize: bool = True,
 ) -> Callable:
     """
     Constructs function to compute the empirical Fisher information matrix of a function
-    f with respect to its parameters, defined as:
+    f with respect to its parameters, defined as (unnormalized):
     $$
     F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
     $$
     where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
     model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
 
-    Follows API from (torch.func.jacrev)[https://pytorch.org/functorch/stable/generated/functorch.jacrev.html]
+    If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
+    (i.e. batchsize).
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
     Args:
         f:  A Python function that takes one or more arguments, one of which must be a
-            Tensor, and returns one or more Tensors
+            Tensor, and returns one or more Tensors.
+            Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         argnums: Optional, integer or sequence of integers. Specifies which
             positional argument(s) to differentiate with respect to. Defaults to 0.
         has_aux: Whether f returns auxiliary information.
+        normalize: Whether to normalize, divide by the dimension of the output from f.
 
     Returns:
         A function with the same arguments as f that returns the empirical Fisher, F.
@@ -197,13 +215,15 @@ def empirical_fisher(
         jac_output = jacrev(f, argnums=argnums, has_aux=has_aux)(*args, **kwargs)
         jac = jac_output[0] if has_aux else jac_output
 
-        # Convert Jacobian to be flat in parameter dimension
+        # Convert Jacobian to tensor, flat in parameter dimension
         jac = torch.vmap(lambda x: tree_ravel(x)[0])(jac)
 
+        rescale = 1 / jac.shape[0] if normalize else 1
+
         if has_aux:
-            return jac.T @ jac, jac_output[1]
+            return jac.T @ jac * rescale, jac_output[1]
         else:
-            return jac.T @ jac
+            return jac.T @ jac * rescale
 
     return fisher
 

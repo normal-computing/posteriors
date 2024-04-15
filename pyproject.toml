@@ -1,0 +1,28 @@
+[project]
+name = "posteriors"
+version = "0.0.1"
+description = "Uncertainty quantification with PyTorch"
+readme = "README.md"
+requires-python =">=3.9"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Sam Duffield", email = "sam@normalcomputing.ai"},
+]
+keywords = ["pytorch", "uncertainty"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = ["torch>=2.0.0", "torchopt>=0.7.3", "optree>=0.10.0"]
+
+[project.optional-dependencies]
+test = ["pre-commit", "pytest-cov", "ruff"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
+
+[tool.setuptools]
+packages = ["posteriors"]
+
+[tool.ruff]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F821", "E402"]

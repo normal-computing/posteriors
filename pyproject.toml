@@ -28,5 +28,5 @@ packages = ["posteriors"]
 "__init__.py" = ["F401", "F821", "E402"]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"

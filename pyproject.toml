@@ -25,7 +25,7 @@ packages = [
     "posteriors",
     "posteriors.ekf",
     "posteriors.laplace",
-    "posteriors.sgmcmcm",
+    "posteriors.sgmcmc",
     "posteriors.vi",
 ]
 

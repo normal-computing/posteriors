@@ -21,12 +21,18 @@ test = ["pre-commit", "pytest-cov", "ruff"]
 docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [tool.setuptools]
-packages = ["posteriors"]
+packages = [
+    "posteriors",
+    "posteriors.ekf",
+    "posteriors.laplace",
+    "posteriors.sgmcmcm",
+    "posteriors.vi",
+]
 
 [tool.ruff]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F821", "E402"]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"

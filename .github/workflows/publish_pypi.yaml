@@ -23,5 +23,19 @@ jobs:
           pip install build
       - name: Build package
         run: python -m build
+      - name: Check sdist install and imports
+        run: |
+          mkdir -p test-sdist
+          cd test-sdist
+          python -m venv venv-sdist
+          venv-sdist/bin/python -m pip install ../dist/posteriors-*.tar.gz
+          venv-sdist/bin/python -c "import posteriors"
+      - name: Check wheel install and imports
+        run: |
+          mkdir -p test-wheel
+          cd test-wheel
+          python -m venv venv-wheel
+          venv-wheel/bin/python -m pip install ../dist/posteriors-*.whl
+          venv-wheel/bin/python -c "import posteriors"
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

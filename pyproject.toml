@@ -1,6 +1,6 @@
 [project]
 name = "posteriors"
-version = "0.0.1"
+version = "0.0.2"
 description = "Uncertainty quantification with PyTorch"
 readme = "README.md"
 requires-python =">=3.9"
@@ -26,3 +26,7 @@ packages = ["posteriors"]
 [tool.ruff]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F821", "E402"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

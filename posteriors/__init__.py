@@ -36,3 +36,7 @@ from posteriors import torchopt
 
 del logging
 del logger
+
+from importlib.metadata import version
+
+__version__ = version("posteriors")

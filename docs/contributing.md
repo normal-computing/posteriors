@@ -18,13 +18,21 @@ pre-commit install
 3. **Add your code. Add your tests. Update the docs if needed. Party on!**  
     New methods should list `build`, `state`, `init` and `update`
     at the top of the module in order.
-4. Make sure to run the tests and linter:
+4. Check any changes in the docs look 🔥:
+```
+mkdocs serve
+```
+and navigate to [`http://localhost:8000/`](`http://localhost:8000/`) in your browser.[^1]
+5. Make sure to run the tests and linter:
 ```
 python -m pytest
 pre-commit run --all-files
 ```
-5. Commit your changes and push your new branch to your fork.
-6. Open a [pull request on GitHub](https://github.com/normal-computing/posteriors/pulls).
+6. Commit your changes and push your new branch to your fork.
+7. Open a [pull request on GitHub](https://github.com/normal-computing/posteriors/pulls).
+
+[^1]: For more docs info check out [mkdocs-material](https://squidfunk.github.io/mkdocs-material/).
+
 
 !!! note
     Feel free to open a draft PR to discuss changes or get feedback.

@@ -25,7 +25,7 @@ def build(
     Targets $p_T(θ) \\propto \\exp( \\log p(θ) / T)$ with temperature $T$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
-    to ensure robust scaling for a large amount of data.
+    to ensure robust scaling for a large amount of data and variable batchsize.
 
     Args:
         log_posterior: Function that takes parameters and input batch and

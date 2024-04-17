@@ -33,7 +33,7 @@ def build(
     with temperature $T$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
-    to ensure robust scaling for a large amount of data and variable batchsize.
+    to ensure robust scaling for a large amount of data and variable batch size.
     
     Args:
         log_posterior: Function that takes parameters and input batch and

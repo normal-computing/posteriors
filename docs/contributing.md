@@ -18,7 +18,7 @@ pre-commit install
 3. **Add your code. Add your tests. Update the docs if needed. Party on!**  
     New methods should list `build`, `state`, `init` and `update`
     at the top of the module in order.
-4. Check any changes in the docs look 🔥:
+4. Check any changes in the docs render nicely:
 ```
 mkdocs serve
 ```

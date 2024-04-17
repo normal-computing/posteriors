@@ -188,7 +188,7 @@ def nelbo(
     """Returns the negative evidence lower bound (NELBO) for a diagonal Normal
     variational distribution over the parameters of a model.
 
-    Averages NELBO over the batch. Monte Carlo estimate with `n_samples` from q.
+    Monte Carlo estimate with `n_samples` from q.
     $$
     \\text{NELBO} = - 𝔼_{q(θ)}[\\log p(y|x, θ) + \\log p(θ) - \\log q(θ) * T])
     $$
@@ -202,7 +202,7 @@ def nelbo(
     ```
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
-    to ensure robust scaling for a large amount of data and variable batchsize.
+    to ensure robust scaling for a large amount of data and variable batch size.
 
     Args:
         mean: Mean of the variational distribution.

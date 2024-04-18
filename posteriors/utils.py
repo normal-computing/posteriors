@@ -272,6 +272,7 @@ def _identity(x):
 def cg(
     A: Callable,
     b: TensorTree,
+    *,
     x0: TensorTree = None,
     maxiter: int = None,
     damping: float = 0.0,
@@ -284,7 +285,7 @@ def cg(
 
     Adapted from [`jax.scipy.sparse.linalg.cg`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html).
 
-    Args: 
+    Args:
         A:  Callable that calculates the linear map (matrix-vector
             product) ``Ax`` when called like ``A(x)``. ``A`` must represent
             a hermitian, positive definite matrix, and must return array(s) with the
@@ -303,7 +304,7 @@ def cg(
 
     Returns:
         x : The converged solution. Has the same structure as ``b``.
-        info : Placeholder for convergence information. 
+        info : Placeholder for convergence information.
     """
     if x0 is None:
         x0 = tree_map(torch.zeros_like, b)

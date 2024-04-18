@@ -1,11 +1,13 @@
 from typing import Callable, Any, Tuple, Sequence
+import operator
 from functools import partial
 import contextlib
 import torch
 from torch.func import grad, jvp, vjp, functional_call, jacrev
 from torch.distributions import Normal
-from optree import tree_map, tree_map_, tree_reduce, tree_flatten
+from optree import tree_map, tree_map_, tree_reduce, tree_flatten, tree_leaves
 from optree.integration.torch import tree_ravel
+
 
 from posteriors.types import TensorTree, ForwardFn, Tensor
 
@@ -226,6 +228,136 @@ def empirical_fisher(
             return jac.T @ jac * rescale
 
     return fisher
+
+
+def _vdot_real_part(x: Tensor, y: Tensor) -> float:
+    """Vector dot-product guaranteed to have a real valued result despite
+    possibly complex input. Thus neglects the real-imaginary cross-terms.
+
+    Args:
+        x: First tensor in the dot product.
+        y: Second tensor in the dot product.
+
+    Returns:
+        The result vector dot-product, a real float
+    """
+    # all our uses of vdot() in CG are for computing an operator of the form
+    #  z^H M z
+    #  where M is positive definite and Hermitian, so the result is
+    # real valued:
+    # https://en.wikipedia.org/wiki/Definiteness_of_a_matrix#Definitions_for_complex_matrices
+    real_part = torch.vdot(x.real.flatten(), y.real.flatten())
+    if torch.is_complex(x) or torch.is_complex(y):
+        imag_part = torch.vdot(x.imag.flatten(), y.imag.flatten())
+        return real_part + imag_part
+    return real_part
+
+
+def _vdot_real_tree(x, y) -> TensorTree:
+    return sum(tree_leaves(tree_map(_vdot_real_part, x, y)))
+
+
+def _mul(scalar, tree) -> TensorTree:
+    return tree_map(partial(operator.mul, scalar), tree)
+
+
+_add = partial(tree_map, operator.add)
+_sub = partial(tree_map, operator.sub)
+
+
+def _identity(x):
+    return x
+
+
+def cg(
+    A: Callable,
+    b: TensorTree,
+    x0: TensorTree = None,
+    *,
+    maxiter: int = None,
+    damping: float = 0.0,
+    tol: float = 1e-5,
+    atol: float = 0.0,
+    M: Callable = _identity,
+) -> Tuple[TensorTree, Any]:
+    """Use Conjugate Gradient iteration to solve ``Ax = b``.
+    ``A`` is supplied as a function instead of a matrix.
+
+    Adapted from [`jax.scipy.sparse.linalg.cg`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html).
+
+    Args:
+        A:  Callable that calculates the linear map (matrix-vector
+            product) ``Ax`` when called like ``A(x)``. ``A`` must represent
+            a hermitian, positive definite matrix, and must return array(s) with the
+            same structure and shape as its argument.
+        b:  Right hand side of the linear system representing a single vector.
+        x0: Starting guess for the solution. Must have the same structure as ``b``.
+        maxiter: Maximum number of iterations.  Iteration will stop after maxiter
+            steps even if the specified tolerance has not been achieved.
+        damping: damping term for the mvp function. Acts as regularization.
+        tol: Tolerance for convergence.
+        atol: Tolerance for convergence. ``norm(residual) <= max(tol*norm(b), atol)``.
+            The behaviour will differ from SciPy unless you explicitly pass
+            ``atol`` to SciPy's ``cg``.
+        M: Preconditioner for A.
+            See [the preconditioned CG method.](https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_preconditioned_conjugate_gradient_method)
+
+    Returns:
+        x : The converged solution. Has the same structure as ``b``.
+        info : Placeholder for convergence information.
+    """
+    if x0 is None:
+        x0 = tree_map(torch.zeros_like, b)
+
+    if maxiter is None:
+        maxiter = 10 * tree_size(b)  # copied from scipy
+
+    tol *= torch.tensor([1.0])
+    atol *= torch.tensor([1.0])
+
+    # tolerance handling uses the "non-legacy" behavior of scipy.sparse.linalg.cg
+    bs = _vdot_real_tree(b, b)
+    atol2 = torch.maximum(torch.square(tol) * bs, torch.square(atol))
+
+    def A_damped(p):
+        return _add(A(p), _mul(damping, p))
+
+    def cond_fun(value):
+        _, r, gamma, _, k = value
+        rs = gamma.real if M is _identity else _vdot_real_tree(r, r)
+        return (rs > atol2) & (k < maxiter)
+
+    def body_fun(value):
+        x, r, gamma, p, k = value
+        Ap = A_damped(p)
+        alpha = gamma / _vdot_real_tree(p, Ap)
+        x_ = _add(x, _mul(alpha, p))
+        r_ = _sub(r, _mul(alpha, Ap))
+        z_ = M(r_)
+        gamma_ = _vdot_real_tree(r_, z_)
+        beta_ = gamma_ / gamma
+        p_ = _add(z_, _mul(beta_, p))
+        return x_, r_, gamma_, p_, k + 1
+
+    r0 = _sub(b, A_damped(x0))
+    p0 = z0 = r0
+    gamma0 = _vdot_real_tree(r0, z0)
+    initial_value = (x0, r0, gamma0, p0, 0)
+
+    value = initial_value
+
+    while cond_fun(value):
+        value = body_fun(value)
+
+    x_final, r, gamma, _, k = value
+    # compute the final error and whether it has converged.
+    rs = gamma if M is _identity else _vdot_real_tree(r, r)
+    converged = rs <= atol2
+
+    # additional info output structure
+    info = {"error": rs, "converged": converged, "niter": k}
+
+    return x_final, info
 
 
 def diag_normal_log_prob(

@@ -10,6 +10,7 @@ from posteriors import (
     hvp,
     fvp,
     empirical_fisher,
+    cg,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -258,6 +259,60 @@ def test_empirical_fisher():
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
+
+
+def test_cg():
+    # simple function with tensor parameters
+    def func(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()])
+
+    def partial_fvp(v):
+        return fvp(func, (x,), (v,), normalize=False)[1]
+
+    x = torch.arange(1.0, 6.0)
+    v = torch.ones_like(x)
+
+    jac = torch.func.jacrev(func)(x)
+    fisher = jac.T @ jac
+    damping = 100
+
+    sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
+    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, maxiter=10000, tol=1e-10)
+    assert torch.allclose(sol, sol_cg, rtol=1e-3)
+
+    # simple complex number example
+    A = torch.tensor([[0, -1j], [1j, 0]])
+
+    def mvp(x):
+        return A @ x
+
+    b = torch.randn(2, dtype=torch.cfloat)
+
+    sol = torch.linalg.solve(A, b)
+    sol_cg, _ = cg(mvp, b, x0=None, tol=1e-10)
+
+    assert torch.allclose(sol, sol_cg, rtol=1e-1)
+
+    # function with parameters as a TensorTree
+    model = TestModel()
+
+    func_model = model_to_function(model)
+    f_per_sample = torch.vmap(func_model, in_dims=(None, 0))
+
+    xs = torch.randn(100, 10)
+
+    def partial_fvp(v):
+        return fvp(lambda p: func_model(p, xs), (params,), (v,), normalize=False)[1]
+
+    params = dict(model.named_parameters())
+    fisher = empirical_fisher(lambda p: f_per_sample(p, xs), normalize=False)(params)
+    damping = 0
+
+    v, _ = tree_ravel(params)
+    sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
+    sol_cg, _ = cg(partial_fvp, params, x0=None, damping=damping, tol=1e-10)
+
+    assert torch.allclose(sol, tree_ravel(sol_cg)[0], rtol=1e-3)
 
 
 def test_diag_normal_log_prob():

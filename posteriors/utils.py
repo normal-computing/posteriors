@@ -273,7 +273,6 @@ def cg(
     A: Callable,
     b: TensorTree,
     x0: TensorTree = None,
-    *,
     maxiter: int = None,
     damping: float = 0.0,
     tol: float = 1e-5,
@@ -283,33 +282,28 @@ def cg(
     """Use Conjugate Gradient iteration to solve ``Ax = b``.
     ``A`` is supplied as a function instead of a matrix.
 
-    Derivatives of ``cg`` are implemented via implicit differentiation with
-    another ``cg`` solve, rather than by differentiating *through* the solver.
-    They will be accurate only if both solves converge.
-    Adapted from https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html
+    Adapted from [`jax.scipy.sparse.linalg.cg`](https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html).
 
-    Args:
-
+    Args: 
         A:  Callable that calculates the linear map (matrix-vector
             product) ``Ax`` when called like ``A(x)``. ``A`` must represent
             a hermitian, positive definite matrix, and must return array(s) with the
             same structure and shape as its argument.
-        b : Right hand side of the linear system representing a single vector.
-        x0 : Starting guess for the solution. Must have the same structure as ``b``.
-        tol, atol : Tolerances for convergence, ``norm(residual) <= max(tol*norm(b), atol)``.
-            The behaviour will differ from SciPy unless you explicitly pass
-            ``atol`` to SciPy's ``cg``.
+        b:  Right hand side of the linear system representing a single vector.
+        x0: Starting guess for the solution. Must have the same structure as ``b``.
         maxiter : Maximum number of iterations.  Iteration will stop after maxiter
             steps even if the specified tolerance has not been achieved.
+        damping : damping term for the mvp function. Acts as regularization.
+        tol: Tolerance for convergence.
+        atol: Tolerance for convergence. ``norm(residual) <= max(tol*norm(b), atol)``.
+            The behaviour will differ from SciPy unless you explicitly pass
+            ``atol`` to SciPy's ``cg``.
         M : Preconditioner for A.
             See https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_preconditioned_conjugate_gradient_method
 
-    Returns
-        x : array or tree of arrays
-            The converged solution. Has the same structure as ``b``.
-        info : Placeholder for convergence information. In the future, JAX will report
-            the number of iterations when convergence is not achieved, like SciPy.
-
+    Returns:
+        x : The converged solution. Has the same structure as ``b``.
+        info : Placeholder for convergence information. 
     """
     if x0 is None:
         x0 = tree_map(torch.zeros_like, b)

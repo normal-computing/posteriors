@@ -10,6 +10,7 @@ from posteriors import (
     hvp,
     fvp,
     empirical_fisher,
+    cg,
     diag_normal_log_prob,
     diag_normal_sample,
     tree_size,
@@ -258,6 +259,27 @@ def test_empirical_fisher():
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
+
+
+def test_cg():
+    def func(x):
+        return torch.stack([(x**5).sum(), (x**3).sum()])
+
+    def partial_fvp(v):
+        return fvp(func, (x,), (v,), normalize=False)[1]
+
+    x = torch.arange(1.0, 6.0)
+    v = torch.ones_like(x)
+
+    jac = torch.func.jacrev(func)(x)
+    fisher = jac.T @ jac
+
+    damping = 1
+
+    sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
+    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, tol=torch.Tensor([1e-10]))
+
+    assert torch.allclose(sol, sol_cg, rtol=1e-1)
 
 
 def test_diag_normal_log_prob():

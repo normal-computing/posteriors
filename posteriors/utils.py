@@ -272,19 +272,19 @@ def cg(
     x0: TensorTree = None,
     *,
     maxiter: int = None,
-    damping: float = 0,
+    damping: float = 0.0,
     tol: Tensor = torch.Tensor([1e-5]),
     atol: Tensor = torch.Tensor([0]),
     M: Callable = _identity,
 ) -> Tuple[TensorTree, Any]:
     """Use Conjugate Gradient iteration to solve ``Ax = b``.
-    ``A`` is suplied as a function instead of a sparse
+    ``A`` is supplied as a function instead of a sparse
     matrix or ``LinearOperator``.
 
     Derivatives of ``cg`` are implemented via implicit differentiation with
     another ``cg`` solve, rather than by differentiating *through* the solver.
     They will be accurate only if both solves converge.
-    Adapted from https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html.
+    Adapted from https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html
 
     Args:
 
@@ -313,8 +313,7 @@ def cg(
         x0 = tree_map(torch.zeros_like, b)
 
     if maxiter is None:
-        size = sum(bi.numel() for bi in tree_leaves(b))
-        maxiter = 10 * size  # copied from scipy
+        maxiter = 10 * tree_size(b)  # copied from scipy
 
     # tolerance handling uses the "non-legacy" behavior of scipy.sparse.linalg.cg
     bs = _vdot_real_tree(b, b)

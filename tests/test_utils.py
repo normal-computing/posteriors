@@ -274,12 +274,11 @@ def test_cg():
 
     jac = torch.func.jacrev(func)(x)
     fisher = jac.T @ jac
-    damping = 1
+    damping = 100
 
     sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
-    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, tol=1e-10)
-
-    assert torch.allclose(sol, sol_cg, rtol=1e-1)
+    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, maxiter=10000, tol=1e-10)
+    assert torch.allclose(sol, sol_cg, rtol=1e-3)
 
     # simple complex number example
     A = torch.tensor([[0, -1j], [1j, 0]])

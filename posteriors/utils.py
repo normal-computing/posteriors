@@ -230,10 +230,16 @@ def empirical_fisher(
     return fisher
 
 
-def _vdot_real_part(x, y):
+def _vdot_real_part(x: Tensor, y: Tensor) -> float:
     """Vector dot-product guaranteed to have a real valued result despite
     possibly complex input. Thus neglects the real-imaginary cross-terms.
-    The result is a real float.
+
+    Args:
+        x: First tensor in the dot product.
+        y: Second tensor in the dot product.
+
+    Returns:
+        The result vector dot-product, a real float
     """
     # all our uses of vdot() in CG are for computing an operator of the form
     #  z^H M z
@@ -247,11 +253,11 @@ def _vdot_real_part(x, y):
     return real_part
 
 
-def _vdot_real_tree(x, y):
+def _vdot_real_tree(x, y) -> TensorTree:
     return sum(tree_leaves(tree_map(_vdot_real_part, x, y)))
 
 
-def _mul(scalar, tree):
+def _mul(scalar, tree) -> TensorTree:
     return tree_map(partial(operator.mul, scalar), tree)
 
 
@@ -270,7 +276,7 @@ def cg(
     tol: Tensor = torch.Tensor([1e-5]),
     atol: Tensor = torch.Tensor([0]),
     M: Callable = _identity,
-):
+) -> Tuple[TensorTree, Any]:
     """Use Conjugate Gradient iteration to solve ``Ax = b``.
     ``A`` is suplied as a function instead of a sparse
     matrix or ``LinearOperator``.
@@ -278,7 +284,7 @@ def cg(
     Derivatives of ``cg`` are implemented via implicit differentiation with
     another ``cg`` solve, rather than by differentiating *through* the solver.
     They will be accurate only if both solves converge.
-    Adapted from
+    Adapted from https://jax.readthedocs.io/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html.
 
     Args:
 

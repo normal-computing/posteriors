@@ -277,7 +277,20 @@ def test_cg():
     damping = 1
 
     sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
-    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, tol=torch.Tensor([1e-10]))
+    sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, tol=1e-10)
+
+    assert torch.allclose(sol, sol_cg, rtol=1e-1)
+
+    # simple complex number example
+    A = torch.tensor([[0, -1j], [1j, 0]])
+
+    def mvp(x):
+        return A @ x
+
+    b = torch.randn(2, dtype=torch.cfloat)
+
+    sol = torch.linalg.solve(A, b)
+    sol_cg, _ = cg(mvp, b, x0=None, tol=1e-10)
 
     assert torch.allclose(sol, sol_cg, rtol=1e-1)
 
@@ -298,9 +311,7 @@ def test_cg():
 
     v, _ = tree_ravel(params)
     sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
-    sol_cg, _ = cg(
-        partial_fvp, params, x0=None, damping=damping, tol=torch.Tensor([1e-10])
-    )
+    sol_cg, _ = cg(partial_fvp, params, x0=None, damping=damping, tol=1e-10)
 
     assert torch.allclose(sol, tree_ravel(sol_cg)[0], rtol=1e-3)
 

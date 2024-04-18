@@ -262,6 +262,7 @@ def test_empirical_fisher():
 
 
 def test_cg():
+    # simple function with tensor parameters
     def func(x):
         return torch.stack([(x**5).sum(), (x**3).sum()])
 
@@ -273,13 +274,35 @@ def test_cg():
 
     jac = torch.func.jacrev(func)(x)
     fisher = jac.T @ jac
-
     damping = 1
 
     sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
     sol_cg, _ = cg(partial_fvp, v, x0=None, damping=damping, tol=torch.Tensor([1e-10]))
 
     assert torch.allclose(sol, sol_cg, rtol=1e-1)
+
+    # function with parameters as a TensorTree
+    model = TestModel()
+
+    func_model = model_to_function(model)
+    f_per_sample = torch.vmap(func_model, in_dims=(None, 0))
+
+    xs = torch.randn(100, 10)
+
+    def partial_fvp(v):
+        return fvp(lambda p: func_model(p, xs), (params,), (v,), normalize=False)[1]
+
+    params = dict(model.named_parameters())
+    fisher = empirical_fisher(lambda p: f_per_sample(p, xs), normalize=False)(params)
+    damping = 0
+
+    v, _ = tree_ravel(params)
+    sol = torch.linalg.solve(fisher + damping * torch.eye(fisher.shape[0]), v)
+    sol_cg, _ = cg(
+        partial_fvp, params, x0=None, damping=damping, tol=torch.Tensor([1e-10])
+    )
+
+    assert torch.allclose(sol, tree_ravel(sol_cg)[0], rtol=1e-3)
 
 
 def test_diag_normal_log_prob():

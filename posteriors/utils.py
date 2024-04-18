@@ -292,14 +292,14 @@ def cg(
             same structure and shape as its argument.
         b:  Right hand side of the linear system representing a single vector.
         x0: Starting guess for the solution. Must have the same structure as ``b``.
-        maxiter : Maximum number of iterations.  Iteration will stop after maxiter
+        maxiter: Maximum number of iterations.  Iteration will stop after maxiter
             steps even if the specified tolerance has not been achieved.
-        damping : damping term for the mvp function. Acts as regularization.
+        damping: damping term for the mvp function. Acts as regularization.
         tol: Tolerance for convergence.
         atol: Tolerance for convergence. ``norm(residual) <= max(tol*norm(b), atol)``.
             The behaviour will differ from SciPy unless you explicitly pass
             ``atol`` to SciPy's ``cg``.
-        M : Preconditioner for A.
+        M: Preconditioner for A.
             See [the preconditioned CG method.](https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_preconditioned_conjugate_gradient_method)
 
     Returns:

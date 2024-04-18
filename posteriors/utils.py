@@ -272,8 +272,8 @@ def _identity(x):
 def cg(
     A: Callable,
     b: TensorTree,
-    *,
     x0: TensorTree = None,
+    *,
     maxiter: int = None,
     damping: float = 0.0,
     tol: float = 1e-5,
@@ -300,7 +300,7 @@ def cg(
             The behaviour will differ from SciPy unless you explicitly pass
             ``atol`` to SciPy's ``cg``.
         M : Preconditioner for A.
-            See https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_preconditioned_conjugate_gradient_method
+            See [the preconditioned CG method.](https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_preconditioned_conjugate_gradient_method)
 
     Returns:
         x : The converged solution. Has the same structure as ``b``.

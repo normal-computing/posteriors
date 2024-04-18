@@ -246,9 +246,9 @@ def _vdot_real_part(x: Tensor, y: Tensor) -> float:
     #  where M is positive definite and Hermitian, so the result is
     # real valued:
     # https://en.wikipedia.org/wiki/Definiteness_of_a_matrix#Definitions_for_complex_matrices
-    real_part = torch.einsum("...i,...i->...", x.real, y.real)
+    real_part = torch.vdot(x.real.flatten(), y.real.flatten())
     if torch.is_complex(x) or torch.is_complex(y):
-        imag_part = torch.einsum("...i,...i->...", x.imag, y.imag)
+        imag_part = torch.vdot(x.imag.flatten(), y.imag.flatten())
         return real_part + imag_part
     return real_part
 
@@ -263,7 +263,10 @@ def _mul(scalar, tree) -> TensorTree:
 
 _add = partial(tree_map, operator.add)
 _sub = partial(tree_map, operator.sub)
-_identity = partial(lambda x: x)
+
+
+def _identity(x):
+    return x
 
 
 def cg(
@@ -273,13 +276,12 @@ def cg(
     *,
     maxiter: int = None,
     damping: float = 0.0,
-    tol: Tensor = torch.Tensor([1e-5]),
-    atol: Tensor = torch.Tensor([0]),
+    tol: float = 1e-5,
+    atol: float = 0.0,
     M: Callable = _identity,
 ) -> Tuple[TensorTree, Any]:
     """Use Conjugate Gradient iteration to solve ``Ax = b``.
-    ``A`` is supplied as a function instead of a sparse
-    matrix or ``LinearOperator``.
+    ``A`` is supplied as a function instead of a matrix.
 
     Derivatives of ``cg`` are implemented via implicit differentiation with
     another ``cg`` solve, rather than by differentiating *through* the solver.
@@ -314,6 +316,9 @@ def cg(
 
     if maxiter is None:
         maxiter = 10 * tree_size(b)  # copied from scipy
+
+    tol *= torch.tensor([1.0])
+    atol *= torch.tensor([1.0])
 
     # tolerance handling uses the "non-legacy" behavior of scipy.sparse.linalg.cg
     bs = _vdot_real_tree(b, b)

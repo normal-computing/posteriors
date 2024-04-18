@@ -331,11 +331,11 @@ def cg(
     def body_fun(value):
         x, r, gamma, p, k = value
         Ap = A_damped(p)
-        alpha = gamma / _vdot_real_tree(p, Ap)  # .astype(dtype)
+        alpha = gamma / _vdot_real_tree(p, Ap)  
         x_ = _add(x, _mul(alpha, p))
         r_ = _sub(r, _mul(alpha, Ap))
         z_ = M(r_)
-        gamma_ = _vdot_real_tree(r_, z_)  # .astype(dtype)
+        gamma_ = _vdot_real_tree(r_, z_) 
         beta_ = gamma_ / gamma
         p_ = _add(z_, _mul(beta_, p))
         return x_, r_, gamma_, p_, k + 1

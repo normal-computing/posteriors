@@ -230,6 +230,74 @@ def empirical_fisher(
     return fisher
 
 
+def ggnvp(
+    forward: Callable,
+    loss: Callable,
+    primals: tuple,
+    tangents: tuple,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = True,
+) -> (
+    Tuple[float, TensorTree]
+    | Tuple[float, TensorTree, Any]
+    | Tuple[float, TensorTree, Any, Any]
+):
+    """Generalised Gauss-Newton vector product.
+
+    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    Defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z_i)$
+    is the scalar output of the loss function.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$, with dimensions `(dz, dθ)`.
+    And $H_l(z)$ is the Hessian of the loss function $l$ evaluated at `z = f(θ)`, with
+    dimensions `(dz, dz)`.
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+        primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
+        tangents: Tuple matching structure of primals.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the dimension of the output from f.
+
+
+    Returns:
+        Returns a (output, ggnvp_out) tuple containing the output of func evaluated at
+            primals and the GGN-vector product. If forward_has_aux or loss_has_aux is
+            True, then instead returns a (output, ggnvp_out, aux) or
+            (output, ggnvp_out, forward_aux, loss_aux) tuple accordingly.
+            output is a tuple of (forward(primals), grad(loss)(forward(primals))).
+    """
+
+    jvp_output = jvp(forward, primals, tangents, has_aux=forward_has_aux)
+    z = jvp_output[0]
+    Jv = jvp_output[1]
+    HJv_output = hvp(loss, (z,), (Jv,), has_aux=loss_has_aux)
+    HJv = HJv_output[1]
+
+    if normalize:
+        output_dim = tree_flatten(jvp_output[0])[0][0].shape[0]
+        HJv = tree_map(lambda x: x / output_dim, HJv)
+
+    forward_vjp = vjp(forward, *primals, has_aux=forward_has_aux)[1]
+    JTHJv = forward_vjp(HJv)[0]
+
+    return (jvp_output[0], HJv_output[0]), JTHJv, *jvp_output[2:], *HJv_output[2:]
+
+
 def _vdot_real_part(x: Tensor, y: Tensor) -> float:
     """Vector dot-product guaranteed to have a real valued result despite
     possibly complex input. Thus neglects the real-imaginary cross-terms.

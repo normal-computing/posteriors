@@ -10,6 +10,7 @@ from posteriors import (
     hvp,
     fvp,
     empirical_fisher,
+    ggnvp,
     cg,
     diag_normal_log_prob,
     diag_normal_sample,
@@ -259,6 +260,78 @@ def test_empirical_fisher():
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
+
+
+def test_ggnvp():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = torch.randn(10)
+    v = torch.randn(10)
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected = Jac.T @ Hes @ Jac
+
+    # Test unnormalised
+    ggnvp_result = ggnvp(forward, loss, (x,), (v,), normalize=False)
+    assert torch.allclose(ggnvp_result[1], expected @ v, rtol=1e-5)
+    assert len(ggnvp_result) == 2
+    assert len(ggnvp_result[0]) == 2
+    assert torch.allclose(ggnvp_result[0][0], z)
+    assert torch.allclose(ggnvp_result[0][1], torch.func.grad(loss)(z))
+
+    # Test normalised
+    ggnvp_result_norm = ggnvp(forward, loss, (x,), (v,))
+    assert torch.allclose(ggnvp_result_norm[1], expected @ v / 2, rtol=1e-5)
+    assert len(ggnvp_result_norm) == 2
+    assert len(ggnvp_result_norm[0]) == 2
+    assert torch.allclose(ggnvp_result_norm[0][0], z)
+    assert torch.allclose(ggnvp_result_norm[0][1], torch.func.grad(loss)(z))
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggnvp_result_faux = ggnvp(forward_aux, loss, (x,), (v,), forward_has_aux=True)
+    assert torch.allclose(ggnvp_result_faux[1], expected @ v / 2, rtol=1e-5)
+    assert len(ggnvp_result_faux) == 3
+    assert len(ggnvp_result_faux[0]) == 2
+    assert torch.allclose(ggnvp_result_faux[0][0], z)
+    assert torch.allclose(ggnvp_result_faux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_faux[2], x)
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggnvp_result_laux = ggnvp(forward, loss_aux, (x,), (v,), loss_has_aux=True)
+    assert torch.allclose(ggnvp_result_laux[1], expected @ v / 2, rtol=1e-5)
+    assert len(ggnvp_result_laux) == 3
+    assert len(ggnvp_result_laux[0]) == 2
+    assert torch.allclose(ggnvp_result_laux[0][0], z)
+    assert torch.allclose(ggnvp_result_laux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_laux[2], z)
+
+    # Test both aux
+    ggnvp_result_flaux = ggnvp(
+        forward_aux, loss_aux, (x,), (v,), forward_has_aux=True, loss_has_aux=True
+    )
+    assert torch.allclose(ggnvp_result_flaux[1], expected @ v / 2, rtol=1e-5)
+    assert len(ggnvp_result_flaux) == 4
+    assert len(ggnvp_result_flaux[0]) == 2
+    assert torch.allclose(ggnvp_result_flaux[0][0], z)
+    assert torch.allclose(ggnvp_result_flaux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_faux[2], x)
+    assert torch.allclose(ggnvp_result_flaux[3], z)
 
 
 def test_cg():

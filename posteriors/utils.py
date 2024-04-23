@@ -3,7 +3,7 @@ import operator
 from functools import partial
 import contextlib
 import torch
-from torch.func import grad, jvp, vjp, functional_call, jacrev
+from torch.func import grad, jvp, vjp, functional_call, jacrev, jacfwd
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten, tree_leaves
 from optree.integration.torch import tree_ravel
@@ -107,7 +107,7 @@ def hvp(
     where H(primals) is the Hessian of f evaluated at primals.
 
     Taken from [jacobians_hessians.html](https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html).
-    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
 
     Args:
         f: A function with scalar output.
@@ -196,6 +196,10 @@ def empirical_fisher(
     If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
     (i.e. batchsize).
 
+    The empirical Fisher will be provided as a square tensor with respect to the
+    ravelled parameters.
+    `flat_params, params_unravel = optree.tree_ravel(params)`.
+
     Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
 
     More info on empirical Fisher matrices can be found in
@@ -206,7 +210,7 @@ def empirical_fisher(
             Tensor, and returns one or more Tensors.
             Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         argnums: Optional, integer or sequence of integers. Specifies which
-            positional argument(s) to differentiate with respect to. Defaults to 0.
+            positional argument(s) to differentiate with respect to.
         has_aux: Whether f returns auxiliary information.
         normalize: Whether to normalize, divide by the dimension of the output from f.
 
@@ -215,8 +219,16 @@ def empirical_fisher(
             If has_aux is True, then the function instead returns a tuple of (F, aux).
     """
 
+    def f_to_flat(*args, **kwargs):
+        f_out = f(*args, **kwargs)
+        f_out_val = f_out[0] if has_aux else f_out
+        f_out_val = tree_ravel(f_out_val)[0]
+        return (f_out_val, f_out[1]) if has_aux else f_out_val
+
     def fisher(*args, **kwargs):
-        jac_output = jacrev(f, argnums=argnums, has_aux=has_aux)(*args, **kwargs)
+        jac_output = jacrev(f_to_flat, argnums=argnums, has_aux=has_aux)(
+            *args, **kwargs
+        )
         jac = jac_output[0] if has_aux else jac_output
 
         # Convert Jacobian to tensor, flat in parameter dimension
@@ -255,13 +267,15 @@ def ggnvp(
     $$
     G(θ) = J_f(θ) H_l(z) J_f(θ)^T
     $$
-    where $z = f(θ)$ is the output of the forward function $f$ and $l(z_i)$
-    is the scalar output of the loss function.
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
 
     Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
     at `primals` $θ$, with dimensions `(dz, dθ)`.
     And $H_l(z)$ is the Hessian of the loss function $l$ evaluated at `z = f(θ)`, with
     dimensions `(dz, dz)`.
+
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
 
     More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
@@ -275,7 +289,6 @@ def ggnvp(
         loss_has_aux: Whether loss returns auxiliary information.
         normalize: Whether to normalize, divide by the first dimension of the output
             from f.
-
 
     Returns:
         Returns a (output, ggnvp_out) tuple containing the output of func evaluated at
@@ -299,6 +312,110 @@ def ggnvp(
     JTHJv = forward_vjp(HJv)[0]
 
     return (jvp_output[0], HJv_output[0]), JTHJv, *jvp_output[2:], *HJv_output[2:]
+
+
+def ggn(
+    forward: Callable,
+    loss: Callable,
+    argnums: int | Sequence[int] = 0,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = False,
+) -> Callable:
+    """
+    Constructs function to compute the Generalised Gauss-Newton matrix.
+
+    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    Defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$. And $H_l(z)$ is the Hessian of the loss function $l$ evaluated
+    at `z = f(θ)`.
+
+    Requires output from `forward` to be a tensor and therefore `loss` takes a tensor as
+    input. Although both support `aux` output.
+
+    If `normalize=True`, then $G(θ)$ is divided by the size of the leading dimension of
+    outputs from `forward` (i.e. batchsize).
+
+    The GGN will be provided as a square tensor with respect to the
+    ravelled parameters.
+    `flat_params, params_unravel = optree.tree_ravel(params)`.
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+            Takes a single input and returns a scalar (and possibly aux).
+        argnums: Optional, integer or sequence of integers. Specifies which
+            positional argument(s) to differentiate `forward` with respect to.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
+
+    Returns:
+        A function with the same arguments as f that returns the tensor GGN.
+            If has_aux is True, then the function instead returns a tuple of (F, aux).
+    """
+    assert argnums == 0, "Only argnums=0 is supported for now."
+
+    def internal_ggn(params):
+        flat_params, params_unravel = tree_ravel(params)
+
+        def flat_params_to_forward(fps):
+            return forward(params_unravel(fps))
+
+        jac_output = jacrev(
+            flat_params_to_forward, argnums=argnums, has_aux=forward_has_aux
+        )(flat_params)
+        jac = jac_output[0] if forward_has_aux else jac_output  # (..., dθ)
+        jac = torch.stack(tree_leaves(jac))[
+            0
+        ]  # convert to tensor (assumes jac has tensor output)
+        rescale = 1 / jac.shape[0] if normalize else 1  #  maybe normalize by batchsize
+        jac = jac.flatten(end_dim=-2)  # (d, dθ)
+
+        z = forward(params)
+        z = z[0] if forward_has_aux else z
+
+        hess_output = jacfwd(jacrev(loss, has_aux=loss_has_aux), has_aux=loss_has_aux)(
+            z
+        )
+        hess = hess_output[0] if loss_has_aux else hess_output
+        hess = torch.stack(tree_leaves(hess))[
+            0
+        ]  # convert to tensor (assumes loss has tensor input)
+        z_ndim = hess.ndim // 2
+        hess = hess.flatten(start_dim=z_ndim).flatten(
+            end_dim=-z_ndim
+        )  # flatten to square tensor
+
+        # Collect aux outputs
+        aux = []
+        if forward_has_aux:
+            aux.append(jac_output[1])
+        if loss_has_aux:
+            aux.append(loss(z)[1])
+
+        if aux:
+            return jac.T @ (hess @ jac) * rescale, *aux
+        else:
+            return jac.T @ (hess @ jac) * rescale
+
+    return internal_ggn
 
 
 def _vdot_real_part(x: Tensor, y: Tensor) -> float:

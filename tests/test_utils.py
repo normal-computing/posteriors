@@ -11,6 +11,7 @@ from posteriors import (
     fvp,
     empirical_fisher,
     ggnvp,
+    ggn,
     cg,
     diag_normal_log_prob,
     diag_normal_sample,
@@ -334,6 +335,63 @@ def test_ggnvp():
     assert torch.allclose(ggnvp_result_flaux[0][1], torch.func.grad(loss)(z))
     assert torch.allclose(ggnvp_result_faux[2], x)
     assert torch.allclose(ggnvp_result_flaux[3], z)
+
+
+def test_ggn():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = torch.randn(10)
+    v = torch.randn(10)
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected = Jac.T @ Hes @ Jac
+
+    # Test unnormalised
+    ggn_result = ggn(forward, loss)(x)
+    assert torch.allclose(ggn_result, expected, rtol=1e-5)
+    assert torch.allclose(
+        ggn_result @ v, ggnvp(forward, loss, (x,), (v,))[1], rtol=1e-5
+    )
+
+    # Test normalised
+    ggn_result_norm = ggn(forward, loss, normalize=True)(x)
+    assert torch.allclose(ggn_result_norm, expected / 2, rtol=1e-5)
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggn_result_faux = ggn(forward_aux, loss, forward_has_aux=True)(x)
+    assert torch.allclose(ggn_result_faux[0], expected, rtol=1e-5)
+    assert len(ggn_result_faux) == 2
+    assert torch.allclose(ggn_result_faux[1], x)
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggn_result_laux = ggn(forward, loss_aux, loss_has_aux=True)(x)
+    assert torch.allclose(ggn_result_laux[0], expected, rtol=1e-5)
+    assert len(ggn_result_laux) == 2
+    assert torch.allclose(ggn_result_laux[1], z)
+
+    # Test both aux
+    ggn_result_flaux = ggn(
+        forward_aux, loss_aux, forward_has_aux=True, loss_has_aux=True
+    )(x)
+    assert torch.allclose(ggn_result_flaux[0], expected, rtol=1e-5)
+    assert len(ggn_result_flaux) == 3
+    assert torch.allclose(ggn_result_flaux[1], x)
+    assert torch.allclose(ggn_result_flaux[2], z)
 
 
 def test_cg():

@@ -108,3 +108,6 @@ ENV/
 
 # Experiment runs
 examples/runs/
+*.gz
+*.pkl
+*-ubyte

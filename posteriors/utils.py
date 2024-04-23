@@ -128,7 +128,7 @@ def fvp(
     primals: tuple,
     tangents: tuple,
     has_aux: bool = False,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Empirical Fisher vector product.
 
@@ -138,10 +138,11 @@ def fvp(
 
     The empirical Fisher is defined as:
     $$
-    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    F(θ) = J_f(θ) J_f(θ)^T
     $$
-    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
-    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
+    where typically $f_θ$ is the per-sample log likelihood (with elements
+    $\\log p(y_i | x_i, θ)$ for a model with `primals` $θ$ given inputs $x_i$ and
+    labels $y_i$).
 
     If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
     (i.e. batchsize).
@@ -180,16 +181,17 @@ def empirical_fisher(
     f: Callable,
     argnums: int | Sequence[int] = 0,
     has_aux: bool = False,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> Callable:
     """
     Constructs function to compute the empirical Fisher information matrix of a function
     f with respect to its parameters, defined as (unnormalized):
     $$
-    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    F(θ) = J_f(θ) J_f(θ)^T
     $$
-    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
-    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
+    where typically $f_θ$ is the per-sample log likelihood (with elements
+    $\\log p(y_i | x_i, θ)$ for a model with `primals` $θ$ given inputs $x_i$ and
+    labels $y_i$).
 
     If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
     (i.e. batchsize).
@@ -237,7 +239,7 @@ def ggnvp(
     tangents: tuple,
     forward_has_aux: bool = False,
     loss_has_aux: bool = False,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> (
     Tuple[float, TensorTree]
     | Tuple[float, TensorTree, Any]
@@ -271,7 +273,8 @@ def ggnvp(
         tangents: Tuple matching structure of primals.
         forward_has_aux: Whether forward returns auxiliary information.
         loss_has_aux: Whether loss returns auxiliary information.
-        normalize: Whether to normalize, divide by the dimension of the output from f.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
 
 
     Returns:

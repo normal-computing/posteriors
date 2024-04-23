@@ -168,7 +168,7 @@ def test_fvp():
     v = torch.ones_like(x)
 
     # Test not normalized
-    output, fvp_result = fvp(func, (x,), (v,), normalize=False)
+    output, fvp_result = fvp(func, (x,), (v,))
 
     jac = torch.func.jacrev(func)(x)
     fisher = jac.T @ jac
@@ -177,7 +177,7 @@ def test_fvp():
     assert torch.allclose(output, func(x))
 
     # Test normalize
-    output_norm, fvp_result_norm = fvp(func, (x,), (v,))
+    output_norm, fvp_result_norm = fvp(func, (x,), (v,), normalize=True)
     assert torch.allclose(fvp_result_norm, expected / 2)
     assert torch.allclose(output_norm, func(x))
 
@@ -222,7 +222,7 @@ def test_empirical_fisher():
 
     # Test not normalized
     batch = (x, y)
-    fisher = empirical_fisher(lambda p: f_per_sample(p, batch), normalize=False)(params)
+    fisher = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
     expected_fisher = torch.zeros((num_features + 1, num_features + 1))
     for xs, ys in zip(x, y):
         g = torch.func.grad(f)(params, (xs, ys))
@@ -232,7 +232,9 @@ def test_empirical_fisher():
     assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
 
     # Test normalized
-    fisher_norm = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
+    fisher_norm = empirical_fisher(lambda p: f_per_sample(p, batch), normalize=True)(
+        params
+    )
     assert torch.allclose(fisher_norm, expected_fisher / num_samples, rtol=1e-5)
 
     # Test aux, not normalized
@@ -282,7 +284,7 @@ def test_ggnvp():
     expected = Jac.T @ Hes @ Jac
 
     # Test unnormalised
-    ggnvp_result = ggnvp(forward, loss, (x,), (v,), normalize=False)
+    ggnvp_result = ggnvp(forward, loss, (x,), (v,))
     assert torch.allclose(ggnvp_result[1], expected @ v, rtol=1e-5)
     assert len(ggnvp_result) == 2
     assert len(ggnvp_result[0]) == 2
@@ -290,7 +292,7 @@ def test_ggnvp():
     assert torch.allclose(ggnvp_result[0][1], torch.func.grad(loss)(z))
 
     # Test normalised
-    ggnvp_result_norm = ggnvp(forward, loss, (x,), (v,))
+    ggnvp_result_norm = ggnvp(forward, loss, (x,), (v,), normalize=True)
     assert torch.allclose(ggnvp_result_norm[1], expected @ v / 2, rtol=1e-5)
     assert len(ggnvp_result_norm) == 2
     assert len(ggnvp_result_norm[0]) == 2
@@ -302,7 +304,7 @@ def test_ggnvp():
         return forward(x), x
 
     ggnvp_result_faux = ggnvp(forward_aux, loss, (x,), (v,), forward_has_aux=True)
-    assert torch.allclose(ggnvp_result_faux[1], expected @ v / 2, rtol=1e-5)
+    assert torch.allclose(ggnvp_result_faux[1], expected @ v, rtol=1e-5)
     assert len(ggnvp_result_faux) == 3
     assert len(ggnvp_result_faux[0]) == 2
     assert torch.allclose(ggnvp_result_faux[0][0], z)
@@ -314,7 +316,7 @@ def test_ggnvp():
         return loss(z), z
 
     ggnvp_result_laux = ggnvp(forward, loss_aux, (x,), (v,), loss_has_aux=True)
-    assert torch.allclose(ggnvp_result_laux[1], expected @ v / 2, rtol=1e-5)
+    assert torch.allclose(ggnvp_result_laux[1], expected @ v, rtol=1e-5)
     assert len(ggnvp_result_laux) == 3
     assert len(ggnvp_result_laux[0]) == 2
     assert torch.allclose(ggnvp_result_laux[0][0], z)
@@ -325,7 +327,7 @@ def test_ggnvp():
     ggnvp_result_flaux = ggnvp(
         forward_aux, loss_aux, (x,), (v,), forward_has_aux=True, loss_has_aux=True
     )
-    assert torch.allclose(ggnvp_result_flaux[1], expected @ v / 2, rtol=1e-5)
+    assert torch.allclose(ggnvp_result_flaux[1], expected @ v, rtol=1e-5)
     assert len(ggnvp_result_flaux) == 4
     assert len(ggnvp_result_flaux[0]) == 2
     assert torch.allclose(ggnvp_result_flaux[0][0], z)

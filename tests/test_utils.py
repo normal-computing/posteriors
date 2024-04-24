@@ -1,4 +1,5 @@
 import pytest
+from functools import partial
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
@@ -201,6 +202,29 @@ def test_fvp():
     assert torch.allclose(output_aux_norm, func(x))
     assert torch.allclose(aux_norm, x)
 
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+    batch_spec = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood_per_sample(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss(reduction="none")(
+            output, batch["labels"].float()
+        )
+
+    v = tree_map(lambda x: torch.randn_like(x), params)
+
+    fvp_result = fvp(
+        partial(log_likelihood_per_sample, batch=batch_spec),
+        (params,),
+        (v,),
+    )
+    assert len(fvp_result) == 2
+    assert torch.allclose(fvp_result[0], log_likelihood_per_sample(params, batch_spec))
+
 
 def test_empirical_fisher():
     # Test no aux
@@ -263,6 +287,30 @@ def test_empirical_fisher():
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+    batch = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
+
+    ef_result = empirical_fisher(log_likelihood_per_sample)(params, batch)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def log_likelihood_flat(flat_p, batch):
+        return log_likelihood_per_sample(unravel_params(flat_p), batch)
+
+    jac = torch.func.jacrev(log_likelihood_flat)(flat_params, batch)
+    expected = jac.T @ jac
+    assert torch.allclose(ef_result, expected, rtol=1e-5)
 
 
 def test_ggnvp():
@@ -336,6 +384,34 @@ def test_ggnvp():
     assert torch.allclose(ggnvp_result_faux[2], x)
     assert torch.allclose(ggnvp_result_flaux[3], z)
 
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    v = tree_map(lambda x: torch.randn_like(x), params)
+    ggnvp_result = ggnvp(
+        partial(forward, inputs=batch_inputs),
+        partial(loss, labels=batch_labels),
+        (params,),
+        (v,),
+    )
+    assert len(ggnvp_result) == 2
+    assert torch.allclose(ggnvp_result[0][0], forward(params, batch_inputs))
+    assert torch.allclose(
+        ggnvp_result[0][1],
+        torch.func.grad(partial(loss, labels=batch_labels))(
+            forward(params, batch_inputs)
+        ),
+    )
+
 
 def test_ggn():
     # Batchsize=2, dz=5
@@ -392,6 +468,33 @@ def test_ggn():
     assert len(ggn_result_flaux) == 3
     assert torch.allclose(ggn_result_flaux[1], x)
     assert torch.allclose(ggn_result_flaux[2], z)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    ggn_result = ggn(
+        partial(forward, inputs=batch_inputs), partial(loss, labels=batch_labels)
+    )(params)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def forward_flat(p):
+        return forward(unravel_params(p), batch_inputs)[:, 0]
+
+    z = forward_flat(flat_params)
+    jac = torch.func.jacrev(forward_flat)(flat_params)
+    hess = torch.func.hessian(partial(loss, labels=batch_labels[:, 0]))(z)
+    expected = jac.T @ hess @ jac
+    assert torch.allclose(ggn_result, expected, rtol=1e-5)
 
 
 def test_cg():

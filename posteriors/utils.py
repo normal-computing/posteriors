@@ -152,6 +152,31 @@ def fvp(
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
+    Examples:
+        ```python
+        from functools import partial
+        from optree import tree_map
+        import torch
+        from posteriors import fvp
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def log_likelihood_per_sample(params, batch):
+            output = torch.func.functional_call(model, params, batch["inputs"])
+            return -torch.nn.functional.cross_entropy(
+                output, batch["labels"], reduction="none"
+            )
+
+        params = dict(model.parameters())
+        v = tree_map(lambda x: torch.randn_like(x), params)
+        fvp_result = fvp(
+            partial(log_likelihood_per_sample, batch=batch),
+            (params,),
+            (v,)
+        )
+        ```
+
     Args:
         f: A function with tensor output.
             Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
@@ -204,6 +229,23 @@ def empirical_fisher(
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        import torch
+        from posteriors import empirical_fisher, per_samplify
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def log_likelihood(params, batch):
+            output = torch.func.functional_call(model, params, batch['inputs'])
+            return -torch.nn.functional.cross_entropy(output, batch['labels'])
+
+        likelihood_per_sample = per_samplify(log_likelihood)
+        params = dict(model.parameters())
+        ef_result = empirical_fisher(log_likelihood_per_sample)(params, batch)
+        ```
 
     Args:
         f:  A Python function that takes one or more arguments, one of which must be a
@@ -280,6 +322,32 @@ def ggnvp(
     More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
+    Examples:
+        ```python
+        from functools import partial
+        from optree import tree_map
+        import torch
+        from posteriors import ggnvp
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        v = tree_map(lambda x: torch.randn_like(x), params)
+        ggnvp_result = ggnvp(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+            (params,),
+            (v,),
+        )
+        ```
+
     Args:
         forward: A function with tensor output.
         loss: A function that maps the output of forward to a scalar output.
@@ -291,11 +359,11 @@ def ggnvp(
             from f.
 
     Returns:
-        Returns a (output, ggnvp_out) tuple containing the output of func evaluated at
-            primals and the GGN-vector product. If forward_has_aux or loss_has_aux is
-            True, then instead returns a (output, ggnvp_out, aux) or
+        Returns a (output, ggnvp_out) tuple, where output is a tuple of
+            `(forward(primals), grad(loss)(forward(primals)))`.
+            If forward_has_aux or loss_has_aux is True, then instead returns a
+            (output, ggnvp_out, aux) or
             (output, ggnvp_out, forward_aux, loss_aux) tuple accordingly.
-            output is a tuple of (forward(primals), grad(loss)(forward(primals))).
     """
 
     jvp_output = jvp(forward, primals, tangents, has_aux=forward_has_aux)
@@ -354,6 +422,28 @@ def ggn(
 
     More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        import torch
+        from posteriors import ggn
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        ggn_result = ggn(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+        )(params)
+        ```
 
     Args:
         forward: A function with tensor output.

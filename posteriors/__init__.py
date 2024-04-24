@@ -10,6 +10,8 @@ from posteriors.utils import linearized_forward_diag
 from posteriors.utils import hvp
 from posteriors.utils import fvp
 from posteriors.utils import empirical_fisher
+from posteriors.utils import ggnvp
+from posteriors.utils import ggn
 from posteriors.utils import cg
 from posteriors.utils import diag_normal_log_prob
 from posteriors.utils import diag_normal_sample

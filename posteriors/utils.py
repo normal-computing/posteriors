@@ -1,13 +1,12 @@
 from typing import Callable, Any, Tuple, Sequence
 import operator
-from functools import partial
+from functools import partial, wraps
 import contextlib
 import torch
 from torch.func import grad, jvp, vjp, functional_call, jacrev, jacfwd
 from torch.distributions import Normal
 from optree import tree_map, tree_map_, tree_reduce, tree_flatten, tree_leaves
 from optree.integration.torch import tree_ravel
-
 
 from posteriors.types import TensorTree, ForwardFn, Tensor
 
@@ -987,9 +986,8 @@ def flexi_tree_map(
 def per_samplify(
     f: Callable[[TensorTree, TensorTree], Any],
 ) -> Callable[[TensorTree, TensorTree], Any]:
-    """Converts a function that takes params and batch and averages over the batch in
-    its output into one that provides an output for each batch sample
-    (i.e. no averaging).
+    """Converts a function that takes params and batch into one that provides an output
+    for each batch sample.
 
     ```
     output = f(params, batch)
@@ -999,8 +997,8 @@ def per_samplify(
     For more info see [per_sample_grads.html](https://pytorch.org/tutorials/intermediate/per_sample_grads.html)
 
     Args:
-        f: A function that takes params and batch and averages over the batch in its
-            output.
+        f: A function that takes params and batch provides an output with size
+            independent of batchsize (i.e. averaged).
 
     Returns:
         A new function that provides an output for each batch sample.
@@ -1012,7 +1010,11 @@ def per_samplify(
         batch = tree_map(lambda x: x.unsqueeze(0), batch)
         return f(params, batch)
 
-    return f_per_sample
+    @wraps(f)
+    def f_per_sample_ensure_no_kwargs(params, batch):
+        return f_per_sample(params, batch)  # vmap in_dims requires no kwargs
+
+    return f_per_sample_ensure_no_kwargs
 
 
 def is_scalar(x: Any) -> bool:

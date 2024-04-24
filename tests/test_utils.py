@@ -13,6 +13,7 @@ from posteriors import (
     empirical_fisher,
     ggnvp,
     ggn,
+    diag_ggn,
     cg,
     diag_normal_log_prob,
     diag_normal_sample,
@@ -495,6 +496,27 @@ def test_ggn():
     hess = torch.func.hessian(partial(loss, labels=batch_labels[:, 0]))(z)
     expected = jac.T @ hess @ jac
     assert torch.allclose(ggn_result, expected, rtol=1e-5)
+
+
+def test_ggndiag():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = torch.randn(10)
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected_full = Jac.T @ Hes @ Jac
+
+    ggndiag_result = diag_ggn(forward, loss)(x)
+    assert torch.allclose(ggndiag_result, torch.diagonal(expected_full), rtol=1e-5)
 
 
 def test_cg():

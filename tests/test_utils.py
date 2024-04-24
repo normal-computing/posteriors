@@ -209,11 +209,11 @@ def test_fvp():
     batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
     batch_spec = {"inputs": batch_inputs, "labels": batch_labels}
 
-    def log_likelihood_per_sample(params, batch):
+    def log_likelihood(params, batch):
         output = torch.func.functional_call(model, params, batch["inputs"])
-        return -torch.nn.BCEWithLogitsLoss(reduction="none")(
-            output, batch["labels"].float()
-        )
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
 
     v = tree_map(lambda x: torch.randn_like(x), params)
 
@@ -871,6 +871,33 @@ def test_per_samplify():
     expected_b = torch.tensor([1.0, 1.0])
     assert torch.allclose(ra, expected_a)
     assert torch.allclose(rb, expected_b)
+
+    # Test model
+    model = TestModel()  # From tests.scenarios
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3, 1))
+    batch_spec = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
+
+    expected = torch.tensor(
+        [
+            log_likelihood(
+                params, {"inputs": inp.unsqueeze(0), "labels": lab.unsqueeze(0)}
+            )
+            for inp, lab in zip(batch_inputs, batch_labels)
+        ]
+    )
+
+    eval = log_likelihood_per_sample(params, batch_spec)
+    eval_p = partial(log_likelihood_per_sample, batch=batch_spec)(params)
+    assert torch.allclose(expected, eval)
+    assert torch.allclose(expected, eval_p)
 
 
 def test_is_scalar():

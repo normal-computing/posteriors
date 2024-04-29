@@ -580,7 +580,7 @@ def diag_ggn(
         ```python
         from functools import partial
         import torch
-        from posteriors import ggn_diag
+        from posteriors import diag_ggn
 
         # Load model that outputs logits
         # Load batch = {'inputs': ..., 'labels': ...}
@@ -592,7 +592,7 @@ def diag_ggn(
             return torch.nn.functional.cross_entropy(logits, labels)
 
         params = dict(model.parameters())
-        ggn_result = ggn_diag(
+        ggndiag_result = diag_ggn(
             partial(forward, inputs=batch['inputs']),
             partial(loss, labels=batch['labels']),
         )(params)

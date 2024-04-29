@@ -444,7 +444,7 @@ def ggn(
     """
     Constructs function to compute the Generalised Gauss-Newton matrix.
 
-    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    Equivalent to the (non-empirical) Fisher when `loss` is the negative
     log likelihood of an exponential family distribution as a function of its natural
     parameter.
 
@@ -548,7 +548,7 @@ def diag_ggn(
     """
     Constructs function to compute the diagonal of the Generalised Gauss-Newton matrix.
 
-    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    Equivalent to the (non-empirical) diagonal Fisher when `loss` is the negative
     log likelihood of an exponential family distribution as a function of its natural
     parameter.
 

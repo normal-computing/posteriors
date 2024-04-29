@@ -31,7 +31,7 @@ from posteriors import (
     per_samplify,
     is_scalar,
 )
-from posteriors.utils import AUX_ERROR_MSG
+from posteriors.utils import NO_AUX_ERROR_MSG, NON_TENSOR_AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
 
 
@@ -39,27 +39,51 @@ def test_CatchAuxError():
     def func(x):
         return x**2
 
-    def func_aux(x):
+    def func_aux_none(x):
         return x**2, None
 
-    # Check AUX_ERROR_MSG is correct
+    def func_aux(x):
+        return x**2, torch.tensor([])
+
+    # Check NO_AUX_ERROR_MSG is correct
     try:
         torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
     except Exception as e:
-        assert AUX_ERROR_MSG in str(e)
+        assert NO_AUX_ERROR_MSG in str(e)
 
+    # Check NON_TENSOR_AUX_ERROR_MSG is correct
+    try:
+        torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+    except Exception as e:
+        assert NON_TENSOR_AUX_ERROR_MSG in str(e)
+
+    # Check CatchAuxError works for NO_AUX_ERROR_MSG
     with pytest.raises(RuntimeError) as e:
         with CatchAuxError():
             torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
 
-        assert "Auxiliary output not found" in str(e)
+    assert "Auxiliary output not found" in str(e)
 
     with pytest.raises(RuntimeError) as e:
         with torch.no_grad(), CatchAuxError():
             torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
 
-        assert "Auxiliary output not found" in str(e)
+    assert "Auxiliary output not found" in str(e)
 
+    # Check CatchAuxError works for NON_TENSOR_AUX_ERROR_MSG
+    with pytest.raises(RuntimeError) as e:
+        with CatchAuxError():
+            torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+
+    assert "Auxiliary output should be a TensorTree" in str(e)
+
+    with pytest.raises(RuntimeError) as e:
+        with torch.no_grad(), CatchAuxError():
+            torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+
+    assert "Auxiliary output should be a TensorTree" in str(e)
+
+    # Check CatchAuxError works for correct func_aux
     with CatchAuxError():
         torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
 

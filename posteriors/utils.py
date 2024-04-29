@@ -11,7 +11,8 @@ from optree.integration.torch import tree_ravel
 from posteriors.types import TensorTree, ForwardFn, Tensor
 
 
-AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
+NO_AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
+NON_TENSOR_AUX_ERROR_MSG = "Expected tensors, got unsupported type"
 
 
 class CatchAuxError(contextlib.AbstractContextManager):
@@ -19,11 +20,18 @@ class CatchAuxError(contextlib.AbstractContextManager):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
-            if AUX_ERROR_MSG in str(exc_value):
+            if NO_AUX_ERROR_MSG in str(exc_value):
                 raise RuntimeError(
                     "Auxiliary output not found. Perhaps you have forgotten to return "
                     "the aux output?\n"
                     "\tIf you don't have any auxiliary info, simply amend to e.g. "
+                    "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
+                    "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
+                )
+            elif NON_TENSOR_AUX_ERROR_MSG in str(exc_value):
+                raise RuntimeError(
+                    "Auxiliary output should be a TensorTree. If you don't have any "
+                    "auxiliary info, simply amend to e.g. "
                     "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
                     "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
                 )

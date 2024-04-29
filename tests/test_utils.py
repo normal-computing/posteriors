@@ -525,22 +525,91 @@ def test_ggn():
 def test_ggndiag():
     # Batchsize=2, dz=5
     def forward(x):
-        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
-        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x["a"]).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x["a"]).sum(0)
         return torch.stack([zs1, zs2])
 
     def loss(z):
         return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
 
-    x = torch.randn(10)
+    x = {"a": torch.randn(10)}
 
     z = forward(x)
-    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Jac = torch.func.jacrev(forward)(x)["a"].flatten(end_dim=-2)
     Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
     expected_full = Jac.T @ Hes @ Jac
+    expected_diag = torch.diagonal(expected_full)
+    expected = {"a": expected_diag}
 
+    # Test unnormalised
     ggndiag_result = diag_ggn(forward, loss)(x)
-    assert torch.allclose(ggndiag_result, torch.diagonal(expected_full), rtol=1e-5)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result[k], expected[k], rtol=1e-5)
+
+    # Test normalised
+    ggndiag_result_norm = diag_ggn(forward, loss, normalize=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_norm[k], expected[k] / 2, rtol=1e-5)
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggndiag_result_faux = diag_ggn(forward_aux, loss, forward_has_aux=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_faux[0][k], expected[k], rtol=1e-5)
+        assert torch.allclose(ggndiag_result_faux[1][k], x[k])
+    assert len(ggndiag_result_faux) == 2
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggndiag_result_laux = diag_ggn(forward, loss_aux, loss_has_aux=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_laux[0][k], expected[k], rtol=1e-5)
+    assert len(ggndiag_result_laux) == 2
+    assert torch.allclose(ggndiag_result_laux[1], z)
+
+    # Test both aux
+    ggndiag_result_flaux = diag_ggn(
+        forward_aux, loss_aux, forward_has_aux=True, loss_has_aux=True
+    )(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_flaux[0][k], expected[k], rtol=1e-5)
+        assert torch.allclose(ggndiag_result_flaux[1][k], x[k])
+    assert len(ggndiag_result_flaux) == 3
+    assert torch.allclose(ggndiag_result_flaux[2], z)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    ggndiag_result = diag_ggn(
+        partial(forward, inputs=batch_inputs), partial(loss, labels=batch_labels)
+    )(params)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def forward_flat(p):
+        return forward(unravel_params(p), batch_inputs)[:, 0]
+
+    z = forward_flat(flat_params)
+    jac = torch.func.jacrev(forward_flat)(flat_params)
+    hess = torch.func.hessian(partial(loss, labels=batch_labels[:, 0]))(z)
+    expected_dense = jac.T @ hess @ jac
+    expected_diag = torch.diagonal(expected_dense)
+    expected = unravel_params(expected_diag)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result[k], expected[k], rtol=1e-5)
 
 
 def test_cg():

@@ -6,9 +6,9 @@ from optree import tree_map
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.tree_utils import flexi_tree_map
 from posteriors.utils import (
     diag_normal_sample,
-    flexi_tree_map,
     per_samplify,
     is_scalar,
     CatchAuxError,

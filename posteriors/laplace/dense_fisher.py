@@ -6,9 +6,9 @@ from optree import tree_map
 from optree.integration.torch import tree_ravel
 
 from posteriors.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
+from posteriors.tree_utils import tree_size
 from posteriors.utils import (
     per_samplify,
-    tree_size,
     empirical_fisher,
     is_scalar,
     CatchAuxError,

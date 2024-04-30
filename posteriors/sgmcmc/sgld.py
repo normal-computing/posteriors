@@ -5,7 +5,8 @@ from torch.func import grad_and_value
 from dataclasses import dataclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.utils import flexi_tree_map, CatchAuxError
+from posteriors.tree_utils import flexi_tree_map
+from posteriors.utils import CatchAuxError
 
 
 def build(

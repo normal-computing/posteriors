@@ -10,7 +10,6 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.utils import logging
-import einops
 from torch.nn import CrossEntropyLoss, functional as F
 
 
@@ -337,7 +336,7 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
             logits = torch.cat(logits, dim=-1)
         else:
             logits = self.lm_head(hidden_states)
-        logits = einops.rearrange(logits, "e b s v -> b e s v")
+        logits = logits.transpose(0, 1)
         logits = logits.float()
 
         loss = None

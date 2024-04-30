@@ -1,7 +1,13 @@
+from typing import Optional, Tuple, Union, List
+
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple, Union, List
-from transformers.models.llama.modeling_llama import LlamaModel, LlamaForCausalLM, CausalLMOutputWithPast, BaseModelOutputWithPast
+from transformers.models.llama.modeling_llama import (
+    LlamaModel,
+    LlamaForCausalLM,
+    CausalLMOutputWithPast,
+    BaseModelOutputWithPast,
+)
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.utils import logging
 import einops
@@ -12,21 +18,38 @@ logger = logging.get_logger(__name__)
 
 
 class BayesLlamaModel(LlamaModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, config, bayes_config):
+        super().__init__(config)
+
+        self.n_ensemble = bayes_config["n_ensemble"]
+        self.ensemble_param_names = bayes_config["ensemble_param_names"]
+        self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
 
         self.bayes_ensemble = None
-    
-    def load_ensemble_weights(self, layer_idx, param_name, ensemble_params):
-        module = self.layers[layer_idx]
-        attributes = param_name.split('.')
 
-        sub_module=module
+    def get_module_weights(self, module, param_name: str):
+        attributes = param_name.split(".")
         for attr in attributes:
-            sub_module = getattr(sub_module, attr)
-        setattr(sub_module, attr, torch.nn.Parameter(ensemble_params.to(self.device)))
+            module = getattr(module, attr)
+
         return module
-    
+
+    def load_ensemble_weights(
+        self, layer_idx: int, param_names: list, ensemble_params: list[torch.Tensor]
+    ):
+        module = self.layers[layer_idx]
+
+        for param_name, params in zip(param_names, ensemble_params):
+            attributes = param_name.split(".")
+
+            sub_module = module
+            attr = None
+            for attr in attributes:
+                sub_module = getattr(sub_module, attr)
+            setattr(sub_module, attr, torch.nn.Parameter(params.to(self.device)))
+
+        return module
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -40,12 +63,20 @@ class BayesLlamaModel(LlamaModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError(
@@ -69,15 +100,21 @@ class BayesLlamaModel(LlamaModel):
 
         if cache_position is None:
             if isinstance(past_key_values, StaticCache):
-                raise ValueError("cache_position is a required argument when using StaticCache.")
+                raise ValueError(
+                    "cache_position is a required argument when using StaticCache."
+                )
             cache_position = torch.arange(
-                past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
+                past_seen_tokens,
+                past_seen_tokens + inputs_embeds.shape[1],
+                device=inputs_embeds.device,
             )
 
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)
-        
-        causal_mask = self._update_causal_mask(attention_mask, inputs_embeds, cache_position, past_seen_tokens)
+
+        causal_mask = self._update_causal_mask(
+            attention_mask, inputs_embeds, cache_position, past_seen_tokens
+        )
 
         # embed positions
         hidden_states = inputs_embeds
@@ -121,11 +158,23 @@ class BayesLlamaModel(LlamaModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-    
-        #Define pass through ensembled last layer
-        def bayes_layer(ensemble_params, hidden_states, causal_mask, position_ids, past_key_values, use_cache, output_attentions, cache_position, all_self_attns):
-
-            final_decoder = self.load_ensemble_weights(layer_idx=-1, param_name='self_attn.o_proj.weight', ensemble_params=ensemble_params)
+        # Define pass through ensembled last layer
+        def bayes_layer(
+            ensemble_params,
+            hidden_states,
+            causal_mask,
+            position_ids,
+            past_key_values,
+            use_cache,
+            output_attentions,
+            cache_position,
+            all_self_attns,
+        ):
+            final_decoder = self.load_ensemble_weights(
+                layer_idx=self.ensemble_param_layer,
+                param_names=self.ensemble_param_names,
+                ensemble_params=ensemble_params,
+            )
 
             if self.gradient_checkpointing and self.training:
                 layer_outputs = self._gradient_checkpointing_func(
@@ -154,14 +203,28 @@ class BayesLlamaModel(LlamaModel):
             if use_cache:
                 next_decoder_cache = layer_outputs[2 if output_attentions else 1]
                 next_decoder_cache = next_decoder_cache.to_legacy_cache()
-            
+
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-            return hidden_states, all_self_attns if output_attentions else torch.empty(0), next_decoder_cache if use_cache else torch.empty(0)
+            return (
+                hidden_states,
+                all_self_attns if output_attentions else torch.empty(0),
+                next_decoder_cache if use_cache else torch.empty(0),
+            )
 
-        layer_outputs = torch.vmap(bayes_layer, in_dims=(0, None))(self.bayes_ensemble, hidden_states, causal_mask=attention_mask, position_ids=position_ids, past_key_values=past_key_values, use_cache=use_cache, output_attentions=output_attentions, cache_position=cache_position, all_self_attns=all_self_attns)
-        
+        layer_outputs = torch.vmap(bayes_layer, in_dims=(0, None))(
+            self.bayes_ensemble,
+            hidden_states,
+            causal_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            cache_position=cache_position,
+            all_self_attns=all_self_attns,
+        )
+
         hidden_states = layer_outputs[0]
         hidden_states = self.norm(hidden_states)
 
@@ -176,34 +239,39 @@ class BayesLlamaModel(LlamaModel):
         if use_cache:
             next_cache = layer_outputs[2 if output_attentions else 1]
             next_cache = (
-                next_decoder_cache.to_legacy_cache() if isinstance(next_decoder_cache, Cache) else next_decoder_cache
+                next_decoder_cache.to_legacy_cache()
+                if isinstance(next_decoder_cache, Cache)
+                else next_decoder_cache
             )
         if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+            return tuple(
+                v
+                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+                if v is not None
+            )
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-    
 
 
-    
 class BayesLlamaForCausalLM(LlamaForCausalLM):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config):
+    def __init__(self, config, bayes_config=None):
         super().__init__(config)
-        self.model = BayesLlamaModel(config)
+        self.model = BayesLlamaModel(config, bayes_config)
+
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.n_ensemble = 10
-
+        self.n_ensemble = bayes_config["n_ensemble"]
+        self.ensemble_param_names = bayes_config["ensemble_param_names"]
+        self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
         # Initialize weights and apply final processing
         self.post_init()
 
-  
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -218,14 +286,30 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        if self.n_ensemble>0 and self.model.bayes_ensemble is None:
-            self.model.bayes_ensemble = self.model.layers[-1].self_attn.o_proj.weight.repeat(self.n_ensemble, 1,1) 
+        if self.n_ensemble > 0 and self.model.bayes_ensemble is None:
+            self.model.bayes_ensemble = torch.stack(
+                [
+                    self.model.get_module_weights(
+                        self.model.layers[self.ensemble_param_layer], param_name
+                    ).repeat(self.n_ensemble, 1, 1)
+                    for param_name in self.ensemble_param_names
+                ],
+                dim=0,
+            )
 
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
@@ -243,14 +327,18 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
 
         hidden_states = outputs[0]
         if self.config.pretraining_tp > 1:
-            lm_head_slices = self.lm_head.weight.split(self.vocab_size // self.config.pretraining_tp, dim=0)
-            logits = [F.linear(hidden_states, lm_head_slices[i]) for i in range(self.config.pretraining_tp)]
+            lm_head_slices = self.lm_head.weight.split(
+                self.vocab_size // self.config.pretraining_tp, dim=0
+            )
+            logits = [
+                F.linear(hidden_states, lm_head_slices[i])
+                for i in range(self.config.pretraining_tp)
+            ]
             logits = torch.cat(logits, dim=-1)
         else:
             logits = self.lm_head(hidden_states)
-        logits = einops.rearrange(logits, 'e b s v -> b e s v')
+        logits = einops.rearrange(logits, "e b s v -> b e s v")
         logits = logits.float()
-
 
         loss = None
         if labels is not None:

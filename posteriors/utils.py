@@ -1,18 +1,19 @@
 from typing import Callable, Any, Tuple, Sequence
 import operator
-from functools import partial
+from functools import partial, wraps
 import contextlib
 import torch
-from torch.func import grad, jvp, vjp, functional_call, jacrev
+from torch.func import grad, jvp, vjp, functional_call, jacrev, jacfwd
 from torch.distributions import Normal
-from optree import tree_map, tree_map_, tree_reduce, tree_flatten, tree_leaves
+from optree import tree_map, tree_reduce, tree_flatten, tree_leaves
 from optree.integration.torch import tree_ravel
 
-
 from posteriors.types import TensorTree, ForwardFn, Tensor
+from posteriors.tree_utils import tree_size
 
 
-AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
+NO_AUX_ERROR_MSG = "should be a tuple: (output, aux) if has_aux is True"
+NON_TENSOR_AUX_ERROR_MSG = "Expected tensors, got unsupported type"
 
 
 class CatchAuxError(contextlib.AbstractContextManager):
@@ -20,11 +21,18 @@ class CatchAuxError(contextlib.AbstractContextManager):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
-            if AUX_ERROR_MSG in str(exc_value):
+            if NO_AUX_ERROR_MSG in str(exc_value):
                 raise RuntimeError(
                     "Auxiliary output not found. Perhaps you have forgotten to return "
                     "the aux output?\n"
                     "\tIf you don't have any auxiliary info, simply amend to e.g. "
+                    "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
+                    "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
+                )
+            elif NON_TENSOR_AUX_ERROR_MSG in str(exc_value):
+                raise RuntimeError(
+                    "Auxiliary output should be a TensorTree. If you don't have any "
+                    "auxiliary info, simply amend to e.g. "
                     "log_posterior(params, batch) -> Tuple[float, torch.tensor([])].\n"
                     "\tMore info at https://normal-computing.github.io/posteriors/log_posteriors"
                 )
@@ -107,7 +115,7 @@ def hvp(
     where H(primals) is the Hessian of f evaluated at primals.
 
     Taken from [jacobians_hessians.html](https://pytorch.org/functorch/nightly/notebooks/jacobians_hessians.html).
-    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html)
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
 
     Args:
         f: A function with scalar output.
@@ -128,7 +136,7 @@ def fvp(
     primals: tuple,
     tangents: tuple,
     has_aux: bool = False,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> Tuple[float, TensorTree] | Tuple[float, TensorTree, Any]:
     """Empirical Fisher vector product.
 
@@ -138,10 +146,11 @@ def fvp(
 
     The empirical Fisher is defined as:
     $$
-    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    F(θ) = J_f(θ) J_f(θ)^T
     $$
-    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
-    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
+    where typically $f_θ$ is the per-sample log likelihood (with elements
+    $\\log p(y_i | x_i, θ)$ for a model with `primals` $θ$ given inputs $x_i$ and
+    labels $y_i$).
 
     If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
     (i.e. batchsize).
@@ -150,6 +159,31 @@ def fvp(
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        from optree import tree_map
+        import torch
+        from posteriors import fvp
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def log_likelihood_per_sample(params, batch):
+            output = torch.func.functional_call(model, params, batch["inputs"])
+            return -torch.nn.functional.cross_entropy(
+                output, batch["labels"], reduction="none"
+            )
+
+        params = dict(model.parameters())
+        v = tree_map(lambda x: torch.randn_like(x), params)
+        fvp_result = fvp(
+            partial(log_likelihood_per_sample, batch=batch),
+            (params,),
+            (v,)
+        )
+        ```
 
     Args:
         f: A function with tensor output.
@@ -180,31 +214,53 @@ def empirical_fisher(
     f: Callable,
     argnums: int | Sequence[int] = 0,
     has_aux: bool = False,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> Callable:
     """
     Constructs function to compute the empirical Fisher information matrix of a function
     f with respect to its parameters, defined as (unnormalized):
     $$
-    F(θ) = \\sum_i ∇_θ f_θ(x_i, y_i) ∇_θ f_θ(x_i, y_i)^T
+    F(θ) = J_f(θ) J_f(θ)^T
     $$
-    where typically $f_θ(x_i, y_i)$ is the log likelihood $\\log p(y_i | x_i,θ)$ of a
-    model with parameters $θ$ given inputs $x_i$ and labels $y_i$.
+    where typically $f_θ$ is the per-sample log likelihood (with elements
+    $\\log p(y_i | x_i, θ)$ for a model with `primals` $θ$ given inputs $x_i$ and
+    labels $y_i$).
 
     If `normalize=True`, then $F(θ)$ is divided by the number of outputs from f
     (i.e. batchsize).
+
+    The empirical Fisher will be provided as a square tensor with respect to the
+    ravelled parameters.
+    `flat_params, params_unravel = optree.tree_ravel(params)`.
 
     Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
 
     More info on empirical Fisher matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 
+    Examples:
+        ```python
+        import torch
+        from posteriors import empirical_fisher, per_samplify
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def log_likelihood(params, batch):
+            output = torch.func.functional_call(model, params, batch['inputs'])
+            return -torch.nn.functional.cross_entropy(output, batch['labels'])
+
+        likelihood_per_sample = per_samplify(log_likelihood)
+        params = dict(model.parameters())
+        ef_result = empirical_fisher(log_likelihood_per_sample)(params, batch)
+        ```
+
     Args:
         f:  A Python function that takes one or more arguments, one of which must be a
             Tensor, and returns one or more Tensors.
             Typically this is the [per-sample log likelihood of a model](https://pytorch.org/tutorials/intermediate/per_sample_grads.html).
         argnums: Optional, integer or sequence of integers. Specifies which
-            positional argument(s) to differentiate with respect to. Defaults to 0.
+            positional argument(s) to differentiate with respect to.
         has_aux: Whether f returns auxiliary information.
         normalize: Whether to normalize, divide by the dimension of the output from f.
 
@@ -213,8 +269,16 @@ def empirical_fisher(
             If has_aux is True, then the function instead returns a tuple of (F, aux).
     """
 
+    def f_to_flat(*args, **kwargs):
+        f_out = f(*args, **kwargs)
+        f_out_val = f_out[0] if has_aux else f_out
+        f_out_val = tree_ravel(f_out_val)[0]
+        return (f_out_val, f_out[1]) if has_aux else f_out_val
+
     def fisher(*args, **kwargs):
-        jac_output = jacrev(f, argnums=argnums, has_aux=has_aux)(*args, **kwargs)
+        jac_output = jacrev(f_to_flat, argnums=argnums, has_aux=has_aux)(
+            *args, **kwargs
+        )
         jac = jac_output[0] if has_aux else jac_output
 
         # Convert Jacobian to tensor, flat in parameter dimension
@@ -228,6 +292,355 @@ def empirical_fisher(
             return jac.T @ jac * rescale
 
     return fisher
+
+
+def ggnvp(
+    forward: Callable,
+    loss: Callable,
+    primals: tuple,
+    tangents: tuple,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = False,
+) -> (
+    Tuple[float, TensorTree]
+    | Tuple[float, TensorTree, Any]
+    | Tuple[float, TensorTree, Any, Any]
+):
+    """Generalised Gauss-Newton vector product.
+
+    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    Defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$, with dimensions `(dz, dθ)`.
+    And $H_l(z)$ is the Hessian of the loss function $l$ evaluated at `z = f(θ)`, with
+    dimensions `(dz, dz)`.
+
+    Follows API from [`torch.func.jvp`](https://pytorch.org/docs/stable/generated/torch.func.jvp.html).
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        from optree import tree_map
+        import torch
+        from posteriors import ggnvp
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        v = tree_map(lambda x: torch.randn_like(x), params)
+        ggnvp_result = ggnvp(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+            (params,),
+            (v,),
+        )
+        ```
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+        primals: Tuple of e.g. tensor or dict with tensor values to evaluate f at.
+        tangents: Tuple matching structure of primals.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
+
+    Returns:
+        Returns a (output, ggnvp_out) tuple, where output is a tuple of
+            `(forward(primals), grad(loss)(forward(primals)))`.
+            If forward_has_aux or loss_has_aux is True, then instead returns a
+            (output, ggnvp_out, aux) or
+            (output, ggnvp_out, forward_aux, loss_aux) tuple accordingly.
+    """
+
+    jvp_output = jvp(forward, primals, tangents, has_aux=forward_has_aux)
+    z = jvp_output[0]
+    Jv = jvp_output[1]
+    HJv_output = hvp(loss, (z,), (Jv,), has_aux=loss_has_aux)
+    HJv = HJv_output[1]
+
+    if normalize:
+        output_dim = tree_flatten(jvp_output[0])[0][0].shape[0]
+        HJv = tree_map(lambda x: x / output_dim, HJv)
+
+    forward_vjp = vjp(forward, *primals, has_aux=forward_has_aux)[1]
+    JTHJv = forward_vjp(HJv)[0]
+
+    return (jvp_output[0], HJv_output[0]), JTHJv, *jvp_output[2:], *HJv_output[2:]
+
+
+def _hess_and_jac_for_ggn(
+    flat_params_to_forward,
+    loss,
+    argnums,
+    forward_has_aux,
+    loss_has_aux,
+    normalize,
+    flat_params,
+) -> Tuple[Tensor, Tensor, list]:
+    jac_output = jacrev(
+        flat_params_to_forward, argnums=argnums, has_aux=forward_has_aux
+    )(flat_params)
+    jac = jac_output[0] if forward_has_aux else jac_output  # (..., dθ)
+    jac = torch.stack(tree_leaves(jac))[
+        0
+    ]  # convert to tensor (assumes jac has tensor output)
+    rescale = 1 / jac.shape[0] if normalize else 1  #  maybe normalize by batchsize
+    jac = jac.flatten(end_dim=-2)  # (d, dθ)
+
+    z = flat_params_to_forward(flat_params)
+    z = z[0] if forward_has_aux else z
+
+    hess_output = jacfwd(jacrev(loss, has_aux=loss_has_aux), has_aux=loss_has_aux)(z)
+    hess = hess_output[0] if loss_has_aux else hess_output
+    hess = torch.stack(tree_leaves(hess))[
+        0
+    ]  # convert to tensor (assumes loss has tensor input)
+    z_ndim = hess.ndim // 2
+    hess = hess.flatten(start_dim=z_ndim).flatten(
+        end_dim=-z_ndim
+    )  # flatten to square tensor
+
+    hess *= rescale
+
+    # Collect aux outputs
+    aux = []
+    if forward_has_aux:
+        aux.append(jac_output[1])
+    if loss_has_aux:
+        aux.append(loss(z)[1])
+
+    return jac, hess, aux
+
+
+def ggn(
+    forward: Callable,
+    loss: Callable,
+    argnums: int | Sequence[int] = 0,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = False,
+) -> Callable:
+    """
+    Constructs function to compute the Generalised Gauss-Newton matrix.
+
+    Equivalent to the (non-empirical) Fisher when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    Defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$. And $H_l(z)$ is the Hessian of the loss function $l$ evaluated
+    at `z = f(θ)`.
+
+    Requires output from `forward` to be a tensor and therefore `loss` takes a tensor as
+    input. Although both support `aux` output.
+
+    If `normalize=True`, then $G(θ)$ is divided by the size of the leading dimension of
+    outputs from `forward` (i.e. batchsize).
+
+    The GGN will be provided as a square tensor with respect to the
+    ravelled parameters.
+    `flat_params, params_unravel = optree.tree_ravel(params)`.
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        import torch
+        from posteriors import ggn
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        ggn_result = ggn(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+        )(params)
+        ```
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+            Takes a single input and returns a scalar (and possibly aux).
+        argnums: Optional, integer or sequence of integers. Specifies which
+            positional argument(s) to differentiate `forward` with respect to.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
+
+    Returns:
+        A function with the same arguments as f that returns the tensor GGN.
+            If has_aux is True, then the function instead returns a tuple of (F, aux).
+    """
+    assert argnums == 0, "Only argnums=0 is supported for now."
+
+    def internal_ggn(params):
+        flat_params, params_unravel = tree_ravel(params)
+
+        def flat_params_to_forward(fps):
+            return forward(params_unravel(fps))
+
+        jac, hess, aux = _hess_and_jac_for_ggn(
+            flat_params_to_forward,
+            loss,
+            argnums,
+            forward_has_aux,
+            loss_has_aux,
+            normalize,
+            flat_params,
+        )
+
+        if aux:
+            return jac.T @ (hess @ jac), *aux
+        else:
+            return jac.T @ (hess @ jac)
+
+    return internal_ggn
+
+
+def diag_ggn(
+    forward: Callable,
+    loss: Callable,
+    argnums: int | Sequence[int] = 0,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = False,
+) -> Callable:
+    """
+    Constructs function to compute the diagonal of the Generalised Gauss-Newton matrix.
+
+    Equivalent to the (non-empirical) diagonal Fisher when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    The GGN is defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$. And $H_l(z)$ is the Hessian of the loss function $l$ evaluated
+    at `z = f(θ)`.
+
+    Requires output from `forward` to be a tensor and therefore `loss` takes a tensor as
+    input. Although both support `aux` output.
+
+    If `normalize=True`, then $G(θ)$ is divided by the size of the leading dimension of
+    outputs from `forward` (i.e. batchsize).
+
+    Unlike `posteriors.ggn`, the output will be in PyTree form matching the input.
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        import torch
+        from posteriors import diag_ggn
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        ggndiag_result = diag_ggn(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+        )(params)
+        ```
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+            Takes a single input and returns a scalar (and possibly aux).
+        argnums: Optional, integer or sequence of integers. Specifies which
+            positional argument(s) to differentiate `forward` with respect to.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
+
+    Returns:
+        A function with the same arguments as f that returns the diagonal GGN.
+            If has_aux is True, then the function instead returns a tuple of (F, aux).
+    """
+    assert argnums == 0, "Only argnums=0 is supported for now."
+
+    def internal_ggn(params):
+        flat_params, params_unravel = tree_ravel(params)
+
+        def flat_params_to_forward(fps):
+            return forward(params_unravel(fps))
+
+        jac, hess, aux = _hess_and_jac_for_ggn(
+            flat_params_to_forward,
+            loss,
+            argnums,
+            forward_has_aux,
+            loss_has_aux,
+            normalize,
+            flat_params,
+        )
+
+        G_diag = torch.einsum("ji,jk,ki->i", jac, hess, jac)
+        G_diag = params_unravel(G_diag)
+
+        if aux:
+            return G_diag, *aux
+        else:
+            return G_diag
+
+    return internal_ggn
 
 
 def _vdot_real_part(x: Tensor, y: Tensor) -> float:
@@ -433,285 +846,11 @@ def diag_normal_sample(
     )
 
 
-def tree_size(tree: TensorTree) -> int:
-    """Returns the total number of elements in a PyTree.
-    Not the number of leaves, but the total number of elements for all tensors in the
-    tree.
-
-    Args:
-        tree: A PyTree of tensors.
-
-    Returns:
-        Number of elements in the PyTree.
-    """
-
-    def ensure_tensor(x):
-        return x if isinstance(x, torch.Tensor) else torch.tensor(x)
-
-    return tree_reduce(torch.add, tree_map(lambda x: ensure_tensor(x).numel(), tree))
-
-
-def tree_extract(f: Callable[[torch.tensor], bool], tree: TensorTree) -> TensorTree:
-    """Extracts values from a PyTree where f returns True.
-    False values are replaced with empty tensors.
-
-    Args:
-        f: A function that takes a PyTree element and returns True or False.
-        tree: A PyTree.
-
-    Returns:
-        A PyTree with the same structure as tree where f returns True.
-    """
-    return tree_map(lambda x: x if f(x) else torch.tensor([], device=x.device), tree)
-
-
-def tree_insert(
-    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
-) -> TensorTree:
-    """Inserts sub_tree into full_tree where full_tree tensors evaluate f to True.
-    Both PyTrees must have the same structure.
-
-    Args:
-        f: A function that takes a PyTree element and returns True or False.
-        full_tree: A PyTree to insert sub_tree into.
-        sub_tree: A PyTree to insert into full_tree.
-
-    Returns:
-        A PyTree with sub_tree inserted into full_tree.
-    """
-    return tree_map(
-        lambda sub, full: sub if f(full) else full,
-        sub_tree,
-        full_tree,
-    )
-
-
-def tree_insert_(
-    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
-) -> TensorTree:
-    """Inserts sub_tree into full_tree in-place where full_tree tensors evaluate
-    f to True. Both PyTrees must have the same structure.
-
-    Args:
-        f: A function that takes a PyTree element and returns True or False.
-        full_tree: A PyTree to insert sub_tree into.
-        sub_tree: A PyTree to insert into full_tree.
-
-    Returns:
-        A pointer to full_tree with sub_tree inserted.
-    """
-
-    def insert_(full, sub):
-        if f(full):
-            full.data = sub.data
-
-    return tree_map_(insert_, full_tree, sub_tree)
-
-
-def extract_requires_grad(tree: TensorTree) -> TensorTree:
-    """Extracts only parameters that require gradients.
-
-    Args:
-        tree: A PyTree of tensors.
-
-    Returns:
-        A PyTree of tensors that require gradients.
-    """
-    return tree_extract(lambda x: x.requires_grad, tree)
-
-
-def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
-    """Inserts sub_tree into full_tree where full_tree tensors requires_grad.
-    Both PyTrees must have the same structure.
-
-    Args:
-        full_tree: A PyTree to insert sub_tree into.
-        sub_tree: A PyTree to insert into full_tree.
-
-    Returns:
-        A PyTree with sub_tree inserted into full_tree.
-    """
-    return tree_insert(lambda x: x.requires_grad, full_tree, sub_tree)
-
-
-def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
-    """Inserts sub_tree into full_tree in-place where full_tree tensors requires_grad.
-    Both PyTrees must have the same structure.
-
-    Args:
-        full_tree: A PyTree to insert sub_tree into.
-        sub_tree: A PyTree to insert into full_tree.
-
-    Returns:
-        A pointer to full_tree with sub_tree inserted.
-    """
-    return tree_insert_(lambda x: x.requires_grad, full_tree, sub_tree)
-
-
-def extract_requires_grad_and_func(
-    tree: TensorTree, func: Callable, inplace: bool = False
-) -> Tuple[TensorTree, Callable]:
-    """Extracts only parameters that require gradients and converts a function
-    that takes the full parameter tree (in its first argument)
-    into one that takes the subtree.
-
-    Args:
-        tree: A PyTree of tensors.
-        func: A function that takes tree in its first argument.
-        inplace: Whether to modify the tree inplace or not whe the new function
-            is called.
-
-    Returns:
-        A PyTree of tensors that require gradients and a modified func that takes the
-            subtree structure rather than full tree in its first argument.
-    """
-    subtree = extract_requires_grad(tree)
-
-    insert = insert_requires_grad_ if inplace else insert_requires_grad
-
-    def subfunc(subtree, *args, **kwargs):
-        return func(insert(tree, subtree), *args, **kwargs)
-
-    return subtree, subfunc
-
-
-def inplacify(func: Callable) -> Callable:
-    """Converts a function that takes a tensor as its first argument
-    into one that takes the same arguments but modifies the first argument
-    tensor in-place with the output of the function.
-
-    Args:
-        func: A function that takes a tensor as its first argument and a returns
-            a modified version of said tensor.
-
-    Returns:
-        A function that takes a tensor as its first argument and modifies it
-            in-place.
-    """
-
-    def func_(tens, *args, **kwargs):
-        tens.data = func(tens, *args, **kwargs)
-        return tens
-
-    return func_
-
-
-def tree_map_inplacify_(
-    func: Callable,
-    tree: TensorTree,
-    *rests: TensorTree,
-    is_leaf: Callable[[TensorTree], bool] | None = None,
-    none_is_leaf: bool = False,
-    namespace: str = "",
-) -> TensorTree:
-    """Applies a pure function to each tensor in a PyTree in-place.
-
-    Like [optree.tree_map_](https://optree.readthedocs.io/en/latest/ops.html#optree.tree_map_)
-    but takes a pure function as input (and takes replaces its first argument with its
-    output in-place) rather than a side-effect function.
-
-    Args:
-        func: A function that takes a tensor as its first argument and a returns
-            a modified version of said tensor.
-        tree (pytree): A pytree to be mapped over, with each leaf providing the first
-            positional argument to function ``func``.
-        rests (tuple of pytree): A tuple of pytrees, each of which has the same
-            structure as ``tree`` or has ``tree`` as a prefix.
-        is_leaf (callable, optional): An optionally specified function that will be
-            called at each flattening step. It should return a boolean, with
-            `True` stopping the traversal and the whole subtree being treated as a
-            leaf, and `False` indicating the flattening should traverse the
-            current object.
-        none_is_leaf (bool, optional): Whether to treat `None` as a leaf. If
-            `False`, `None` is a non-leaf node with arity 0. Thus `None` is contained in
-            the treespec rather than in the leaves list and `None` will be remain in the
-            result pytree. (default: `False`)
-        namespace (str, optional): The registry namespace used for custom pytree node
-            types. (default: :const:`''`, i.e., the global namespace)
-
-    Returns:
-        The original ``tree`` with the value at each leaf is given by the side-effect of
-            function ``func(x, *xs)`` (not the return value) where ``x`` is the value at
-            the corresponding leaf in ``tree`` and ``xs`` is the tuple of values at
-            values at corresponding nodes in ``rests``.
-    """
-    return tree_map_(
-        inplacify(func),
-        tree,
-        *rests,
-        is_leaf=is_leaf,
-        none_is_leaf=none_is_leaf,
-        namespace=namespace,
-    )
-
-
-def flexi_tree_map(
-    func: Callable,
-    tree: TensorTree,
-    *rests: TensorTree,
-    inplace: bool = False,
-    is_leaf: Callable[[TensorTree], bool] | None = None,
-    none_is_leaf: bool = False,
-    namespace: str = "",
-) -> TensorTree:
-    """Applies a pure function to each tensor in a PyTree, with inplace argument.
-
-    ```
-    out_tensor = func(tensor, *rest_tensors)
-    ```
-
-    where `out_tensor` is of the same shape as `tensor`.
-    Therefore
-
-    ```
-    out_tree = func(tree, *rests, inplace=True)
-    ```
-
-    will return `out_tree` a pointer to the original `tree` with leaves (tensors)
-    modified in place.
-    If `inplace=False`, `flexi_tree_map` is equivalent to [`optree.tree_map`](https://optree.readthedocs.io/en/latest/ops.html#optree.tree_map)
-    and returns a new tree.
-
-    Args:
-        func: A pure function that takes a tensor as its first argument and a returns
-            a modified version of said tensor.
-        tree (pytree): A pytree to be mapped over, with each leaf providing the first
-            positional argument to function ``func``.
-        rests (tuple of pytree): A tuple of pytrees, each of which has the same
-            structure as ``tree`` or has ``tree`` as a prefix.
-        inplace (bool, optional): Whether to modify the tree in-place or not.
-        is_leaf (callable, optional): An optionally specified function that will be
-            called at each flattening step. It should return a boolean, with `True`
-            stopping the traversal and the whole subtree being treated as a leaf, and
-            `False` indicating the flattening should traverse the current object.
-        none_is_leaf (bool, optional): Whether to treat `None` as a leaf. If `False`,
-            `None` is a non-leaf node with arity 0. Thus `None` is contained in the
-            treespec rather than in the leaves list and `None` will be remain in the
-            result pytree. (default: `False`)
-        namespace (str, optional): The registry namespace used for custom pytree node
-            types. (default: :const:`''`, i.e., the global namespace)
-
-    Returns:
-        Either the original tree modified in-place or a new tree depending on the
-            `inplace` argument.
-    """
-    tm = tree_map_inplacify_ if inplace else tree_map
-    return tm(
-        func,
-        tree,
-        *rests,
-        is_leaf=is_leaf,
-        none_is_leaf=none_is_leaf,
-        namespace=namespace,
-    )
-
-
 def per_samplify(
     f: Callable[[TensorTree, TensorTree], Any],
 ) -> Callable[[TensorTree, TensorTree], Any]:
-    """Converts a function that takes params and batch and averages over the batch in
-    its output into one that provides an output for each batch sample
-    (i.e. no averaging).
+    """Converts a function that takes params and batch into one that provides an output
+    for each batch sample.
 
     ```
     output = f(params, batch)
@@ -721,8 +860,8 @@ def per_samplify(
     For more info see [per_sample_grads.html](https://pytorch.org/tutorials/intermediate/per_sample_grads.html)
 
     Args:
-        f: A function that takes params and batch and averages over the batch in its
-            output.
+        f: A function that takes params and batch provides an output with size
+            independent of batchsize (i.e. averaged).
 
     Returns:
         A new function that provides an output for each batch sample.
@@ -734,7 +873,11 @@ def per_samplify(
         batch = tree_map(lambda x: x.unsqueeze(0), batch)
         return f(params, batch)
 
-    return f_per_sample
+    @wraps(f)
+    def f_per_sample_ensure_no_kwargs(params, batch):
+        return f_per_sample(params, batch)  # vmap in_dims requires no kwargs
+
+    return f_per_sample_ensure_no_kwargs
 
 
 def is_scalar(x: Any) -> bool:

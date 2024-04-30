@@ -6,9 +6,8 @@ from torch.func import functional_call
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from posteriors.utils import tree_size, empirical_fisher
+from posteriors import tree_size, empirical_fisher, diag_normal_log_prob
 from posteriors.laplace import dense_fisher
-from posteriors import diag_normal_log_prob
 
 from tests.scenarios import TestModel
 

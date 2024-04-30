@@ -30,9 +30,7 @@ We'll use the [football-data.co.uk](https://www.football-data.co.uk/englandm.php
         data = data.dropna()
         data["Timestamp"] = pd.to_datetime(data["Date"], dayfirst=True)
         data["Timestamp"] = pd.to_datetime(data["Timestamp"], unit="D")
-        data["TimestampDays"] = (
-            (data["Timestamp"] - origin_date).astype("timedelta64[D]").astype(int)
-        )
+        data["TimestampDays"] = (data["Timestamp"] - origin_date).dt.days.astype(int)
 
         players_arr = pd.unique(pd.concat([data["HomeTeam"], data["AwayTeam"]]))
         players_arr.sort()

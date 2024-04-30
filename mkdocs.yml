@@ -79,6 +79,7 @@ nav:
       - Diag: api/vi/diag.md
     - api/optim.md
     - TorchOpt: api/torchopt.md
+    - api/tree_utils.md
     - api/types.md
     - api/utils.md
 

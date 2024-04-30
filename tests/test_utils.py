@@ -1,4 +1,5 @@
 import pytest
+from functools import partial
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
 from optree.integration.torch import tree_ravel
@@ -10,24 +11,16 @@ from posteriors import (
     hvp,
     fvp,
     empirical_fisher,
+    ggnvp,
+    ggn,
+    diag_ggn,
     cg,
     diag_normal_log_prob,
     diag_normal_sample,
-    tree_size,
-    tree_extract,
-    tree_insert,
-    tree_insert_,
-    extract_requires_grad,
-    insert_requires_grad,
-    insert_requires_grad_,
-    extract_requires_grad_and_func,
-    inplacify,
-    tree_map_inplacify_,
-    flexi_tree_map,
     per_samplify,
     is_scalar,
 )
-from posteriors.utils import AUX_ERROR_MSG
+from posteriors.utils import NO_AUX_ERROR_MSG, NON_TENSOR_AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
 
 
@@ -35,27 +28,51 @@ def test_CatchAuxError():
     def func(x):
         return x**2
 
-    def func_aux(x):
+    def func_aux_none(x):
         return x**2, None
 
-    # Check AUX_ERROR_MSG is correct
+    def func_aux(x):
+        return x**2, torch.tensor([])
+
+    # Check NO_AUX_ERROR_MSG is correct
     try:
         torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
     except Exception as e:
-        assert AUX_ERROR_MSG in str(e)
+        assert NO_AUX_ERROR_MSG in str(e)
 
+    # Check NON_TENSOR_AUX_ERROR_MSG is correct
+    try:
+        torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+    except Exception as e:
+        assert NON_TENSOR_AUX_ERROR_MSG in str(e)
+
+    # Check CatchAuxError works for NO_AUX_ERROR_MSG
     with pytest.raises(RuntimeError) as e:
         with CatchAuxError():
             torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
 
-        assert "Auxiliary output not found" in str(e)
+    assert "Auxiliary output not found" in str(e)
 
     with pytest.raises(RuntimeError) as e:
         with torch.no_grad(), CatchAuxError():
             torch.func.grad(func, has_aux=True)(torch.tensor(1.0))
 
-        assert "Auxiliary output not found" in str(e)
+    assert "Auxiliary output not found" in str(e)
 
+    # Check CatchAuxError works for NON_TENSOR_AUX_ERROR_MSG
+    with pytest.raises(RuntimeError) as e:
+        with CatchAuxError():
+            torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+
+    assert "Auxiliary output should be a TensorTree" in str(e)
+
+    with pytest.raises(RuntimeError) as e:
+        with torch.no_grad(), CatchAuxError():
+            torch.func.grad(func_aux_none, has_aux=True)(torch.tensor(1.0))
+
+    assert "Auxiliary output should be a TensorTree" in str(e)
+
+    # Check CatchAuxError works for correct func_aux
     with CatchAuxError():
         torch.func.grad(func_aux, has_aux=True)(torch.tensor(1.0))
 
@@ -167,7 +184,7 @@ def test_fvp():
     v = torch.ones_like(x)
 
     # Test not normalized
-    output, fvp_result = fvp(func, (x,), (v,), normalize=False)
+    output, fvp_result = fvp(func, (x,), (v,))
 
     jac = torch.func.jacrev(func)(x)
     fisher = jac.T @ jac
@@ -176,7 +193,7 @@ def test_fvp():
     assert torch.allclose(output, func(x))
 
     # Test normalize
-    output_norm, fvp_result_norm = fvp(func, (x,), (v,))
+    output_norm, fvp_result_norm = fvp(func, (x,), (v,), normalize=True)
     assert torch.allclose(fvp_result_norm, expected / 2)
     assert torch.allclose(output_norm, func(x))
 
@@ -198,6 +215,29 @@ def test_fvp():
     assert torch.allclose(fvp_aux_result_norm, expected / 2)
     assert torch.allclose(output_aux_norm, func(x))
     assert torch.allclose(aux_norm, x)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+    batch_spec = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
+
+    v = tree_map(lambda x: torch.randn_like(x), params)
+
+    fvp_result = fvp(
+        partial(log_likelihood_per_sample, batch=batch_spec),
+        (params,),
+        (v,),
+    )
+    assert len(fvp_result) == 2
+    assert torch.allclose(fvp_result[0], log_likelihood_per_sample(params, batch_spec))
 
 
 def test_empirical_fisher():
@@ -221,7 +261,7 @@ def test_empirical_fisher():
 
     # Test not normalized
     batch = (x, y)
-    fisher = empirical_fisher(lambda p: f_per_sample(p, batch), normalize=False)(params)
+    fisher = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
     expected_fisher = torch.zeros((num_features + 1, num_features + 1))
     for xs, ys in zip(x, y):
         g = torch.func.grad(f)(params, (xs, ys))
@@ -231,7 +271,9 @@ def test_empirical_fisher():
     assert torch.allclose(fisher, expected_fisher, rtol=1e-5)
 
     # Test normalized
-    fisher_norm = empirical_fisher(lambda p: f_per_sample(p, batch))(params)
+    fisher_norm = empirical_fisher(lambda p: f_per_sample(p, batch), normalize=True)(
+        params
+    )
     assert torch.allclose(fisher_norm, expected_fisher / num_samples, rtol=1e-5)
 
     # Test aux, not normalized
@@ -259,6 +301,304 @@ def test_empirical_fisher():
     fvp_result = tree_ravel(fvp_result)[0]
     fisher_fvp = fisher @ tree_ravel(v)[0]
     assert torch.allclose(fvp_result, fisher_fvp, rtol=1e-5)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+    batch = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
+
+    ef_result = empirical_fisher(log_likelihood_per_sample)(params, batch)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def log_likelihood_flat(flat_p, batch):
+        return log_likelihood_per_sample(unravel_params(flat_p), batch)
+
+    jac = torch.func.jacrev(log_likelihood_flat)(flat_params, batch)
+    expected = jac.T @ jac
+    assert torch.allclose(ef_result, expected, rtol=1e-5)
+
+
+def test_ggnvp():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = torch.randn(10)
+    v = torch.randn(10)
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected = Jac.T @ Hes @ Jac
+
+    # Test unnormalised
+    ggnvp_result = ggnvp(forward, loss, (x,), (v,))
+    assert torch.allclose(ggnvp_result[1], expected @ v, rtol=1e-5)
+    assert len(ggnvp_result) == 2
+    assert len(ggnvp_result[0]) == 2
+    assert torch.allclose(ggnvp_result[0][0], z)
+    assert torch.allclose(ggnvp_result[0][1], torch.func.grad(loss)(z))
+
+    # Test normalised
+    ggnvp_result_norm = ggnvp(forward, loss, (x,), (v,), normalize=True)
+    assert torch.allclose(ggnvp_result_norm[1], expected @ v / 2, rtol=1e-5)
+    assert len(ggnvp_result_norm) == 2
+    assert len(ggnvp_result_norm[0]) == 2
+    assert torch.allclose(ggnvp_result_norm[0][0], z)
+    assert torch.allclose(ggnvp_result_norm[0][1], torch.func.grad(loss)(z))
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggnvp_result_faux = ggnvp(forward_aux, loss, (x,), (v,), forward_has_aux=True)
+    assert torch.allclose(ggnvp_result_faux[1], expected @ v, rtol=1e-5)
+    assert len(ggnvp_result_faux) == 3
+    assert len(ggnvp_result_faux[0]) == 2
+    assert torch.allclose(ggnvp_result_faux[0][0], z)
+    assert torch.allclose(ggnvp_result_faux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_faux[2], x)
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggnvp_result_laux = ggnvp(forward, loss_aux, (x,), (v,), loss_has_aux=True)
+    assert torch.allclose(ggnvp_result_laux[1], expected @ v, rtol=1e-5)
+    assert len(ggnvp_result_laux) == 3
+    assert len(ggnvp_result_laux[0]) == 2
+    assert torch.allclose(ggnvp_result_laux[0][0], z)
+    assert torch.allclose(ggnvp_result_laux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_laux[2], z)
+
+    # Test both aux
+    ggnvp_result_flaux = ggnvp(
+        forward_aux, loss_aux, (x,), (v,), forward_has_aux=True, loss_has_aux=True
+    )
+    assert torch.allclose(ggnvp_result_flaux[1], expected @ v, rtol=1e-5)
+    assert len(ggnvp_result_flaux) == 4
+    assert len(ggnvp_result_flaux[0]) == 2
+    assert torch.allclose(ggnvp_result_flaux[0][0], z)
+    assert torch.allclose(ggnvp_result_flaux[0][1], torch.func.grad(loss)(z))
+    assert torch.allclose(ggnvp_result_faux[2], x)
+    assert torch.allclose(ggnvp_result_flaux[3], z)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    v = tree_map(lambda x: torch.randn_like(x), params)
+    ggnvp_result = ggnvp(
+        partial(forward, inputs=batch_inputs),
+        partial(loss, labels=batch_labels),
+        (params,),
+        (v,),
+    )
+    assert len(ggnvp_result) == 2
+    assert torch.allclose(ggnvp_result[0][0], forward(params, batch_inputs))
+    assert torch.allclose(
+        ggnvp_result[0][1],
+        torch.func.grad(partial(loss, labels=batch_labels))(
+            forward(params, batch_inputs)
+        ),
+    )
+
+
+def test_ggn():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x).sum(0)
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = torch.randn(10)
+    v = torch.randn(10)
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x).flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected = Jac.T @ Hes @ Jac
+
+    # Test unnormalised
+    ggn_result = ggn(forward, loss)(x)
+    assert torch.allclose(ggn_result, expected, rtol=1e-5)
+    assert torch.allclose(
+        ggn_result @ v, ggnvp(forward, loss, (x,), (v,))[1], rtol=1e-5
+    )
+
+    # Test normalised
+    ggn_result_norm = ggn(forward, loss, normalize=True)(x)
+    assert torch.allclose(ggn_result_norm, expected / 2, rtol=1e-5)
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggn_result_faux = ggn(forward_aux, loss, forward_has_aux=True)(x)
+    assert torch.allclose(ggn_result_faux[0], expected, rtol=1e-5)
+    assert len(ggn_result_faux) == 2
+    assert torch.allclose(ggn_result_faux[1], x)
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggn_result_laux = ggn(forward, loss_aux, loss_has_aux=True)(x)
+    assert torch.allclose(ggn_result_laux[0], expected, rtol=1e-5)
+    assert len(ggn_result_laux) == 2
+    assert torch.allclose(ggn_result_laux[1], z)
+
+    # Test both aux
+    ggn_result_flaux = ggn(
+        forward_aux, loss_aux, forward_has_aux=True, loss_has_aux=True
+    )(x)
+    assert torch.allclose(ggn_result_flaux[0], expected, rtol=1e-5)
+    assert len(ggn_result_flaux) == 3
+    assert torch.allclose(ggn_result_flaux[1], x)
+    assert torch.allclose(ggn_result_flaux[2], z)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    ggn_result = ggn(
+        partial(forward, inputs=batch_inputs), partial(loss, labels=batch_labels)
+    )(params)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def forward_flat(p):
+        return forward(unravel_params(p), batch_inputs)[:, 0]
+
+    z = forward_flat(flat_params)
+    jac = torch.func.jacrev(forward_flat)(flat_params)
+    hess = torch.func.hessian(partial(loss, labels=batch_labels[:, 0]))(z)
+    expected = jac.T @ hess @ jac
+    assert torch.allclose(ggn_result, expected, rtol=1e-5)
+
+
+def test_ggndiag():
+    # Batchsize=2, dz=5
+    def forward(x):
+        zs1 = torch.vmap(lambda a: a ** torch.arange(1, 6))(x["a"]).sum(0)
+        zs2 = torch.vmap(lambda a: (a / 2) ** torch.arange(1, 6))(x["a"]).sum(0)
+        return torch.stack([zs1, zs2])
+
+    def loss(z):
+        return torch.nn.functional.log_softmax(z, dim=0)[..., 0].sum()
+
+    x = {"a": torch.randn(10)}
+
+    z = forward(x)
+    Jac = torch.func.jacrev(forward)(x)["a"].flatten(end_dim=-2)
+    Hes = torch.func.hessian(loss)(z).flatten(start_dim=2).flatten(end_dim=1)
+    expected_full = Jac.T @ Hes @ Jac
+    expected_diag = torch.diagonal(expected_full)
+    expected = {"a": expected_diag}
+
+    # Test unnormalised
+    ggndiag_result = diag_ggn(forward, loss)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result[k], expected[k], rtol=1e-5)
+
+    # Test normalised
+    ggndiag_result_norm = diag_ggn(forward, loss, normalize=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_norm[k], expected[k] / 2, rtol=1e-5)
+
+    # Test forward aux
+    def forward_aux(x):
+        return forward(x), x
+
+    ggndiag_result_faux = diag_ggn(forward_aux, loss, forward_has_aux=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_faux[0][k], expected[k], rtol=1e-5)
+        assert torch.allclose(ggndiag_result_faux[1][k], x[k])
+    assert len(ggndiag_result_faux) == 2
+
+    # Test loss aux
+    def loss_aux(z):
+        return loss(z), z
+
+    ggndiag_result_laux = diag_ggn(forward, loss_aux, loss_has_aux=True)(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_laux[0][k], expected[k], rtol=1e-5)
+    assert len(ggndiag_result_laux) == 2
+    assert torch.allclose(ggndiag_result_laux[1], z)
+
+    # Test both aux
+    ggndiag_result_flaux = diag_ggn(
+        forward_aux, loss_aux, forward_has_aux=True, loss_has_aux=True
+    )(x)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result_flaux[0][k], expected[k], rtol=1e-5)
+        assert torch.allclose(ggndiag_result_flaux[1][k], x[k])
+    assert len(ggndiag_result_flaux) == 3
+    assert torch.allclose(ggndiag_result_flaux[2], z)
+
+    # Test model
+    model = TestModel()
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3,)).unsqueeze(-1)
+
+    def forward(params, inputs):
+        return torch.func.functional_call(model, params, inputs)
+
+    def loss(logits, labels):
+        return torch.nn.BCEWithLogitsLoss()(logits, labels.float())
+
+    ggndiag_result = diag_ggn(
+        partial(forward, inputs=batch_inputs), partial(loss, labels=batch_labels)
+    )(params)
+
+    flat_params, unravel_params = tree_ravel(params)
+
+    def forward_flat(p):
+        return forward(unravel_params(p), batch_inputs)[:, 0]
+
+    z = forward_flat(flat_params)
+    jac = torch.func.jacrev(forward_flat)(flat_params)
+    hess = torch.func.hessian(partial(loss, labels=batch_labels[:, 0]))(z)
+    expected_dense = jac.T @ hess @ jac
+    expected_diag = torch.diagonal(expected_dense)
+    expected = unravel_params(expected_diag)
+    for k in expected.keys():
+        assert torch.allclose(ggndiag_result[k], expected[k], rtol=1e-5)
 
 
 def test_cg():
@@ -414,214 +754,6 @@ def test_diag_normal_sample():
         assert torch.equal(result[key], expected[key])
 
 
-def test_tree_size():
-    tree = {
-        "a": 3.0,
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    result = tree_size(tree)
-    expected = 3
-
-    assert result == expected
-
-    assert tree_size(1) == 1
-    assert tree_size(1.2) == 1
-
-
-def test_tree_extract():
-    params = {
-        "a": torch.tensor([1.0, 2.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    def check_func(x):
-        return x[0] < 2.0
-
-    result = tree_extract(check_func, params)
-
-    expected = {
-        "a": torch.tensor([1.0, 2.0]),
-        "b": torch.tensor([]),
-    }
-
-    for key in expected:
-        assert torch.equal(result[key], expected[key])
-
-
-def test_tree_insert():
-    params = {
-        "a": torch.tensor([1.0, 2.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    params_static = {
-        "a": torch.tensor([1.0, 2.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    sub_params = {
-        "a": torch.tensor([5.0, 6.0]),
-        "b": torch.tensor([]),
-    }
-
-    def check_func(x):
-        return x[0] < 2.0
-
-    params2 = tree_insert(check_func, params, sub_params)
-
-    expected = {
-        "a": torch.tensor([5.0, 6.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    for key in expected:
-        assert torch.equal(params2[key], expected[key])
-        assert torch.equal(params[key], params_static[key])
-
-
-def test_tree_insert_():
-    params = {
-        "a": torch.tensor([1.0, 2.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    sub_params = {
-        "a": torch.tensor([5.0, 6.0]),
-        "b": torch.tensor([]),
-    }
-
-    def check_func(x):
-        return x[0] < 2.0
-
-    params2 = tree_insert_(check_func, params, sub_params)
-
-    expected = {
-        "a": torch.tensor([5.0, 6.0]),
-        "b": torch.tensor([3.0, 4.0]),
-    }
-
-    for key in expected:
-        assert torch.equal(params2[key], expected[key])
-        assert torch.equal(params[key], params2[key])
-
-
-def test_extract_requires_grad():
-    params = {
-        "a": torch.tensor([1.0, 2.0], requires_grad=True),
-        "b": torch.tensor([3.0, 4.0], requires_grad=False),
-    }
-
-    result = extract_requires_grad(params)
-
-    expected = {
-        "a": torch.tensor([1.0, 2.0], requires_grad=True),
-        "b": torch.tensor([], requires_grad=False),
-    }
-
-    for key in expected:
-        assert torch.equal(result[key], expected[key])
-        assert result[key].requires_grad == expected[key].requires_grad
-
-
-def test_insert_requires_grad():
-    params = {
-        "a": torch.tensor([1.0, 2.0], requires_grad=True),
-        "b": torch.tensor([3.0, 4.0], requires_grad=False),
-    }
-
-    params_copy = {k: v.clone() for k, v in params.items()}
-
-    sub_params = {
-        "a": torch.tensor([5.0, 6.0], requires_grad=True),
-        "b": torch.tensor([]),
-    }
-
-    params2 = insert_requires_grad(params, sub_params)
-
-    expected = {
-        "a": torch.tensor([5.0, 6.0], requires_grad=True),
-        "b": torch.tensor([3.0, 4.0], requires_grad=False),
-    }
-
-    for key in expected:
-        assert torch.equal(params2[key], expected[key])
-        assert params2[key].requires_grad == expected[key].requires_grad
-        assert torch.equal(params[key], params_copy[key])
-
-    params = insert_requires_grad_(params, sub_params)
-
-    for key in expected:
-        assert torch.equal(params[key], expected[key])
-        assert params[key].requires_grad == expected[key].requires_grad
-
-
-def test_extract_requires_grad_func():
-    params = {
-        "a": torch.tensor([1.0, 2.0], requires_grad=True),
-        "b": torch.tensor([3.0, 4.0], requires_grad=False),
-    }
-
-    def func(params):
-        return params["a"].sum() + params["b"].sum()
-
-    sub_params, sub_func = extract_requires_grad_and_func(params, func, inplace=False)
-
-    result = sub_func(sub_params)
-
-    assert torch.equal(result, func(params))
-
-    sub_params, sub_func = extract_requires_grad_and_func(params, func, inplace=True)
-
-    sub_params["a"].data = torch.tensor([5.0, 6.0])
-
-    result2 = sub_func(sub_params)
-
-    params2 = insert_requires_grad(params, sub_params)
-
-    assert torch.equal(result2, func(params2))
-    assert torch.equal(params2["a"], sub_params["a"])
-    assert torch.equal(params2["a"], params["a"])
-
-
-def test_inplacify():
-    def func(x):
-        return x + 1
-
-    x = torch.tensor(1.0)
-    y = inplacify(func)(x)
-
-    assert y == 2.0
-    assert x == 2.0
-
-
-def test_tree_map_inplacify_():
-    def func(x):
-        return x + 1
-
-    x = torch.tensor(1.0)
-    y = tree_map_inplacify_(func, x)
-
-    assert y == 2.0
-    assert x == 2.0
-
-
-def test_flexi_tree_map():
-    def func(x):
-        return x + 1
-
-    x = torch.tensor(1.0)
-    y = flexi_tree_map(func, x, inplace=False)
-
-    assert y == 2.0
-    assert x == 1.0
-
-    y = flexi_tree_map(func, x, inplace=True)
-
-    assert y == 2.0
-    assert x == 2.0
-
-
 def test_per_samplify():
     def func(p, b):
         return p + b, p
@@ -635,6 +767,33 @@ def test_per_samplify():
     expected_b = torch.tensor([1.0, 1.0])
     assert torch.allclose(ra, expected_a)
     assert torch.allclose(rb, expected_b)
+
+    # Test model
+    model = TestModel()  # From tests.scenarios
+    params = dict(model.named_parameters())
+    batch_inputs = torch.randn(3, 10)
+    batch_labels = torch.randint(2, (3, 1))
+    batch_spec = {"inputs": batch_inputs, "labels": batch_labels}
+
+    def log_likelihood(params, batch):
+        output = torch.func.functional_call(model, params, batch["inputs"])
+        return -torch.nn.BCEWithLogitsLoss()(output, batch["labels"].float())
+
+    log_likelihood_per_sample = per_samplify(log_likelihood)
+
+    expected = torch.tensor(
+        [
+            log_likelihood(
+                params, {"inputs": inp.unsqueeze(0), "labels": lab.unsqueeze(0)}
+            )
+            for inp, lab in zip(batch_inputs, batch_labels)
+        ]
+    )
+
+    eval = log_likelihood_per_sample(params, batch_spec)
+    eval_p = partial(log_likelihood_per_sample, batch=batch_spec)(params)
+    assert torch.allclose(expected, eval)
+    assert torch.allclose(expected, eval_p)
 
 
 def test_is_scalar():

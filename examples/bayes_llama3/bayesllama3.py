@@ -24,8 +24,6 @@ class BayesLlamaModel(LlamaModel):
         self.ensemble_param_names = bayes_config["ensemble_param_names"]
         self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
 
-        self.bayes_ensemble = None
-
     def get_module_weights(self, module, param_name: str):
         attributes = param_name.split(".")
         for attr in attributes:
@@ -212,8 +210,21 @@ class BayesLlamaModel(LlamaModel):
                 next_decoder_cache if use_cache else torch.empty(0),
             )
 
+        get_names = [
+            "_".join(param_nm.split(".")) for param_nm in self.ensemble_param_names
+        ]
         layer_outputs = torch.vmap(bayes_layer, in_dims=(0, None))(
-            self.bayes_ensemble,
+            torch.stack(
+                [
+                    torch.stack(
+                        [
+                            getattr(self, f"bayesian_ensemble_{param_nm}_{en}")
+                            for param_nm in get_names
+                        ]
+                    )
+                    for en in range(self.n_ensemble)
+                ]
+            ),
             hidden_states,
             causal_mask=attention_mask,
             position_ids=position_ids,
@@ -268,6 +279,7 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         self.n_ensemble = bayes_config["n_ensemble"]
         self.ensemble_param_names = bayes_config["ensemble_param_names"]
         self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
+        self.bayes_ensemble_initialized = False
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -285,16 +297,22 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        if self.n_ensemble > 0 and self.model.bayes_ensemble is None:
-            self.model.bayes_ensemble = torch.stack(
-                [
-                    self.model.get_module_weights(
-                        self.model.layers[self.ensemble_param_layer], param_name
-                    ).repeat(self.n_ensemble, 1, 1)
-                    for param_name in self.ensemble_param_names
-                ],
-                dim=0,
-            )
+        if self.n_ensemble > 0 and not self.bayes_ensemble_initialized:
+            for param_nm in self.ensemble_param_names:
+                set_param_nm = "_".join(param_nm.split("."))
+                for en in range(self.n_ensemble):
+                    setattr(
+                        self.model,
+                        f"bayesian_ensemble_{set_param_nm}_{en}",
+                        torch.nn.Parameter(
+                            self.model.get_module_weights(
+                                self.model.layers[self.ensemble_param_layer], param_nm
+                            )
+                            .clone()
+                            .detach(),
+                            requires_grad=True,
+                        ),
+                    )
 
         output_attentions = (
             output_attentions

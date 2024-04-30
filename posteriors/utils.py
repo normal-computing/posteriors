@@ -389,6 +389,50 @@ def ggnvp(
     return (jvp_output[0], HJv_output[0]), JTHJv, *jvp_output[2:], *HJv_output[2:]
 
 
+def _hess_and_jac_for_ggn(
+    flat_params_to_forward,
+    loss,
+    argnums,
+    forward_has_aux,
+    loss_has_aux,
+    normalize,
+    flat_params,
+) -> Tuple[Tensor, Tensor, list]:
+    jac_output = jacrev(
+        flat_params_to_forward, argnums=argnums, has_aux=forward_has_aux
+    )(flat_params)
+    jac = jac_output[0] if forward_has_aux else jac_output  # (..., dθ)
+    jac = torch.stack(tree_leaves(jac))[
+        0
+    ]  # convert to tensor (assumes jac has tensor output)
+    rescale = 1 / jac.shape[0] if normalize else 1  #  maybe normalize by batchsize
+    jac = jac.flatten(end_dim=-2)  # (d, dθ)
+
+    z = flat_params_to_forward(flat_params)
+    z = z[0] if forward_has_aux else z
+
+    hess_output = jacfwd(jacrev(loss, has_aux=loss_has_aux), has_aux=loss_has_aux)(z)
+    hess = hess_output[0] if loss_has_aux else hess_output
+    hess = torch.stack(tree_leaves(hess))[
+        0
+    ]  # convert to tensor (assumes loss has tensor input)
+    z_ndim = hess.ndim // 2
+    hess = hess.flatten(start_dim=z_ndim).flatten(
+        end_dim=-z_ndim
+    )  # flatten to square tensor
+
+    hess *= rescale
+
+    # Collect aux outputs
+    aux = []
+    if forward_has_aux:
+        aux.append(jac_output[1])
+    if loss_has_aux:
+        aux.append(loss(z)[1])
+
+    return jac, hess, aux
+
+
 def ggn(
     forward: Callable,
     loss: Callable,
@@ -400,7 +444,7 @@ def ggn(
     """
     Constructs function to compute the Generalised Gauss-Newton matrix.
 
-    Equivalent to the (non-empirical) Fisher vector product when `loss` is the negative
+    Equivalent to the (non-empirical) Fisher when `loss` is the negative
     log likelihood of an exponential family distribution as a function of its natural
     parameter.
 
@@ -475,42 +519,125 @@ def ggn(
         def flat_params_to_forward(fps):
             return forward(params_unravel(fps))
 
-        jac_output = jacrev(
-            flat_params_to_forward, argnums=argnums, has_aux=forward_has_aux
-        )(flat_params)
-        jac = jac_output[0] if forward_has_aux else jac_output  # (..., dθ)
-        jac = torch.stack(tree_leaves(jac))[
-            0
-        ]  # convert to tensor (assumes jac has tensor output)
-        rescale = 1 / jac.shape[0] if normalize else 1  #  maybe normalize by batchsize
-        jac = jac.flatten(end_dim=-2)  # (d, dθ)
-
-        z = forward(params)
-        z = z[0] if forward_has_aux else z
-
-        hess_output = jacfwd(jacrev(loss, has_aux=loss_has_aux), has_aux=loss_has_aux)(
-            z
+        jac, hess, aux = _hess_and_jac_for_ggn(
+            flat_params_to_forward,
+            loss,
+            argnums,
+            forward_has_aux,
+            loss_has_aux,
+            normalize,
+            flat_params,
         )
-        hess = hess_output[0] if loss_has_aux else hess_output
-        hess = torch.stack(tree_leaves(hess))[
-            0
-        ]  # convert to tensor (assumes loss has tensor input)
-        z_ndim = hess.ndim // 2
-        hess = hess.flatten(start_dim=z_ndim).flatten(
-            end_dim=-z_ndim
-        )  # flatten to square tensor
-
-        # Collect aux outputs
-        aux = []
-        if forward_has_aux:
-            aux.append(jac_output[1])
-        if loss_has_aux:
-            aux.append(loss(z)[1])
 
         if aux:
-            return jac.T @ (hess @ jac) * rescale, *aux
+            return jac.T @ (hess @ jac), *aux
         else:
-            return jac.T @ (hess @ jac) * rescale
+            return jac.T @ (hess @ jac)
+
+    return internal_ggn
+
+
+def diag_ggn(
+    forward: Callable,
+    loss: Callable,
+    argnums: int | Sequence[int] = 0,
+    forward_has_aux: bool = False,
+    loss_has_aux: bool = False,
+    normalize: bool = False,
+) -> Callable:
+    """
+    Constructs function to compute the diagonal of the Generalised Gauss-Newton matrix.
+
+    Equivalent to the (non-empirical) diagonal Fisher when `loss` is the negative
+    log likelihood of an exponential family distribution as a function of its natural
+    parameter.
+
+    The GGN is defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss function with scalar output.
+
+    Thus $J_f(θ)$ is the Jacobian of the forward function $f$ evaluated
+    at `primals` $θ$. And $H_l(z)$ is the Hessian of the loss function $l$ evaluated
+    at `z = f(θ)`.
+
+    Requires output from `forward` to be a tensor and therefore `loss` takes a tensor as
+    input. Although both support `aux` output.
+
+    If `normalize=True`, then $G(θ)$ is divided by the size of the leading dimension of
+    outputs from `forward` (i.e. batchsize).
+
+    Unlike `posteriors.ggn`, the output will be in PyTree form matching the input.
+
+    Follows API from [`torch.func.jacrev`](https://pytorch.org/functorch/stable/generated/functorch.jacrev.html).
+
+    More info on Fisher and GGN matrices can be found in
+    [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
+
+    Examples:
+        ```python
+        from functools import partial
+        import torch
+        from posteriors import diag_ggn
+
+        # Load model that outputs logits
+        # Load batch = {'inputs': ..., 'labels': ...}
+
+        def forward(params, inputs):
+            return torch.func.functional_call(model, params, inputs)
+
+        def loss(logits, labels):
+            return torch.nn.functional.cross_entropy(logits, labels)
+
+        params = dict(model.parameters())
+        ggndiag_result = diag_ggn(
+            partial(forward, inputs=batch['inputs']),
+            partial(loss, labels=batch['labels']),
+        )(params)
+        ```
+
+    Args:
+        forward: A function with tensor output.
+        loss: A function that maps the output of forward to a scalar output.
+            Takes a single input and returns a scalar (and possibly aux).
+        argnums: Optional, integer or sequence of integers. Specifies which
+            positional argument(s) to differentiate `forward` with respect to.
+        forward_has_aux: Whether forward returns auxiliary information.
+        loss_has_aux: Whether loss returns auxiliary information.
+        normalize: Whether to normalize, divide by the first dimension of the output
+            from f.
+
+    Returns:
+        A function with the same arguments as f that returns the diagonal GGN.
+            If has_aux is True, then the function instead returns a tuple of (F, aux).
+    """
+    assert argnums == 0, "Only argnums=0 is supported for now."
+
+    def internal_ggn(params):
+        flat_params, params_unravel = tree_ravel(params)
+
+        def flat_params_to_forward(fps):
+            return forward(params_unravel(fps))
+
+        jac, hess, aux = _hess_and_jac_for_ggn(
+            flat_params_to_forward,
+            loss,
+            argnums,
+            forward_has_aux,
+            loss_has_aux,
+            normalize,
+            flat_params,
+        )
+
+        G_diag = torch.einsum("ji,jk,ki->i", jac, hess, jac)
+        G_diag = params_unravel(G_diag)
+
+        if aux:
+            return G_diag, *aux
+        else:
+            return G_diag
 
     return internal_ggn
 

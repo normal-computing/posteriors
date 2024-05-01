@@ -7,7 +7,7 @@ from tqdm import tqdm
 from optree import tree_map
 import posteriors
 
-from examples.bayes_llama3.load import load_model, load_dataloaders
+from llama3.model import load_model, load_dataloaders
 from examples.yelp import utils
 
 # Get config path and device from user

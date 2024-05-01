@@ -6,7 +6,7 @@ from torch.distributions import Categorical
 from transformers import AutoTokenizer
 
 import posteriors
-from examples.bayes_llama3.bayesllama3 import BayesLlamaForCausalLM
+from examples.bayes_llama3.model.bayesllama3 import BayesLlamaForCausalLM
 
 from posteriors import model_to_function
 

@@ -1,34 +1,53 @@
 from typing import List
 from tqdm import tqdm
 
-from posteriors import model_to_function
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from safetensors.torch import load_model
+from torch import func
+import torchopt
+import posteriors
 import pytorch_lightning as pl
+import torch.nn.functional as F
 import torch.nn as nn
 import torch
+
+
+def log_posterior(num_data):
+    def fn_call(params, output, labels):
+        log_post_val = (
+            -F.cross_entropy(output, labels)
+            + posteriors.diag_normal_log_prob(params) / num_data
+        )
+        return log_post_val
+
+    return fn_call
 
 
 class BayesLlama(pl.LightningModule):
     def __init__(
         self,
+        num_data: int,
         pretrained_weights_folder: str = "Meta-Llama-3-8B",
         lr: float = 1e-6,
-        weight_decay: float = 0.1,
-        reg_strength: float = 1,
     ):
         super().__init__()
+
+        self.lr = lr
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
         )
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_weights_folder)
 
+        self.num_data = num_data
+        self.log_posterior = log_posterior(num_data)
+
         self.freeze_weights()
-        self.model_func = model_to_function(self.model)
+        self.params = dict(self.model.named_parameters())
 
     def freeze_weights(self):
         for name, param in self.model.named_parameters():
+            # TODO: Change this to set for other layers
             if "lm_head" not in name:
                 param.requires_grad_ = False
 
@@ -43,20 +62,18 @@ class BayesLlama(pl.LightningModule):
         )
 
     def training_step(self, batch):
-        # inputs = self.batch_setup(batch)
-        # question, answer = batch["question"], batch["answer"]
-        # self.model_func()
-
-        # self.state = self.transform.update(self.state, batch)
+        inputs, labels = self.batch_setup(batch)
+        output = func.functional_call(self.model, self.params, **inputs)
+        self.state = self.transform.update(self.state, output, labels)
         # TODO: Add logging
-        pass
 
     def configure_optimizers(self):
-        pass
-        # self.transform = config.method.build(
-        #     sub_param_to_log_posterior, **config.config_args
-        # )
-        # self.state = self.transform.init(sub_params)
+        self.transform = posteriors.vi.diag.build(
+            log_posterior=log_posterior,
+            optimizer=torchopt.adam(lr=1e-3),
+            temperature=1 / self.num_data,
+        )
+        self.state = self.transform.init(self.params)
 
     # TODO: Implement save checkpoint to only save the last layer, we don't need all of these weights
     # def on_save_checkpoint(self, checkpoint: dict) -> None:

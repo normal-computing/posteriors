@@ -1,7 +1,7 @@
 from typing import List
 from tqdm import tqdm
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from safetensors.torch import load_model
 from torch import func
 import torchopt
@@ -10,6 +10,8 @@ import pytorch_lightning as pl
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+
+# from modules.bayesllama import BayesLlamaForCausalLM
 
 
 def log_posterior(num_data):
@@ -38,18 +40,19 @@ class BayesLlama(pl.LightningModule):
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
         )
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_weights_folder)
+        self.num_decoder_layers = len(self.model.model.layers)
 
-        self.num_data = num_data
         self.log_posterior = log_posterior(num_data)
+        self.num_data = num_data
 
         self.freeze_weights()
         self.params = dict(self.model.named_parameters())
 
     def freeze_weights(self):
         for name, param in self.model.named_parameters():
-            # TODO: Change this to set for other layers
-            if "lm_head" not in name:
-                param.requires_grad_ = False
+            # Freeze everything but the last decoder layer
+            if f".{self.num_decoder_layers - 1}." not in name:
+                param.requires_grad = False
 
     def load_weights(self, weights_path: List[str]):
         print("Loading weights now")

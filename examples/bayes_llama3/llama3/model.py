@@ -42,6 +42,10 @@ class BayesLlama(pl.LightningModule):
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_weights_folder)
         self.num_decoder_layers = len(self.model.model.layers)
 
+        self.vocab_size = self.model.config.vocab_size
+        self.tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        self.tokenizer.padding_side = "left"
+
         self.log_posterior = log_posterior(num_data)
         self.num_data = num_data
 
@@ -60,21 +64,27 @@ class BayesLlama(pl.LightningModule):
             load_model(self.model, path, strict=False)
 
     def batch_setup(self, batch):
-        return self.tokenizer(batch["model"], return_tensors="pt", padding=True).to(
+        inputs = self.tokenizer(batch, return_tensors="pt", padding=True).to(
             self.device
         )
+        return inputs
 
     def training_step(self, batch):
-        inputs, labels = self.batch_setup(batch)
-        output = func.functional_call(self.model, self.params, **inputs)
-        self.state = self.transform.update(self.state, output, labels)
+        inputs = self.batch_setup(batch)
+        input_ids = inputs["input_ids"]
+        print(inputs)
+        logits = func.functional_call(self.model, self.params, inputs)
+
+        pred_logits = logits[:, self.inversion_token_seq_len : -1].contiguous()
+        labels = input_ids[:, 1:].contiguous()
+        self.state = self.transform.update(self.state, pred_logits, labels)
         # TODO: Add logging
 
     def configure_optimizers(self):
-        self.transform = posteriors.vi.diag.build(
+        self.transform = posteriors.sgmcmc.sghmc.build(
             log_posterior=log_posterior,
-            optimizer=torchopt.adam(lr=1e-3),
-            temperature=1 / self.num_data,
+            # temperature=1 / self.num_data,
+            lr=self.lr,
         )
         self.state = self.transform.init(self.params)
 

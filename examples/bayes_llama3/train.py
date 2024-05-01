@@ -12,7 +12,6 @@ from llama3.model import BayesLlama
 from llama3.data.tqa import TQADataLoader
 from llama3.utils.load_utils import parse_devices
 
-# from llama3.utils.logger import Logger
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

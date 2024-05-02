@@ -75,7 +75,7 @@ class BayesLlama(pl.LightningModule):
         print(inputs)
         logits = func.functional_call(self.model, self.params, inputs)
 
-        pred_logits = logits[:, self.inversion_token_seq_len : -1].contiguous()
+        pred_logits = logits[:, :-1].contiguous()
         labels = input_ids[:, 1:].contiguous()
         self.state = self.transform.update(self.state, pred_logits, labels)
         # TODO: Add logging

@@ -48,16 +48,21 @@ if __name__ == "__main__":
         logger = TensorBoardLogger("", name=name, version=version)
         checkpoint_callback = ModelCheckpoint(
             dirpath=f"{logger.log_dir}/checkpoints",
-            filename="{epoch}",
-            save_weights_only=False,
+            filename="{epoch}-{step}",
+            save_weights_only=True,
             verbose=True,
+            save_top_k=-1,
             every_n_train_steps=config["save_frequency"],
         )
         trainer_kwargs["logger"] = logger
         trainer_kwargs["callbacks"] = [checkpoint_callback]
 
     trainer = pl.Trainer(**trainer_kwargs)
-    dataloader = TQADataLoader(config["data_dir"])
+    dataloader = TQADataLoader(
+        config["data_dir"],
+        batch_size=config["batch_size"],
+        num_workers=config["num_workers"],
+    )
     model = BayesLlama(
         len(dataloader.train_dataset),
         lr=config["learning_rate"],
@@ -70,6 +75,6 @@ if __name__ == "__main__":
             if not args.debug:
                 epoch_num = trainer.current_epoch
                 final_ckpt = os.path.join(
-                    logger.log_dir, "checkpoints", f"embedding_{epoch_num}.ckpt"
+                    logger.log_dir, "checkpoints", f"{epoch_num}.ckpt"
                 )
                 trainer.save_checkpoint(final_ckpt)

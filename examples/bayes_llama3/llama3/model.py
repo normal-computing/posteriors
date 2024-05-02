@@ -1,17 +1,13 @@
 from typing import List, Tuple
 from tqdm import tqdm
 
+import posteriors
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from safetensors.torch import load_model
-from torch import func
-import torchopt
-import posteriors
 import pytorch_lightning as pl
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-
-# from modules.bayesllama import BayesLlamaForCausalLM
 
 PRIOR_SD = 1e3
 
@@ -85,7 +81,6 @@ class BayesLlama(pl.LightningModule):
         inputs = self.batch_setup(batch)
         self.state = self.transform.update(self.state, inputs)
         self.log("loss", self.state.aux, prog_bar=True)
-        # TODO: Add logging
 
     def configure_optimizers(self):
         sub_params, sub_param_to_log_posterior = (
@@ -102,27 +97,5 @@ class BayesLlama(pl.LightningModule):
         )
         self.state = self.transform.init(sub_params)
 
-    # TODO: Implement save checkpoint to only save the last layer, we don't need all of these weights
-    # def on_save_checkpoint(self, checkpoint: dict) -> None:
-    # checkpoint["state_dict"] = {"bayesian_layer": }
-
-    # @torch.no_grad()
-    # def generate(self, batch, max_length=100, use_inversion_tokens=True):
-    #     inputs, _ = self.batch_setup(
-    #         batch["question"], batch["answer"], use_inversion_tokens
-    #     )
-
-    #     seq_out = []
-    #     for _ in range(max_length):
-    #         outputs = self.model(**inputs)
-
-    #         if "attention_mask" in inputs:
-    #             del inputs["attention_mask"]
-
-    #         next_token = outputs["logits"][:, -1].argmax(-1).unsqueeze(-1)
-    #         inputs["past_key_values"] = outputs["past_key_values"]
-    #         inputs["inputs_embeds"] = self.model.model.embed_tokens(next_token)
-    #         seq_out.append(next_token)
-
-    #     seq_out = torch.cat(seq_out, -1)
-    #     return self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
+    def on_save_checkpoint(self, checkpoint: dict) -> None:
+        checkpoint["state_dict"] = {"bayesian_layer": self.state}

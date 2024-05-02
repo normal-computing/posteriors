@@ -1,6 +1,6 @@
 seed: 2024
 weight_decay: 0.1
-learning_rate: 1e-4
+learning_rate: 1e-2
 epochs: 10
 
 metrics_log_frequency: 10

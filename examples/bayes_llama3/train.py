@@ -1,4 +1,5 @@
 import argparse
+import pathlib
 import os
 
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -18,7 +19,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 parser = argparse.ArgumentParser()
 parser.add_argument("--base", type=str, required=True)
 parser.add_argument("--resume", default=None, type=str)
-parser.add_argument("--name", default=None, type=str)
 parser.add_argument("--devices", default=parse_devices, type=str)
 parser.add_argument("-d", "--debug", default=False, action="store_true")
 args = parser.parse_args()
@@ -40,12 +40,10 @@ if __name__ == "__main__":
     }
     if not callable(args.devices):
         trainer_kwargs["devices"] = args.devices
-
-    name = "lightning_logs" if args.name is None else args.name
-    version = None
+    version = pathlib.Path(args.base).stem
 
     if not args.debug:
-        logger = TensorBoardLogger("", name=name, version=version)
+        logger = TensorBoardLogger("", name="logs", version=version)
         checkpoint_callback = ModelCheckpoint(
             dirpath=f"{logger.log_dir}/checkpoints",
             filename="{epoch}-{step}",
@@ -63,10 +61,7 @@ if __name__ == "__main__":
         batch_size=config["batch_size"],
         num_workers=config["num_workers"],
     )
-    model = BayesLlama(
-        len(dataloader.train_dataset),
-        lr=config["learning_rate"],
-    )
+    model = BayesLlama(len(dataloader.train_dataset), lr=config["learning_rate"])
 
     try:
         trainer.fit(model, dataloader)

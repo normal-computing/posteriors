@@ -304,14 +304,11 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
                     setattr(
                         self.model,
                         f"bayesian_ensemble_{set_param_nm}_{en}",
-                        torch.nn.Parameter(
-                            self.model.get_module_weights(
-                                self.model.layers[self.ensemble_param_layer], param_nm
-                            )
-                            .clone()
-                            .detach(),
-                            requires_grad=True,
-                        ),
+                        self.model.get_module_weights(
+                            self.model.layers[self.ensemble_param_layer], param_nm
+                        )
+                        .clone()
+                        .detach(),
                     )
 
         output_attentions = (

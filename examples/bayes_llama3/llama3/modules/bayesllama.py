@@ -11,6 +11,7 @@ from transformers.models.llama.modeling_llama import (
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.utils import logging
 from torch.nn import CrossEntropyLoss, functional as F
+import regex as re
 
 
 logger = logging.get_logger(__name__)
@@ -21,15 +22,7 @@ class BayesLlamaModel(LlamaModel):
         super().__init__(config)
 
         self.n_ensemble = bayes_config["n_ensemble"]
-        self.ensemble_param_names = bayes_config["ensemble_param_names"]
         self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
-
-    def get_module_weights(self, module, param_name: str):
-        attributes = param_name.split(".")
-        for attr in attributes:
-            module = getattr(module, attr)
-
-        return module
 
     def load_ensemble_weights(
         self, layer_idx: int, param_names: list, ensemble_params: list[torch.Tensor]
@@ -37,7 +30,7 @@ class BayesLlamaModel(LlamaModel):
         module = self.layers[layer_idx]
 
         for param_name, params in zip(param_names, ensemble_params):
-            attributes = param_name.split(".")
+            attributes = re.split(r'\d+', param_name)[-1].split(".")[1:]
 
             sub_module = module
             attr = None
@@ -218,7 +211,7 @@ class BayesLlamaModel(LlamaModel):
                 [
                     torch.stack(
                         [
-                            getattr(self, f"bayesian_ensemble_{param_nm}_{en}")
+                            getattr(self, f"bayesian_ensemble_{en}_{param_nm}")
                             for param_nm in get_names
                         ]
                     )
@@ -270,18 +263,28 @@ class BayesLlamaModel(LlamaModel):
 class BayesLlamaForCausalLM(LlamaForCausalLM):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config, bayes_config=None):
+    def __init__(self, config, bayes_config=None, ):
         super().__init__(config)
         self.model = BayesLlamaModel(config, bayes_config)
 
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.n_ensemble = bayes_config["n_ensemble"]
-        self.ensemble_param_names = bayes_config["ensemble_param_names"]
         self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
-        self.bayes_ensemble_initialized = False
+
         # Initialize weights and apply final processing
         self.post_init()
+    
+    def load(self, bayes_params:list[dict]=None):
+        for en, params in enumerate(bayes_params):
+            for param_nm, value in params.items():
+                set_param_nm = "_".join(param_nm.split("."))
+                setattr(
+                    self.model,
+                    f"bayesian_ensemble_{en}_{set_param_nm}",
+                    torch.tensor(value)
+                )
+        setattr(self.model, 'ensemble_param_names', bayes_params[0].keys())
 
     def forward(
         self,
@@ -297,20 +300,6 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        if self.n_ensemble > 0 and not self.bayes_ensemble_initialized:
-            for param_nm in self.ensemble_param_names:
-                set_param_nm = "_".join(param_nm.split("."))
-                for en in range(self.n_ensemble):
-                    setattr(
-                        self.model,
-                        f"bayesian_ensemble_{set_param_nm}_{en}",
-                        self.model.get_module_weights(
-                            self.model.layers[self.ensemble_param_layer], param_nm
-                        )
-                        .clone()
-                        .detach(),
-                    )
-
         output_attentions = (
             output_attentions
             if output_attentions is not None

@@ -38,10 +38,16 @@ class BayesLlama(pl.LightningModule):
         num_data: int,
         pretrained_weights_folder: str = "Meta-Llama-3-8B",
         lr: float = 1e-6,
+        alpha: float = 1e-1,
+        beta: float = 0.0,
+        momenta: float = 0.0,
     ):
         super().__init__()
 
         self.lr = lr
+        self.alpha = alpha
+        self.beta = beta
+        self.momenta = momenta
         self.num_data = num_data
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
@@ -94,6 +100,9 @@ class BayesLlama(pl.LightningModule):
             log_posterior=sub_param_to_log_posterior,
             temperature=1 / self.num_data,
             lr=self.lr,
+            alpha=self.alpha,
+            beta=self.beta,
+            momenta=self.momenta,
         )
         self.state = self.transform.init(sub_params)
 

@@ -61,7 +61,13 @@ if __name__ == "__main__":
         batch_size=config["batch_size"],
         num_workers=config["num_workers"],
     )
-    model = BayesLlama(len(dataloader.train_dataset), lr=config["learning_rate"])
+    model = BayesLlama(
+        len(dataloader.train_dataset),
+        lr=config["learning_rate"],
+        alpha=config["alpha"],
+        beta=config["beta"],
+        momenta=config["momenta"],
+    )
 
     try:
         trainer.fit(model, dataloader)

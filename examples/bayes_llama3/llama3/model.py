@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from tqdm import tqdm
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -14,13 +14,19 @@ import torch
 # from modules.bayesllama import BayesLlamaForCausalLM
 
 
-def log_posterior(num_data):
-    def fn_call(params, output, labels):
-        log_post_val = (
-            -F.cross_entropy(output, labels)
+def log_posterior(model, num_data, vocab_size):
+    def fn_call(params, inputs):
+        outputs = model(params, **inputs)
+        pred_logits = outputs.logits[:, :-1].contiguous()
+        labels = inputs["input_ids"][:, 1:].contiguous()
+        pred_logits = pred_logits.view(-1, vocab_size)
+        labels = labels.view(-1)
+
+        log_post = (
+            -F.cross_entropy(pred_logits, labels)
             + posteriors.diag_normal_log_prob(params) / num_data
         )
-        return log_post_val
+        return log_post, None
 
     return fn_call
 
@@ -35,6 +41,7 @@ class BayesLlama(pl.LightningModule):
         super().__init__()
 
         self.lr = lr
+        self.num_data = num_data
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
@@ -43,20 +50,21 @@ class BayesLlama(pl.LightningModule):
         self.num_decoder_layers = len(self.model.model.layers)
 
         self.vocab_size = self.model.config.vocab_size
-        self.tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
 
-        self.log_posterior = log_posterior(num_data)
-        self.num_data = num_data
-
-        self.freeze_weights()
-        self.params = dict(self.model.named_parameters())
+        self.params = self.freeze_weights()
+        # self.functional_model = posteriors.model_to_function(self.model)
 
     def freeze_weights(self):
+        params_to_train = {}
         for name, param in self.model.named_parameters():
             # Freeze everything but the last decoder layer
             if f".{self.num_decoder_layers - 1}." not in name:
                 param.requires_grad = False
+            else:
+                params_to_train[name] = param
+        return params_to_train
 
     def load_weights(self, weights_path: List[str]):
         print("Loading weights now")
@@ -67,22 +75,19 @@ class BayesLlama(pl.LightningModule):
         inputs = self.tokenizer(batch, return_tensors="pt", padding=True).to(
             self.device
         )
-        return inputs
+        return {
+            "input_ids": inputs["input_ids"],
+            "attention_mask": inputs["attention_mask"],
+        }
 
     def training_step(self, batch):
         inputs = self.batch_setup(batch)
-        input_ids = inputs["input_ids"]
-        print(inputs)
-        logits = func.functional_call(self.model, self.params, inputs)
-
-        pred_logits = logits[:, :-1].contiguous()
-        labels = input_ids[:, 1:].contiguous()
-        self.state = self.transform.update(self.state, pred_logits, labels)
+        self.state = self.transform.update(self.state, inputs)
         # TODO: Add logging
 
     def configure_optimizers(self):
         self.transform = posteriors.sgmcmc.sghmc.build(
-            log_posterior=log_posterior,
+            log_posterior=log_posterior(self.model, self.num_data, self.vocab_size),
             # temperature=1 / self.num_data,
             lr=self.lr,
         )

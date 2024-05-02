@@ -13,20 +13,25 @@ import torch
 
 # from modules.bayesllama import BayesLlamaForCausalLM
 
+PRIOR_SD = 1e3
 
-def log_posterior(model, num_data, vocab_size):
+
+def log_posterior(model_func, num_data, vocab_size):
     def fn_call(params, inputs):
-        outputs = model(params, **inputs)
+        outputs = model_func(params, **inputs)
         pred_logits = outputs.logits[:, :-1].contiguous()
         labels = inputs["input_ids"][:, 1:].contiguous()
         pred_logits = pred_logits.view(-1, vocab_size)
         labels = labels.view(-1)
 
+        loss = F.cross_entropy(pred_logits, labels)
+
         log_post = (
-            -F.cross_entropy(pred_logits, labels)
-            + posteriors.diag_normal_log_prob(params) / num_data
+            -loss
+            + posteriors.diag_normal_log_prob(params, sd_diag=PRIOR_SD, normalize=False)
+            / num_data
         )
-        return log_post, None
+        return log_post, loss
 
     return fn_call
 
@@ -53,18 +58,14 @@ class BayesLlama(pl.LightningModule):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
 
-        self.params = self.freeze_weights()
-        # self.functional_model = posteriors.model_to_function(self.model)
+        self.freeze_weights()
+        self.functional_model = posteriors.model_to_function(self.model)
 
     def freeze_weights(self):
-        params_to_train = {}
         for name, param in self.model.named_parameters():
             # Freeze everything but the last decoder layer
             if f".{self.num_decoder_layers - 1}." not in name:
                 param.requires_grad = False
-            else:
-                params_to_train[name] = param
-        return params_to_train
 
     def load_weights(self, weights_path: List[str]):
         print("Loading weights now")
@@ -83,15 +84,23 @@ class BayesLlama(pl.LightningModule):
     def training_step(self, batch):
         inputs = self.batch_setup(batch)
         self.state = self.transform.update(self.state, inputs)
+        self.log("loss", self.state.aux, prog_bar=True)
         # TODO: Add logging
 
     def configure_optimizers(self):
+        sub_params, sub_param_to_log_posterior = (
+            posteriors.extract_requires_grad_and_func(
+                dict(self.model.named_parameters()),
+                log_posterior(self.functional_model, self.num_data, self.vocab_size),
+            )
+        )
+
         self.transform = posteriors.sgmcmc.sghmc.build(
-            log_posterior=log_posterior(self.model, self.num_data, self.vocab_size),
-            # temperature=1 / self.num_data,
+            log_posterior=sub_param_to_log_posterior,
+            temperature=1 / self.num_data,
             lr=self.lr,
         )
-        self.state = self.transform.init(self.params)
+        self.state = self.transform.init(sub_params)
 
     # TODO: Implement save checkpoint to only save the last layer, we don't need all of these weights
     # def on_save_checkpoint(self, checkpoint: dict) -> None:

@@ -26,22 +26,6 @@ class BayesLlamaModel(LlamaModel):
             [copy.deepcopy(self.layers[-1]) for _ in range(2)]
         )
 
-    def load_ensemble_weights(
-        self, layer_idx: int, param_names: list, ensemble_params: list[torch.Tensor]
-    ):
-        module = self.layers[layer_idx]
-
-        for param_name, params in zip(param_names, ensemble_params):
-            attributes = re.split(r"\d+", param_name)[-1].split(".")[1:]
-
-            sub_module = module
-            attr = None
-            for attr in attributes:
-                sub_module = getattr(sub_module, attr)
-            setattr(sub_module, attr, torch.nn.Parameter(params.to(self.device)))
-
-        return module
-
     def forward(
         self,
         input_ids: torch.LongTensor = None,

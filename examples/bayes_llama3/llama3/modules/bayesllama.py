@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Union, List
+import copy
 
 import torch
 import torch.nn as nn
@@ -21,24 +22,9 @@ class BayesLlamaModel(LlamaModel):
     def __init__(self, config, bayes_config):
         super().__init__(config)
 
-        self.n_ensemble = bayes_config["n_ensemble"]
-        self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
-
-    def load_ensemble_weights(
-        self, layer_idx: int, param_names: list, ensemble_params: list[torch.Tensor]
-    ):
-        module = self.layers[layer_idx]
-
-        for param_name, params in zip(param_names, ensemble_params):
-            attributes = re.split(r'\d+', param_name)[-1].split(".")[1:]
-
-            sub_module = module
-            attr = None
-            for attr in attributes:
-                sub_module = getattr(sub_module, attr)
-            setattr(sub_module, attr, torch.nn.Parameter(params.to(self.device)))
-
-        return module
+        self.bayesian_layers = nn.ModuleList(
+            [copy.deepcopy(self.layers[-1]) for _ in range(bayes_config["n_ensemble"])]
+        )
 
     def forward(
         self,
@@ -148,91 +134,28 @@ class BayesLlamaModel(LlamaModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-        # Define pass through ensembled last layer
-        def bayes_layer(
-            ensemble_params,
-            hidden_states,
-            causal_mask,
-            position_ids,
-            past_key_values,
-            use_cache,
-            output_attentions,
-            cache_position,
-            all_self_attns,
-        ):
-            final_decoder = self.load_ensemble_weights(
-                layer_idx=self.ensemble_param_layer,
-                param_names=self.ensemble_param_names,
-                ensemble_params=ensemble_params,
-            )
-
-            if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
-                    final_decoder.__call__,
-                    hidden_states,
-                    causal_mask,
-                    position_ids,
-                    past_key_values,
-                    output_attentions,
-                    use_cache,
-                    cache_position,
-                )
-            else:
-                layer_outputs = final_decoder(
-                    hidden_states,
-                    attention_mask=causal_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                )
-
-            hidden_states = layer_outputs[0]
-
-            if use_cache:
-                next_decoder_cache = layer_outputs[2 if output_attentions else 1]
-                next_decoder_cache = next_decoder_cache.to_legacy_cache()
-
-            if output_attentions:
-                all_self_attns += (layer_outputs[1],)
-
-            return (
+        bayesian_layer_outputs = []
+        for layer in self.bayesian_layers:
+            layer_outputs = layer(
                 hidden_states,
-                all_self_attns if output_attentions else torch.empty(0),
-                next_decoder_cache if use_cache else torch.empty(0),
+                attention_mask=causal_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_values,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
             )
+            bayesian_layer_outputs.append(layer_outputs)
 
-        get_names = [
-            "_".join(param_nm.split(".")) for param_nm in self.ensemble_param_names
-        ]
-        layer_outputs = torch.vmap(bayes_layer, in_dims=(0, None))(
-            torch.stack(
-                [
-                    torch.stack(
-                        [
-                            getattr(self, f"bayesian_ensemble_{en}_{param_nm}")
-                            for param_nm in get_names
-                        ]
-                    )
-                    for en in range(self.n_ensemble)
-                ]
-            ),
-            hidden_states,
-            causal_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            cache_position=cache_position,
-            all_self_attns=all_self_attns,
-        )
+        if use_cache: #We cannot sample from kv pairs, by default use rep's from last ensemble layer
+            next_decoder_cache = layer_outputs[2 if output_attentions else 1]
 
-        hidden_states = layer_outputs[0]
+        if output_attentions: #Output attentions from all bayesian layers
+            all_self_attns += ([layer_outputs[1] for layer_outputs in bayesian_layer_outputs],)
+
+        #stack hidden states from bayesian layers
+        hidden_states = torch.stack([bayesian_layer_outputs[i][0] for i in range(len(bayesian_layer_outputs))])
         hidden_states = self.norm(hidden_states)
-
-        if output_attentions:
-            all_self_attns = layer_outputs[1]
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -240,7 +163,6 @@ class BayesLlamaModel(LlamaModel):
 
         next_cache = None
         if use_cache:
-            next_cache = layer_outputs[2 if output_attentions else 1]
             next_cache = (
                 next_decoder_cache.to_legacy_cache()
                 if isinstance(next_decoder_cache, Cache)
@@ -263,28 +185,23 @@ class BayesLlamaModel(LlamaModel):
 class BayesLlamaForCausalLM(LlamaForCausalLM):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config, bayes_config=None, ):
-        super().__init__(config)
-        self.model = BayesLlamaModel(config, bayes_config)
-
+    def __init__(self, config, bayes_config):
+        super().__init__(config,)
         self.vocab_size = config.vocab_size
+
+        self.model = BayesLlamaModel(config, bayes_config=bayes_config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.n_ensemble = bayes_config["n_ensemble"]
-        self.ensemble_param_layer = bayes_config["ensemble_param_layer"]
 
         # Initialize weights and apply final processing
         self.post_init()
-    
-    def load(self, bayes_params:list[dict]=None):
-        for en, params in enumerate(bayes_params):
-            for param_nm, value in params.items():
-                set_param_nm = "_".join(param_nm.split("."))
-                setattr(
-                    self.model,
-                    f"bayesian_ensemble_{en}_{set_param_nm}",
-                    torch.tensor(value)
-                )
-        setattr(self.model, 'ensemble_param_names', bayes_params[0].keys())
+
+    def load_bayesian_layers(self, layer_state_dicts):
+        assert len(layer_state_dicts) == len(self.model.bayesian_layers)
+
+        for state_dict, bayesian_layer in zip(
+            layer_state_dicts, self.model.bayesian_layers
+        ):
+            bayesian_layer.load_state_dict(state_dict)
 
     def forward(
         self,
@@ -329,6 +246,7 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         )
 
         hidden_states = outputs[0]
+
         if self.config.pretraining_tp > 1:
             lm_head_slices = self.lm_head.weight.split(
                 self.vocab_size // self.config.pretraining_tp, dim=0
@@ -340,13 +258,16 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
             logits = torch.cat(logits, dim=-1)
         else:
             logits = self.lm_head(hidden_states)
-        logits = logits.transpose(0, 1)
+
         logits = logits.float()
+        # logits are size (n_ensemble, batch_size, seq_len, vocab_size)
+        # mean over n_ensemble to get (batch_size, seq_len, vocab_size)
+        mean_logits = logits.mean(dim=0)
 
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
+            shift_logits = mean_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
@@ -357,12 +278,12 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
             loss = loss_fct(shift_logits, shift_labels)
 
         if not return_dict:
-            output = (logits,) + outputs[1:]
+            output = (mean_logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
         return CausalLMOutputWithPast(
             loss=loss,
-            logits=logits,
+            logits=(mean_logits, logits), #return logits from all bayesian layers
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,

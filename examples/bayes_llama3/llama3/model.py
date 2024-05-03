@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from tqdm import tqdm
 
 import posteriors
@@ -42,6 +42,7 @@ class BayesLlama(pl.LightningModule):
         beta: float = 0.0,
         momenta: float = 0.0,
         set_temperature: bool = True,
+        max_seq_len: Optional[int] = None,
     ):
         super().__init__()
 
@@ -49,8 +50,10 @@ class BayesLlama(pl.LightningModule):
         self.alpha = alpha
         self.beta = beta
         self.momenta = momenta
-        self.num_data = num_data
         self.set_temperature = set_temperature
+        self.max_seq_len = max_seq_len
+        if max_seq_len:
+            self.num_data = num_data * max_seq_len
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
@@ -77,9 +80,13 @@ class BayesLlama(pl.LightningModule):
             load_model(self.model, path, strict=False)
 
     def batch_setup(self, batch):
-        inputs = self.tokenizer(batch, return_tensors="pt", padding=True).to(
-            self.device
-        )
+        inputs = self.tokenizer(
+            batch,
+            return_tensors="pt",
+            max_length=self.max_seq_len,
+            truncation=True,
+            padding="max_length",
+        ).to(self.device)
         return {
             "input_ids": inputs["input_ids"],
             "attention_mask": inputs["attention_mask"],

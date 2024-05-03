@@ -67,6 +67,7 @@ if __name__ == "__main__":
         alpha=config["alpha"],
         beta=config["beta"],
         momenta=config["momenta"],
+        set_temperature=config["set_temperature"],
     )
 
     try:

@@ -41,6 +41,7 @@ class BayesLlama(pl.LightningModule):
         alpha: float = 1e-1,
         beta: float = 0.0,
         momenta: float = 0.0,
+        set_temperature: bool = True,
     ):
         super().__init__()
 
@@ -49,6 +50,7 @@ class BayesLlama(pl.LightningModule):
         self.beta = beta
         self.momenta = momenta
         self.num_data = num_data
+        self.set_temperature = set_temperature
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
@@ -98,7 +100,7 @@ class BayesLlama(pl.LightningModule):
 
         self.transform = posteriors.sgmcmc.sghmc.build(
             log_posterior=sub_param_to_log_posterior,
-            temperature=1 / self.num_data,
+            temperature=1 / self.num_data if self.set_temperature else 0,
             lr=self.lr,
             alpha=self.alpha,
             beta=self.beta,

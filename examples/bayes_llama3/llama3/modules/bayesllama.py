@@ -11,7 +11,7 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.utils import logging
-from torch.nn import CrossEntropyLoss, functional as F
+import torch.nn.functional as F
 import regex as re
 
 
@@ -25,6 +25,8 @@ class BayesLlamaModel(LlamaModel):
         self.bayesian_layers = nn.ModuleList(
             [copy.deepcopy(self.layers[-1]) for _ in range(bayes_config["n_ensemble"])]
         )
+        for layer in self.bayesian_layers:
+            layer.self_attn.layer_idx = 0
 
     def forward(
         self,
@@ -32,6 +34,7 @@ class BayesLlamaModel(LlamaModel):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
+        ensemble_past_key_values: Optional[List[List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -74,6 +77,19 @@ class BayesLlamaModel(LlamaModel):
                 past_key_values = DynamicCache.from_legacy_cache(past_key_values)
                 past_seen_tokens = past_key_values.get_seq_length()
 
+            if ensemble_past_key_values is None:
+                ensemble_past_key_values = [
+                    None for _ in range(len(self.bayesian_layers))
+                ]
+            if not isinstance(ensemble_past_key_values[0], StaticCache):
+                ensemble_past_key_values = [
+                    DynamicCache.from_legacy_cache(pkv)
+                    for pkv in ensemble_past_key_values
+                ]
+                assert (
+                    ensemble_past_key_values[0].get_seq_length() == past_seen_tokens
+                ), "Ensemble KV cache and decoder cache is out of sync"
+
         if cache_position is None:
             if isinstance(past_key_values, StaticCache):
                 raise ValueError(
@@ -100,7 +116,7 @@ class BayesLlamaModel(LlamaModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
-        for decoder_layer in self.layers[:-1]:
+        for idx, decoder_layer in enumerate(self.layers[:-1]):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -135,26 +151,37 @@ class BayesLlamaModel(LlamaModel):
                 all_self_attns += (layer_outputs[1],)
 
         bayesian_layer_outputs = []
-        for layer in self.bayesian_layers:
+        ensemble_next_decoder_cache = []
+        for idx, layer in enumerate(self.bayesian_layers):
             layer_outputs = layer(
                 hidden_states,
                 attention_mask=causal_mask,
                 position_ids=position_ids,
-                past_key_value=past_key_values,
+                past_key_value=(
+                    ensemble_past_key_values[idx]
+                    if ensemble_past_key_values is not None
+                    else None
+                ),
                 output_attentions=output_attentions,
                 use_cache=use_cache,
                 cache_position=cache_position,
             )
             bayesian_layer_outputs.append(layer_outputs)
 
-        if use_cache: #We cannot sample from kv pairs, by default use rep's from last ensemble layer
-            next_decoder_cache = layer_outputs[2 if output_attentions else 1]
+            if use_cache:
+                ensemble_next_decoder_cache.append(
+                    layer_outputs[2 if output_attentions else 1]
+                )
 
-        if output_attentions: #Output attentions from all bayesian layers
-            all_self_attns += ([layer_outputs[1] for layer_outputs in bayesian_layer_outputs],)
+        if output_attentions:  # Output attentions from all bayesian layers
+            all_self_attns += (
+                [layer_outputs[1] for layer_outputs in bayesian_layer_outputs],
+            )
 
-        #stack hidden states from bayesian layers
-        hidden_states = torch.stack([bayesian_layer_outputs[i][0] for i in range(len(bayesian_layer_outputs))])
+        # stack hidden states from bayesian layers
+        hidden_states = torch.stack(
+            [bayesian_layer_outputs[i][0] for i in range(len(bayesian_layer_outputs))]
+        )
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -162,16 +189,27 @@ class BayesLlamaModel(LlamaModel):
             all_hidden_states += (hidden_states,)
 
         next_cache = None
+        ensemble_next_cache = None
         if use_cache:
             next_cache = (
                 next_decoder_cache.to_legacy_cache()
                 if isinstance(next_decoder_cache, Cache)
                 else next_decoder_cache
             )
+            ensemble_next_cache = [
+                c.to_legacy_cache() if isinstance(c, Cache) else c
+                for c in ensemble_next_decoder_cache
+            ]
         if not return_dict:
             return tuple(
                 v
-                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+                for v in [
+                    hidden_states,
+                    next_cache,
+                    ensemble_next_cache,
+                    all_hidden_states,
+                    all_self_attns,
+                ]
                 if v is not None
             )
         return BaseModelOutputWithPast(
@@ -186,7 +224,7 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config, bayes_config):
-        super().__init__(config,)
+        super().__init__(config)
         self.vocab_size = config.vocab_size
 
         self.model = BayesLlamaModel(config, bayes_config=bayes_config)
@@ -209,8 +247,8 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
+        ensemble_past_key_values: Optional[List[List[torch.FloatTensor]]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -237,6 +275,7 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
+            ensemble_past_key_values=ensemble_past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
@@ -264,26 +303,11 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         # mean over n_ensemble to get (batch_size, seq_len, vocab_size)
         mean_logits = logits.mean(dim=0)
 
-        loss = None
-        if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = mean_logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.view(-1, self.config.vocab_size)
-            shift_labels = shift_labels.view(-1)
-            # Enable model parallelism
-            shift_labels = shift_labels.to(shift_logits.device)
-            loss = loss_fct(shift_logits, shift_labels)
-
         if not return_dict:
-            output = (mean_logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            return ((mean_logits, logits),) + outputs[1:]
 
         return CausalLMOutputWithPast(
-            loss=loss,
-            logits=(mean_logits, logits), #return logits from all bayesian layers
+            logits=(mean_logits, logits),  # return logits from all bayesian layers
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,

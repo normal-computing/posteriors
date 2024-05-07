@@ -15,7 +15,7 @@ from examples.bayes_llama3.llama3.utils.load_utils import load_ensemble, save_co
 from examples.bayes_llama3.llama3.utils.prompting import llama_chat_prompt, ONE_SHOT
 
 
-class RetrievalExperiment:
+class Experiment:
     def __init__(self, config: FrozenConfigDict):
         self.config = ConfigDict(config)  # thaw config
         save_config(

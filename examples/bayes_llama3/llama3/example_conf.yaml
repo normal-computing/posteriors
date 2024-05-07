@@ -1,0 +1,29 @@
+logs_dir: "./experiments/runs/question-answer/"
+dataset_path: "examples/bayes_llama3/llama3/data/test.json"
+
+model: &model_params
+  rms_norm_eps: 1.0e-05
+  rope_scaling:
+    type: dynamic
+    factor: 8.0
+
+bayes: &bayes_params
+  n_ensemble: 6
+
+# Experiment
+experiment_config:
+  experiment_name: question-answer-test
+  model_architecture: 'llama'
+  fp16: true
+  chat_model: true
+  model_config: *model_params
+  bayes_config: *bayes_params
+  n_tokens: 30
+  device_map: 'auto'
+  tokenizer_pretrained_model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+  pretrained_model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+  checkpoint_paths: [
+    'path1',
+    'path2',
+    ...
+  ]

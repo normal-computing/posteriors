@@ -1,7 +1,7 @@
 ---
-title: Laplace Diag Fisher
+title: Laplace Diagonal Fisher
 ---
 
-# Laplace Diag Fisher
+# Laplace Diagonal Fisher
 
 ::: posteriors.laplace.diag_fisher

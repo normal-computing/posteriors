@@ -12,7 +12,7 @@ information matrix and uses it to approximate the posterior precision, i.e. a [L
 approximation](https://arxiv.org/abs/2106.14806).
 - [`laplace.dense_ggn`](laplace/dense_ggn.md) calculates the Generalised
 Gauss-Newton matrix which is equivalent to the non-empirical Fisher in most
-neural network settings.
+neural network settings - see [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 - [`laplace.diag_fisher`](laplace/diag_fisher.md) same as `laplace.dense_fisher` but
 uses the diagonal of the empirical Fisher information matrix instead.
 - [`laplace.diag_ggn`](laplace/diag_ggn.md) same as `laplace.dense_ggn` but

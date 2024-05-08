@@ -1,7 +1,7 @@
 ---
-title: EKF Diag Fisher
+title: EKF Diagonal Fisher
 ---
 
-# EKF Diag Fisher
+# EKF Diagonal Fisher
 
 ::: posteriors.ekf.diag_fisher

@@ -1,7 +1,7 @@
 ---
-title: Laplace Diag GGN
+title: Laplace Diagonal GGN
 ---
 
-# Laplace Diag GGN
+# Laplace Diagonal GGN
 
 ::: posteriors.laplace.diag_ggn

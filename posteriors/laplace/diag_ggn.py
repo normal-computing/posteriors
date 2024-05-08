@@ -40,7 +40,7 @@ def build(
     G(θ) = J_f(θ) H_l(z) J_f(θ)^T
     $$
     where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
-    is a negative outer log-likelihood with scalar output.
+    is a loss (negative log-likelihood) that maps the output of $f$ to a scalar output.
 
     More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf) and
@@ -128,17 +128,21 @@ def update(
     Returns:
         Updated DiagLaplaceState.
     """
+
+    def outer_loss(z, batch):
+        return -outer_log_likelihood(z, batch)
+
     with torch.no_grad(), CatchAuxError():
         diag_ggn_batch, aux = diag_ggn(
             partial(forward, batch=batch),
-            partial(outer_log_likelihood, batch=batch),
+            partial(outer_loss, batch=batch),
             forward_has_aux=True,
             loss_has_aux=False,
             normalize=False,
         )(state.params)
 
     def update_func(x, y):
-        return x - y
+        return x + y
 
     prec_diag = flexi_tree_map(
         update_func, state.prec_diag, diag_ggn_batch, inplace=inplace

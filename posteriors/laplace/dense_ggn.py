@@ -40,7 +40,7 @@ def build(
     G(θ) = J_f(θ) H_l(z) J_f(θ)^T
     $$
     where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
-    is a negative outer log-likelihood with scalar output.
+    is a loss (negative log-likelihood) that maps the output of $f$ to a scalar output.
 
     More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf) and
@@ -131,21 +131,25 @@ def update(
     Returns:
         Updated DenseLaplaceState.
     """
+
+    def outer_loss(z, batch):
+        return -outer_log_likelihood(z, batch)
+
     with torch.no_grad(), CatchAuxError():
         ggn_batch, aux = ggn(
             partial(forward, batch=batch),
-            partial(outer_log_likelihood, batch=batch),
+            partial(outer_loss, batch=batch),
             forward_has_aux=True,
             loss_has_aux=False,
             normalize=False,
         )(state.params)
 
     if inplace:
-        state.prec -= ggn_batch
+        state.prec += ggn_batch
         state.aux = aux
         return state
     else:
-        return DenseLaplaceState(state.params, state.prec - ggn_batch, aux)
+        return DenseLaplaceState(state.params, state.prec + ggn_batch, aux)
 
 
 def sample(

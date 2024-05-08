@@ -12,7 +12,7 @@ from transformers.models.llama.modeling_llama import (
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.utils import logging
 import torch.nn.functional as F
-import regex as re
+from tqdm import tqdm
 
 
 logger = logging.get_logger(__name__)
@@ -236,8 +236,9 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
     def load_bayesian_layers(self, layer_state_dicts):
         assert len(layer_state_dicts) == len(self.model.bayesian_layers)
 
-        for state_dict, bayesian_layer in zip(
-            layer_state_dicts, self.model.bayesian_layers
+        for state_dict, bayesian_layer in tqdm(
+            list(zip(layer_state_dicts, self.model.bayesian_layers)),
+            desc="Loading ensemble weights",
         ):
             bayesian_layer.load_state_dict(state_dict)
 

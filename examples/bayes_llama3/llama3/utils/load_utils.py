@@ -6,8 +6,6 @@ from omegaconf import OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
 from ml_collections.config_dict import FrozenConfigDict
 
-REQUIRED_PARAMS = ["experiment_config", "bayes_config"]
-
 
 @rank_zero_only
 def create_log_dir(log_dir_name: str):
@@ -21,18 +19,11 @@ def create_log_dir(log_dir_name: str):
 def setup_log_dir(
     log_dir_name: str,
     timestamp: str,
-    resume: bool = False,
     experiment_name: str = None,
 ) -> str:
     """
     Setup log directory
     """
-    if resume:
-        return resume
-
-    # Create parent log name
-    if not os.path.exists(log_dir_name):
-        os.makedirs(log_dir_name)
 
     # Create timestamp folder
     log_dir_name = os.path.join(log_dir_name, timestamp)
@@ -58,12 +49,7 @@ def load_config(file: str) -> FrozenConfigDict:
     """
     Load config file
     """
-    config = OmegaConf.load(file)
-    for param in REQUIRED_PARAMS:
-        assert param in config, f"Missing key {param} in config"
-
-    config = FrozenConfigDict(config)
-    return config
+    return FrozenConfigDict(OmegaConf.load(file))
 
 
 def parse_devices(devices):

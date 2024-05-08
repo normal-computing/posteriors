@@ -22,18 +22,13 @@ def main(argv):
 
     assert FLAGS.base is not None, "Configs not specified, must specify base"
     config = load_config(FLAGS.base)
-
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    experiment_name = config.get("experiment_name", None)
 
     experiment_log_dir = setup_log_dir(
-        config.get("logs_dir", "logs"),
+        config.get("logs_dir", "experiment_logs"),
         timestamp,
-        experiment_name=experiment_name,
+        experiment_name=config.get("experiment_name", None),
     )
-    if FLAGS.devices is not None:
-        devices_list = FLAGS.devices.split(",")
-        config["experiment_config"]["devices"] = devices_list
 
     config["experiment_config"]["experiment_log_dir"] = experiment_log_dir
     save_config(config.to_dict(), experiment_log_dir + "/config.yaml")

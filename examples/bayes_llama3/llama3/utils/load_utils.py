@@ -1,11 +1,10 @@
+import os
+
 import torch
 import regex as re
 from omegaconf import OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
-import os
 from ml_collections.config_dict import FrozenConfigDict
-from omegaconf import OmegaConf
-from pytorch_lightning.utilities import rank_zero_only
 
 REQUIRED_PARAMS = ["experiment_config", "bayes_config"]
 
@@ -16,7 +15,7 @@ def create_log_dir(log_dir_name: str):
     Create log directory, only once
     """
     if not os.path.exists(log_dir_name):
-        os.mkdir(log_dir_name)
+        os.makedirs(log_dir_name)
 
 
 def setup_log_dir(
@@ -33,7 +32,7 @@ def setup_log_dir(
 
     # Create parent log name
     if not os.path.exists(log_dir_name):
-        os.mkdir(log_dir_name)
+        os.makedirs(log_dir_name)
 
     # Create timestamp folder
     log_dir_name = os.path.join(log_dir_name, timestamp)
@@ -44,10 +43,8 @@ def setup_log_dir(
 
     create_log_dir(log_dir_name)
 
-    # Create checkpoints folder
-    create_log_dir(f"{log_dir_name}/checkpoints")
-
     return log_dir_name
+
 
 @rank_zero_only
 def save_config(conf: OmegaConf, fp: str):
@@ -91,6 +88,4 @@ def load_ensemble(filepaths):
         }
         return parameters
 
-    return [
-        load_from_checkpoint(filepath) for filepath in filepaths
-    ]
+    return [load_from_checkpoint(filepath) for filepath in filepaths]

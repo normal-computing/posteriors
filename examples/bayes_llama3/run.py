@@ -4,8 +4,8 @@ import datetime
 
 from absl import app, flags
 
-from examples.bayes_llama3.eval import Experiment
-from examples.bayes_llama3.llama3.utils.load_utils import load_config, save_config, setup_log_dir
+from llama3.eval import Experiment
+from llama3.utils.load_utils import load_config, save_config, setup_log_dir
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("base", None, "Path to base config.")

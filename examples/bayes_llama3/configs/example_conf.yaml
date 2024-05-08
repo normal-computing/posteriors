@@ -1,0 +1,28 @@
+logs_dir: "./experiments/runs/question-answer/"
+dataset_path: "/home/paperspace/Projects/posteriors/datasets/tqa_train_val_test/test/tqa_v2_test.json"
+
+model: &model_params
+  rms_norm_eps: 1.0e-05
+  rope_scaling:
+    type: dynamic
+    factor: 8.0
+
+bayes_config: &bayes_params
+  n_ensemble: 3
+
+# Experiment
+experiment_config:
+  experiment_name: question-answer-test
+  model_architecture: 'llama'
+  fp16: true
+  chat_model: false
+  model_config: *model_params
+  bayes_config: *bayes_params
+  n_tokens: 30
+  device_map: 'auto'
+  tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B
+  pretrained_model_name_or_path: Meta-Llama-3-8B
+  checkpoint_paths: 
+    - /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/bayes_with_seq/checkpoints/epoch=0-step=300.ckpt
+    - /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/bayes_with_seq/checkpoints/epoch=1-step=600.ckpt
+    - /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/bayes_with_seq/checkpoints/epoch=2-step=900.ckpt

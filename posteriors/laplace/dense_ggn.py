@@ -1,57 +1,69 @@
-from typing import Any
-from dataclasses import dataclass
 from functools import partial
+from typing import Any
 import torch
 from optree import tree_map
+from dataclasses import dataclass
 from optree.integration.torch import tree_ravel
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.tree_utils import tree_size
+from posteriors.types import (
+    TensorTree,
+    Transform,
+    ForwardFn,
+    OuterLogProbFn,
+    TransformState,
+)
 from posteriors.utils import (
-    per_samplify,
-    empirical_fisher,
+    tree_size,
+    ggn,
     is_scalar,
     CatchAuxError,
 )
 
 
 def build(
-    log_posterior: LogProbFn,
-    per_sample: bool = False,
-    init_prec: torch.Tensor | float = 0.0,
+    forward: ForwardFn,
+    outer_log_likelihood: OuterLogProbFn,
+    init_prec: TensorTree | float = 0.0,
 ) -> Transform:
-    """Builds a transform for dense empirical Fisher information
+    """Builds a transform for a Generalized Gauss-Newton (GGN)
     Laplace approximation.
 
-    The empirical Fisher is defined here as:
-    $$
-    F(θ) = \\sum_i ∇_θ \\log p(y_i, θ | x_i) ∇_θ \\log p(y_i, θ | x_i)^T
-    $$
-    where $p(y_i, θ | x_i)$ is the joint model distribution (equivalent to the posterior
-    up to proportionality) with parameters $θ$, inputs $x_i$ and labels $y_i$.
+    Equivalent to the (non-empirical) Fisher information matrix when
+    the `outer_log_likelihood` is exponential family with natural parameter equal to
+    the output from `forward`.
 
-    More info on empirical Fisher matrices can be found in
+    `forward` should output auxiliary information (or `torch.tensor([])`),
+    `outer_log_likelihood` should not.
+
+    The GGN is defined as
+    $$
+    G(θ) = J_f(θ) H_l(z) J_f(θ)^T
+    $$
+    where $z = f(θ)$ is the output of the forward function $f$ and $l(z)$
+    is a loss (negative log-likelihood) that maps the output of $f$ to a scalar output.
+
+    More info on Fisher and GGN matrices can be found in
     [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf) and
     their use within a Laplace approximation in [Daxberger et al, 2021](https://arxiv.org/abs/2106.14806).
 
     Args:
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-            as well as auxiliary information, e.g. from the model call.
-        per_sample: If True, then log_posterior is assumed to return a vector of
-            log posteriors for each sample in the batch. If False, then log_posterior
-            is assumed to return a scalar log posterior for the whole batch, in this
-            case torch.func.vmap will be called, this is typically slower than
-            directly writing log_posterior to be per sample.
+        forward: Function that takes parameters and input batch and
+            returns a forward value (e.g. logits), not reduced over the batch,
+            as well as auxiliary information.
+        outer_log_likelihood: A function that takes the output of `forward` and batch
+            then returns the log likelihood of the model output,
+            with no auxiliary information.
         init_prec: Initial precision matrix.
             If it is a float, it is defined as an identity matrix
             scaled by that float.
 
     Returns:
-        Empirical Fisher information Laplace approximation transform instance.
+        GGN Laplace approximation transform instance.
     """
     init_fn = partial(init, init_prec=init_prec)
-    update_fn = partial(update, log_posterior=log_posterior, per_sample=per_sample)
+    update_fn = partial(
+        update, forward=forward, outer_log_likelihood=outer_log_likelihood
+    )
     return Transform(init_fn, update_fn)
 
 
@@ -98,43 +110,46 @@ def init(
 def update(
     state: DenseLaplaceState,
     batch: Any,
-    log_posterior: LogProbFn,
-    per_sample: bool = False,
-    inplace: bool = True,
+    forward: ForwardFn,
+    outer_log_likelihood: OuterLogProbFn,
+    inplace: bool = False,
 ) -> DenseLaplaceState:
-    """Adds empirical Fisher information matrix of covariance summed over
-    given batch.
+    """Adds GGN matrix over given batch.
 
     Args:
         state: Current state.
-        batch: Input data to log_posterior.
-        log_posterior: Function that takes parameters and input batch and
-            returns the log posterior value (which can be unnormalised)
-        per_sample: If True, then log_posterior is assumed to return a vector of
-            log posteriors for each sample in the batch. If False, then log_posterior
-            is assumed to return a scalar log posterior for the whole batch, in this
-            case torch.func.vmap will be called, this is typically slower than
-            directly writing log_posterior to be per sample.
-        inplace: If True, the state is updated in place. Otherwise, a new
-            state is returned.
+        batch: Input data to model.
+        forward: Function that takes parameters and input batch and
+            returns a forward value (e.g. logits), not reduced over the batch,
+            as well as auxiliary information.
+        outer_log_likelihood: A function that takes the output of `forward` and batch
+            then returns the log likelihood of the model output,
+            with no auxiliary information.
+        inplace: If True, then the state is updated in place, otherwise a new state
+            is returned.
 
     Returns:
         Updated DenseLaplaceState.
     """
-    if not per_sample:
-        log_posterior = per_samplify(log_posterior)
+
+    def outer_loss(z, batch):
+        return -outer_log_likelihood(z, batch)
 
     with torch.no_grad(), CatchAuxError():
-        fisher, aux = empirical_fisher(
-            lambda p: log_posterior(p, batch), has_aux=True, normalize=False
+        ggn_batch, aux = ggn(
+            partial(forward, batch=batch),
+            partial(outer_loss, batch=batch),
+            forward_has_aux=True,
+            loss_has_aux=False,
+            normalize=False,
         )(state.params)
 
     if inplace:
-        state.prec += fisher
+        state.prec += ggn_batch
         state.aux = aux
         return state
     else:
-        return DenseLaplaceState(state.params, state.prec + fisher, aux)
+        return DenseLaplaceState(state.params, state.prec + ggn_batch, aux)
 
 
 def sample(

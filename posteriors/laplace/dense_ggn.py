@@ -3,6 +3,7 @@ from typing import Any
 import torch
 from optree import tree_map
 from dataclasses import dataclass
+from optree.integration.torch import tree_ravel
 
 from posteriors.types import (
     TensorTree,
@@ -11,10 +12,9 @@ from posteriors.types import (
     OuterLogProbFn,
     TransformState,
 )
-from posteriors.tree_utils import flexi_tree_map
 from posteriors.utils import (
-    diag_normal_sample,
-    diag_ggn,
+    tree_size,
+    ggn,
     is_scalar,
     CatchAuxError,
 )
@@ -23,12 +23,12 @@ from posteriors.utils import (
 def build(
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
-    init_prec_diag: TensorTree | float = 0.0,
+    init_prec: TensorTree | float = 0.0,
 ) -> Transform:
-    """Builds a transform for a diagonal Generalized Gauss-Newton (GGN)
+    """Builds a transform for a Generalized Gauss-Newton (GGN)
     Laplace approximation.
 
-    Equivalent to the diagonal of the (non-empirical) Fisher information matrix when
+    Equivalent to the (non-empirical) Fisher information matrix when
     the `outer_log_likelihood` is exponential family with natural parameter equal to
     the output from `forward`.
 
@@ -53,13 +53,14 @@ def build(
         outer_log_likelihood: A function that takes the output of `forward` and batch
             then returns the log likelihood of the model output,
             with no auxiliary information.
-        init_prec_diag: Initial diagonal precision matrix.
-            Can be tree like params or scalar.
+        init_prec: Initial precision matrix.
+            If it is a float, it is defined as an identity matrix
+            scaled by that float.
 
     Returns:
-        Diagonal GGN Laplace approximation transform instance.
+        GGN Laplace approximation transform instance.
     """
-    init_fn = partial(init, init_prec_diag=init_prec_diag)
+    init_fn = partial(init, init_prec=init_prec)
     update_fn = partial(
         update, forward=forward, outer_log_likelihood=outer_log_likelihood
     )
@@ -67,51 +68,53 @@ def build(
 
 
 @dataclass
-class DiagLaplaceState(TransformState):
-    """State encoding a diagonal Normal distribution over parameters.
+class DenseLaplaceState(TransformState):
+    """State encoding a Normal distribution over parameters,
+    with a dense precision matrix
 
     Args:
         params: Mean of the Normal distribution.
-        prec_diag: Diagonal of the precision matrix of the Normal distribution.
+        prec: Precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
-    prec_diag: TensorTree
+    prec: torch.Tensor
     aux: Any = None
 
 
 def init(
     params: TensorTree,
-    init_prec_diag: TensorTree | float = 0.0,
-) -> DiagLaplaceState:
-    """Initialise diagonal Normal distribution over parameters.
+    init_prec: torch.Tensor | float = 0.0,
+) -> DenseLaplaceState:
+    """Initialise Normal distribution over parameters
+    with a dense precision matrix.
 
     Args:
         params: Mean of the Normal distribution.
-        init_prec_diag: Initial diagonal precision matrix.
-            Can be tree like params or scalar.
+        init_prec: Initial precision matrix.
+            If it is a float, it is defined as an identity matrix
+            scaled by that float.
 
     Returns:
-        Initial DiagLaplaceState.
+        Initial DenseLaplaceState.
     """
-    if is_scalar(init_prec_diag):
-        init_prec_diag = tree_map(
-            lambda x: torch.full_like(x, init_prec_diag, requires_grad=x.requires_grad),
-            params,
-        )
 
-    return DiagLaplaceState(params, init_prec_diag)
+    if is_scalar(init_prec):
+        num_params = tree_size(params)
+        init_prec = init_prec * torch.eye(num_params, requires_grad=False)
+
+    return DenseLaplaceState(params, init_prec)
 
 
 def update(
-    state: DiagLaplaceState,
+    state: DenseLaplaceState,
     batch: Any,
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
     inplace: bool = False,
-) -> DiagLaplaceState:
-    """Adds diagonal GGN matrix of covariance summed over given batch.
+) -> DenseLaplaceState:
+    """Adds GGN matrix over given batch.
 
     Args:
         state: Current state.
@@ -126,10 +129,10 @@ def update(
             is returned.
 
     Returns:
-        Updated DiagLaplaceState.
+        Updated DenseLaplaceState.
     """
     with torch.no_grad(), CatchAuxError():
-        diag_ggn_batch, aux = diag_ggn(
+        ggn_batch, aux = ggn(
             partial(forward, batch=batch),
             partial(outer_log_likelihood, batch=batch),
             forward_has_aux=True,
@@ -137,30 +140,35 @@ def update(
             normalize=False,
         )(state.params)
 
-    def update_func(x, y):
-        return x - y
-
-    prec_diag = flexi_tree_map(
-        update_func, state.prec_diag, diag_ggn_batch, inplace=inplace
-    )
-
     if inplace:
+        state.prec -= ggn_batch
         state.aux = aux
         return state
-    return DiagLaplaceState(state.params, prec_diag, aux)
+    else:
+        return DenseLaplaceState(state.params, state.prec - ggn_batch, aux)
 
 
 def sample(
-    state: DiagLaplaceState, sample_shape: torch.Size = torch.Size([])
+    state: DenseLaplaceState,
+    sample_shape: torch.Size = torch.Size([]),
 ) -> TensorTree:
-    """Sample from diagonal Normal distribution over parameters.
+    """Sample from Normal distribution over parameters.
 
     Args:
-        state: State encoding mean and diagonal precision.
+        state: State encoding mean and precision matrix.
         sample_shape: Shape of the desired samples.
 
     Returns:
-        Sample(s) from Normal distribution.
+        Sample(s) from the Normal distribution.
     """
-    sd_diag = tree_map(lambda x: x.sqrt().reciprocal(), state.prec_diag)
-    return diag_normal_sample(state.params, sd_diag, sample_shape=sample_shape)
+    samples = torch.distributions.MultivariateNormal(
+        loc=torch.zeros(state.prec.shape[0], device=state.prec.device),
+        precision_matrix=state.prec,
+        validate_args=False,
+    ).sample(sample_shape)
+    samples = samples.flatten(end_dim=-2)  # ensure samples is 2D
+    mean_flat, unravel_func = tree_ravel(state.params)
+    samples += mean_flat
+    samples = torch.vmap(unravel_func)(samples)
+    samples = tree_map(lambda x: x.reshape(sample_shape + x.shape[-1:]), samples)
+    return samples

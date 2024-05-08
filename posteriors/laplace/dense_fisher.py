@@ -5,7 +5,7 @@ import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from posteriors.types import TensorTree, Transform, LogProbFn, Tensor, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
 from posteriors.tree_utils import tree_size
 from posteriors.utils import (
     per_samplify,
@@ -18,7 +18,7 @@ from posteriors.utils import (
 def build(
     log_posterior: LogProbFn,
     per_sample: bool = False,
-    init_prec: Tensor | float = 0.0,
+    init_prec: torch.Tensor | float = 0.0,
 ) -> Transform:
     """Builds a transform for dense empirical Fisher information
     Laplace approximation.
@@ -67,13 +67,13 @@ class DenseLaplaceState(TransformState):
     """
 
     params: TensorTree
-    prec: Tensor
+    prec: torch.Tensor
     aux: Any = None
 
 
 def init(
     params: TensorTree,
-    init_prec: Tensor | float = 0.0,
+    init_prec: torch.Tensor | float = 0.0,
 ) -> DenseLaplaceState:
     """Initialise Normal distribution over parameters
     with a dense precision matrix.

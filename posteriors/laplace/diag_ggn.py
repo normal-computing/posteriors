@@ -28,7 +28,7 @@ def build(
     """Builds a transform for diagonal Generalized Gauss-Newton (GGN)
     Laplace approximation.
 
-    Equivalent to the diagonal of the (non-emprical) Fisher information matrix when
+    Equivalent to the diagonal of the (non-empirical) Fisher information matrix when
     the `outer_log_likelihood` is exponential family with natural parameter equal to
     the output from `forward`.
 
@@ -130,15 +130,15 @@ def update(
     """
     with torch.no_grad(), CatchAuxError():
         diag_ggn_batch, aux = diag_ggn(
-            forward,
-            outer_log_likelihood,
+            partial(forward, batch=batch),
+            partial(outer_log_likelihood, batch=batch),
             forward_has_aux=True,
             loss_has_aux=False,
             normalize=False,
-        )(state.params, batch)
+        )(state.params)
 
     def update_func(x, y):
-        return x + y
+        return x - y
 
     prec_diag = flexi_tree_map(
         update_func, state.prec_diag, diag_ggn_batch, inplace=inplace

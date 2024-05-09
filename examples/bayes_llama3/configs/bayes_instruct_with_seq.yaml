@@ -6,11 +6,11 @@ alpha: 1e-2
 beta: 0.0
 momenta: 0.0
 set_temperature: True
-max_seq_len: 100
+max_seq_len: 150
 pretrained_weights_folder: "Meta-Llama-3-8B-Instruct"
 
 metrics_log_frequency: 5
-save_frequency: 100
+save_frequency: 1000
 
 num_workers: 8
 batch_size: 10

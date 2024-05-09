@@ -63,6 +63,7 @@ if __name__ == "__main__":
     )
     model = BayesLlama(
         len(dataloader.train_dataset),
+        pretrained_weights_folder=config["pretrained_weights_folder"],
         lr=config["learning_rate"],
         alpha=config["alpha"],
         beta=config["beta"],

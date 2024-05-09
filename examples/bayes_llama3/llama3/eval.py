@@ -14,7 +14,7 @@ from llama3.utils.load_utils import load_ensemble
 from llama3.utils.prompting import llama_chat_prompt
 
 
-PROMPT = "Answer the question based on the text below. You should answer the question by choosing the letter (a, b, c, or d) that corresponds with the correct answer.\n\n"
+PROMPT = "Answer the following multiple choice question. You should answer the question by choosing the letter (a, b, c, or d) that corresponds with the correct answer.\n\n"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 5
@@ -87,33 +87,21 @@ class Experiment:
             ]
             inputs = self.tokenizer(prompts, return_tensors="pt", padding=True)
         else:
-            prompt = ["\n".join([prompt, q + "\nAnswer:"]) for q in questions]
+            prompt = ["\n".join([prompt, q, "Answer:"]) for q in questions]
             inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
 
         return inputs
 
     def extract_questions(self, sample):
-        questions = sample["questions"]["nonDiagramQuestions"]
         all_qs = []
-        for key, value in questions.items():
-            prompt = value["beingAsked"]["processedText"] + "\n\n"  # Question
-            answers = value["answerChoices"]  # Answers
-            correct = value["correctAnswer"]["processedText"]  # Correct Answer
-            for value in answers.values():  # Extract answer text
-                answer = value["rawText"]
-                prompt += answer + "\n"
-            all_qs.append(
-                (key, prompt, correct),
-            )
+        for key, val in sample["questions"]["nonDiagramQuestions"].items():
+            correct_answer = val["correctAnswer"]["processedText"]
+            correct_answer = val["answerChoices"][correct_answer]["rawText"]
+            question = val["beingAsked"]["processedText"]
+            for _, mc in val["answerChoices"].items():
+                question += "\n" + mc["idStructural"] + " " + mc["processedText"]
+            all_qs.append((key, question, correct_answer))
         return all_qs
-
-    def extract_context(self, sample):
-        context = ""
-        topics = sample["topics"]
-        for value in topics.values():
-            if "text" in value["content"]:
-                context += value["content"]["text"]
-        return context
 
     @torch.no_grad()
     def generate(self, inputs, max_length=10, use_cache=True):

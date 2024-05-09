@@ -71,7 +71,6 @@ class TQADataset(Dataset):
     def tokenize_and_stride(self, sample):
         return self.tokenizer(
             sample,
-            truncation=True,
             max_length=self.stride_length,
             stride=self.stride_overlap,
             padding="max_length",

@@ -11,10 +11,9 @@ from scipy import special
 
 from llama3.modules.bayesllama import BayesLlamaForCausalLM
 from llama3.utils.load_utils import load_ensemble
-from llama3.utils.prompting import llama_chat_prompt
 
 
-PROMPT = "Answer the following multiple choice question. You should answer the question by choosing the letter (a, b, c, or d) that corresponds with the correct answer.\n\n"
+PROMPT = "Answer the following multiple choice question very succintly.\n"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 5
@@ -58,6 +57,7 @@ class Experiment:
             config["tokenizer_pretrained_model_name_or_path"]
         )
         self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.padding_side = "left"
 
         assert os.path.isdir(config["checkpoints_folder"]), "Provided "
         checkpoints = [
@@ -75,27 +75,16 @@ class Experiment:
         self.model.to(DEVICE)
 
     def prepare_prompt(self, prompt, questions):
-        if self.chat_model:
-            prompts = [
-                llama_chat_prompt(
-                    [
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": q},
-                    ]
-                )
-                for q in questions
-            ]
-            inputs = self.tokenizer(prompts, return_tensors="pt", padding=True)
-        else:
-            prompt = ["\n".join([prompt, q, "Answer:"]) for q in questions]
-            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
-
-        return inputs
+        prompt = ["\n".join([prompt, q + "\n", "Answer:"]) for q in questions]
+        return self.tokenizer(prompt, return_tensors="pt", padding=True)
 
     def extract_questions(self, sample):
         all_qs = []
         for key, val in sample["questions"]["nonDiagramQuestions"].items():
             correct_answer = val["correctAnswer"]["processedText"]
+            if correct_answer not in val["answerChoices"]:
+                # Adding catch
+                continue
             correct_answer = val["answerChoices"][correct_answer]["rawText"]
             question = val["beingAsked"]["processedText"]
             for _, mc in val["answerChoices"].items():
@@ -104,7 +93,7 @@ class Experiment:
         return all_qs
 
     @torch.no_grad()
-    def generate(self, inputs, max_length=10, use_cache=True):
+    def generate(self, inputs, max_length=20, use_cache=True):
         seq_out, ensemble_logits = [], [[] for _ in range(inputs["input_ids"].size(0))]
         for _ in range(max_length):
             outputs = self.model(**inputs, return_dict=False, use_cache=use_cache)
@@ -172,14 +161,11 @@ class Experiment:
 
         return results
 
-    def evaluate_response():
-        pass
-
-    def save_results(self, results):  # To do: make more specific than pickle
+    def save_results(self, results, split):  # To do: make more specific than pickle
         """
         Save results as pickle file
         """
-        result_file = os.path.join(self.experiment_log_dir, "results.pkl")
+        result_file = os.path.join(self.experiment_log_dir, f"results_{split}.pkl")
         with open(result_file, "wb") as f:
             pickle.dump(results, f)
 
@@ -188,6 +174,7 @@ class Experiment:
         Run experiment
         """
         results = self.run_experiment(dataset_path, **kwargs)
-        self.save_results(results)
+        split = os.path.basename(dataset_path).split("_")[-1].split(".")[0]
+        self.save_results(results, split)
 
         return results

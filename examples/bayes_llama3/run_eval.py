@@ -22,11 +22,9 @@ def main(argv):
 
     assert FLAGS.base is not None, "Configs not specified, must specify base"
     config = load_config(FLAGS.base)
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
     experiment_log_dir = setup_log_dir(
         config.get("logs_dir", "experiment_logs"),
-        timestamp,
         experiment_name=config.get("experiment_name", None),
     )
 
@@ -34,7 +32,8 @@ def main(argv):
     save_config(config.to_dict(), experiment_log_dir + "/config.yaml")
 
     experiment = Experiment(config["experiment_config"])
-    experiment.run(dataset_path=config["dataset_path"])
+    for path in config["dataset_path"]:
+        experiment.run(dataset_path=path)
 
 
 if __name__ == "__main__":

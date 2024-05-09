@@ -2,7 +2,7 @@ from typing import List, Tuple, Optional
 from tqdm import tqdm
 
 import posteriors
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM
 from safetensors.torch import load_model
 import pytorch_lightning as pl
 import torch.nn.functional as F
@@ -58,12 +58,9 @@ class BayesLlama(pl.LightningModule):
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
             pretrained_weights_folder, torch_dtype=torch.float16, device_map="auto"
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_weights_folder)
         self.num_decoder_layers = len(self.model.model.layers)
 
         self.vocab_size = self.model.config.vocab_size
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.tokenizer.padding_side = "left"
 
         self.freeze_weights()
         self.functional_model = posteriors.model_to_function(self.model)
@@ -79,21 +76,8 @@ class BayesLlama(pl.LightningModule):
         for path in tqdm(weights_path):
             load_model(self.model, path, strict=False)
 
-    def batch_setup(self, batch):
-        inputs = self.tokenizer(
-            batch,
-            return_tensors="pt",
-            max_length=self.max_seq_len,
-            truncation=True,
-            padding="max_length",
-        ).to(self.device)
-        return {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"],
-        }
-
     def training_step(self, batch):
-        inputs = self.batch_setup(batch)
+        inputs = {key: val.to(self.device) for key, val in batch.items()}
         self.state = self.transform.update(self.state, inputs)
         self.log("loss", self.state.aux, prog_bar=True)
 

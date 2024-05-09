@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     trainer = pl.Trainer(**trainer_kwargs)
     dataloader = TQADataLoader(
-        config["data_dir"],
+        config["data_loader"],
         batch_size=config["batch_size"],
         num_workers=config["num_workers"],
     )

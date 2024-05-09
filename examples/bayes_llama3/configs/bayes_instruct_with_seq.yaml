@@ -14,5 +14,8 @@ save_frequency: 1000
 
 num_workers: 8
 batch_size: 10
-
-data_dir: "/home/paperspace/Projects/posteriors/datasets/tqa_train_val_test"
+data_loader:
+  folder: "/home/paperspace/Projects/posteriors/datasets/tqa_train_val_test"
+  tokenizer_path: "Meta-Llama-3-8B-Instruct"
+  stride_length: 300
+  stride_overlap: 100

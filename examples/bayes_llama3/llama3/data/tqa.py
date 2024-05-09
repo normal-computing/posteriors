@@ -30,6 +30,11 @@ class TQADataset(Dataset):
         with open(os.path.join(self.folder, f"tqa_v1_{split}.json")) as f:
             qa_doc = json.load(f)
 
+        if split == "train":
+            self.folder = os.path.join(folder, "val")
+            with open(os.path.join(self.folder, f"tqa_v1_val.json")) as f:
+                qa_doc += json.load(f)
+
         self.list_of_questions = []
         for concept in qa_doc:
             for key in concept["topics"].keys():

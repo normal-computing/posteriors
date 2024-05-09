@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import torch
@@ -16,16 +17,13 @@ def create_log_dir(log_dir_name: str):
         os.makedirs(log_dir_name)
 
 
-def setup_log_dir(
-    log_dir_name: str,
-    timestamp: str,
-    experiment_name: str = None,
-) -> str:
+def setup_log_dir(log_dir_name: str, experiment_name: str = None) -> str:
     """
     Setup log directory
     """
 
     # Create timestamp folder
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     log_dir_name = os.path.join(log_dir_name, timestamp)
 
     # Add experiment name if specified
@@ -33,7 +31,6 @@ def setup_log_dir(
         log_dir_name += f"_{experiment_name}"
 
     create_log_dir(log_dir_name)
-
     return log_dir_name
 
 

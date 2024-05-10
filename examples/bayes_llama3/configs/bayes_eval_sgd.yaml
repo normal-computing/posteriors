@@ -10,4 +10,4 @@ experiment_config:
   n_tokens: 10
   tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
   pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
-  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/bayes_instruct_with_seq2/usable_checkpoints
+  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/bayes_instruct_no_temp/usable_checkpoints

@@ -5,7 +5,7 @@ import pickle
 import torch
 from tqdm import tqdm
 from ml_collections.config_dict import ConfigDict, FrozenConfigDict
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import numpy as np
 from scipy import special
 
@@ -16,7 +16,7 @@ from llama3.utils.load_utils import load_ensemble
 PROMPT = "Answer the following multiple choice question very succintly.\n"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-BATCH_SIZE = 5
+BATCH_SIZE = 1
 
 
 def compute_uncertainties(logits):
@@ -59,7 +59,9 @@ class Experiment:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
 
-        assert os.path.isdir(config["checkpoints_folder"]), "Provided "
+        assert os.path.isdir(
+            config["checkpoints_folder"]
+        ), "Provided checkpoints is not a path to a folder"
         checkpoints = [
             os.path.join(config["checkpoints_folder"], path)
             for path in os.listdir(config["checkpoints_folder"])
@@ -67,11 +69,18 @@ class Experiment:
         ]
         parameters = load_ensemble(checkpoints)
 
-        self.model = BayesLlamaForCausalLM.from_pretrained(
-            config["pretrained_model_name_or_path"],
-            bayes_config={"n_ensemble": len(checkpoints)},
-        )
-        self.model.load_bayesian_layers(parameters)
+        self.eval_pretrained = config.get("eval_pretrained_model", False)
+        if self.eval_pretrained:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                config["pretrained_model_name_or_path"]
+            )
+        else:
+            self.model = BayesLlamaForCausalLM.from_pretrained(
+                config["pretrained_model_name_or_path"],
+                bayes_config={"n_ensemble": len(checkpoints)},
+            )
+            self.model.load_bayesian_layers(parameters)
+
         self.model.to(DEVICE)
 
     def prepare_prompt(self, prompt, questions):
@@ -122,12 +131,39 @@ class Experiment:
         text_outputs = self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
         return text_outputs, ensemble_logits
 
-    def run_experiment(self, dataset_path: str):
+    @torch.no_grad()
+    def generate_base(self, inputs, max_length=20, use_cache=True):
+        seq_out, logits = [], [[] for _ in range(inputs["input_ids"].size(0))]
+        for _ in range(max_length):
+            outputs = self.model(**inputs, return_dict=True, use_cache=use_cache)
+
+            if "attention_mask" in inputs:
+                del inputs["attention_mask"]
+
+            next_token = outputs.logits[:, -1].argmax(-1).unsqueeze(-1)
+            out_logits = outputs.logits[:, -1].cpu().numpy()
+            for idx, logit in enumerate(out_logits):
+                logits[idx].append([logit])
+
+            if use_cache:
+                inputs["past_key_values"] = outputs.past_key_values
+                inputs["input_ids"] = next_token
+            else:
+                inputs["input_ids"] = torch.cat(
+                    [inputs["input_ids"], next_token], dim=1
+                )
+            seq_out.append(next_token)
+
+        seq_out = torch.cat(seq_out, -1)
+        text_outputs = self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
+        return text_outputs, logits
+
+    def run_experiment(self, dataset_path: str, split: str):
         with open(dataset_path, "rb") as file:
             dataset = json.load(file)
 
         results = {}
-        for _, sample in tqdm(list(enumerate(dataset))):
+        for sample_idx, sample in tqdm(list(enumerate(dataset))):
             sample = self.extract_questions(sample)
 
             for idx in range(0, len(sample), BATCH_SIZE):
@@ -137,11 +173,14 @@ class Experiment:
                 questions = [q[1] for q in batch_sample]
                 correct_answers = [q[2] for q in batch_sample]
 
-                # context = self.extract_context(sample)
                 inputs = self.prepare_prompt(PROMPT, questions)
-                answers, logits = self.generate(
-                    inputs.to(self.model.device), max_length=self.n_tokens
-                )
+
+                if self.eval_pretrained:
+                    answers, logits = None, None
+                else:
+                    answers, logits = self.generate(
+                        inputs.to(self.model.device), max_length=self.n_tokens
+                    )
 
                 for qid, answer, ca, q, logit in zip(
                     q_ids, answers, correct_answers, questions, logits
@@ -159,6 +198,9 @@ class Experiment:
                         "epistemic_uncertainty": epistemic_uncertainty,
                     }
 
+            if sample_idx % 10 == 0:
+                self.save_results(results, split)
+
         return results
 
     def save_results(self, results, split):  # To do: make more specific than pickle
@@ -173,8 +215,8 @@ class Experiment:
         """
         Run experiment
         """
-        results = self.run_experiment(dataset_path, **kwargs)
         split = os.path.basename(dataset_path).split("_")[-1].split(".")[0]
+        results = self.run_experiment(dataset_path, split, **kwargs)
         self.save_results(results, split)
 
         return results

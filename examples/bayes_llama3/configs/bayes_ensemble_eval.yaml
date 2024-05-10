@@ -5,9 +5,9 @@ dataset_path:
 
 # Experiment
 experiment_config:
-  eval_pretrained_model: true
   experiment_name: question-answer-test
   chat_model: false
   n_tokens: 10
   tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
   pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
+  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/ensemble_bayes/usable_checkpoints

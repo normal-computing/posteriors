@@ -50,7 +50,6 @@ class Experiment:
     def __init__(self, config: FrozenConfigDict):
         self.config = ConfigDict(config)  # thaw config
         self.experiment_log_dir = config.experiment_log_dir
-        self.chat_model = config["chat_model"]
         self.n_tokens = config["n_tokens"]
 
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -59,22 +58,22 @@ class Experiment:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
 
-        assert os.path.isdir(
-            config["checkpoints_folder"]
-        ), "Provided checkpoints is not a path to a folder"
-        checkpoints = [
-            os.path.join(config["checkpoints_folder"], path)
-            for path in os.listdir(config["checkpoints_folder"])
-            if path.endswith(".ckpt")
-        ]
-        parameters = load_ensemble(checkpoints)
-
         self.eval_pretrained = config.get("eval_pretrained_model", False)
         if self.eval_pretrained:
             self.model = AutoModelForCausalLM.from_pretrained(
                 config["pretrained_model_name_or_path"]
             )
         else:
+            assert os.path.isdir(
+                config["checkpoints_folder"]
+            ), "Provided checkpoints is not a path to a folder"
+            checkpoints = [
+                os.path.join(config["checkpoints_folder"], path)
+                for path in os.listdir(config["checkpoints_folder"])
+                if path.endswith(".ckpt")
+            ]
+            parameters = load_ensemble(checkpoints)
+
             self.model = BayesLlamaForCausalLM.from_pretrained(
                 config["pretrained_model_name_or_path"],
                 bayes_config={"n_ensemble": len(checkpoints)},
@@ -176,7 +175,9 @@ class Experiment:
                 inputs = self.prepare_prompt(PROMPT, questions)
 
                 if self.eval_pretrained:
-                    answers, logits = None, None
+                    answers, logits = self.generate_base(
+                        inputs.to(self.model.device), max_length=self.n_tokens
+                    )
                 else:
                     answers, logits = self.generate(
                         inputs.to(self.model.device), max_length=self.n_tokens

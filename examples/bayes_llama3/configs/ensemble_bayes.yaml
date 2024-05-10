@@ -1,5 +1,7 @@
 seed: 2024
-epochs: 50
+epochs: 15
+
+num_ensembles: 10
 
 learning_rate: 1e-3
 alpha: 1e-2
@@ -10,7 +12,7 @@ max_seq_len: 150
 pretrained_weights_folder: "Meta-Llama-3-8B-Instruct"
 
 metrics_log_frequency: 5
-save_frequency: 1000
+save_frequency: 400
 
 num_workers: 8
 batch_size: 10

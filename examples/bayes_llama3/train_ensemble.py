@@ -72,7 +72,7 @@ if __name__ == "__main__":
             beta=config["beta"],
             momenta=config["momenta"],
             set_temperature=config["set_temperature"],
-            max_seq_len=config.get("max_seq_len", None),
+            max_seq_len=config["data_loader"]["stride_length"],
         )
 
         try:

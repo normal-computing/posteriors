@@ -9,6 +9,7 @@ TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)  # type: ignore
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
+OuterLogProbFn = Callable[[TensorTree, TensorTree], float]
 
 namespace = registry.__GLOBAL_NAMESPACE
 

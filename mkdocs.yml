@@ -68,10 +68,12 @@ nav:
   - API:
     - api/index.md
     - EKF:
-      - Diag Fisher: api/ekf/diag_fisher.md
+      - Diagonal Fisher: api/ekf/diag_fisher.md
     - Laplace:
       - Dense Fisher: api/laplace/dense_fisher.md
-      - Diag Fisher: api/laplace/diag_fisher.md
+      - Dense GGN: api/laplace/dense_ggn.md
+      - Diagonal Fisher: api/laplace/diag_fisher.md
+      - Diagonal GGN: api/laplace/diag_ggn.md
     - SGMCMC:
       - api/sgmcmc/sgld.md
       - api/sgmcmc/sghmc.md
@@ -79,7 +81,7 @@ nav:
       - Diag: api/vi/diag.md
     - api/optim.md
     - TorchOpt: api/torchopt.md
-    - api/tree_utils.md
+    - Tree Utils: api/tree_utils.md
     - api/types.md
     - api/utils.md
 

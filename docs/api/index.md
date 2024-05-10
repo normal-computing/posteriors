@@ -9,11 +9,16 @@ Natural gradient descent equivalence following [Ollivier, 2019](https://arxiv.or
 ### Laplace approximation
 - [`laplace.dense_fisher`](laplace/dense_fisher.md) calculates the empirical Fisher
 information matrix and uses it to approximate the posterior precision, i.e. a [Laplace
-approximation](https://arxiv.org/abs/2106.14806), without modification to parameters.
+approximation](https://arxiv.org/abs/2106.14806).
+- [`laplace.dense_ggn`](laplace/dense_ggn.md) calculates the Generalised
+Gauss-Newton matrix which is equivalent to the non-empirical Fisher in most
+neural network settings - see [Martens, 2020](https://jmlr.org/papers/volume21/17-678/17-678.pdf).
 - [`laplace.diag_fisher`](laplace/diag_fisher.md) same as `laplace.dense_fisher` but
-uses the diagonal empirical Fisher information matrix instead.
+uses the diagonal of the empirical Fisher information matrix instead.
+- [`laplace.diag_ggn`](laplace/diag_ggn.md) same as `laplace.dense_ggn` but
+uses the diagonal of the Generalised Gauss-Newton matrix instead.
 
-Comprehensive details on Laplace approximations can be found in [Daxberger et al, 2021](https://arxiv.org/abs/2106.14806).
+All Laplace transforms leave the parameters unmodified. Comprehensive details on Laplace approximations can be found in [Daxberger et al, 2021](https://arxiv.org/abs/2106.14806).
 
 
 ### Stochastic gradient Markov chain Monte Carlo (SGMCMC)

@@ -221,7 +221,7 @@ class Experiment:
                     }
 
             if sample_idx % 10 == 0:
-                self.save_results(results, split)
+                self.save_results(dataset_name, results, split)
 
         return results
 

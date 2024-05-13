@@ -1,0 +1,13 @@
+dataset_path:
+  head_qa:
+  - /home/paperspace/Projects/posteriors/datasets/head_qa/data/HEAD/test_HEAD.json
+  - /home/paperspace/Projects/posteriors/datasets/head_qa/data/HEAD/train_HEAD.json
+experiment_config:
+  experiment_name: question-answer-test
+  chat_model: false
+  n_tokens: 10
+  tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
+  pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
+  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/ensemble_bayes/usable_checkpoints
+  experiment_log_dir: ./experiments/TQA/2024-05-13T18-26-21
+logs_dir: ./experiments/TQA

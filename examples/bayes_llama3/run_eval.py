@@ -1,7 +1,5 @@
 """Script for running perplexity experiment."""
 
-import datetime
-
 from absl import app, flags
 
 from llama3.eval import Experiment
@@ -32,8 +30,9 @@ def main(argv):
     save_config(config.to_dict(), experiment_log_dir + "/config.yaml")
 
     experiment = Experiment(config["experiment_config"])
-    for path in config["dataset_path"]:
-        experiment.run(dataset_path=path)
+    for key, paths in config["dataset_path"].items():
+        for path in paths:
+            experiment.run(dataset_name=key, dataset_path=path)
 
 
 if __name__ == "__main__":

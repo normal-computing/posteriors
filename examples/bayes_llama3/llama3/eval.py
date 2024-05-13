@@ -17,22 +17,22 @@ PROMPT = "Answer the following multiple choice question very succintly.\n"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 1
+eps = 1e-5
 
 
 def compute_uncertainties(logits):
     # There is no notion of batch size in this function
     # Logits is a list of logits where each idx corresponds to the ith token output
     # The shape at index i is just (n ensemble, vocab size)
-    prevent_zeros = lambda x: np.where(x < 1e-5, 1e-5, x)
     normalize_logits = lambda x: x / np.sum(x, axis=-1, keepdims=True)
     avg_ensemble = lambda x: np.mean(x, axis=0)
     apply_softmax = lambda x: special.softmax(x, axis=-1)
 
-    calc_total_uncertainty = lambda x: -np.mean(np.log(x) * x)
-    calc_aleatoric_uncertainty = lambda x: -np.mean(np.log(x) * x, axis=-1)
+    calc_total_uncertainty = lambda x: -np.mean(x * np.log(x + eps))
+    calc_aleatoric_uncertainty = lambda x: -np.mean(x * np.log(x + eps), axis=-1)
 
     probs = list(
-        map(normalize_logits, map(prevent_zeros, map(apply_softmax, logits)))
+        map(normalize_logits, map(apply_softmax, logits))
     )  # List[(n ensemble, vocab size)]
     expected_probs = list(map(avg_ensemble, probs))  # List[(vocab size, )]
 
@@ -44,6 +44,36 @@ def compute_uncertainties(logits):
     ]
 
     return total_uncertainty, aleatoric_uncertainty, epistemic_uncertainty
+
+
+def extract_tqa_questions(sample):
+    all_qs = []
+    for key, val in sample["questions"]["nonDiagramQuestions"].items():
+        correct_answer = val["correctAnswer"]["processedText"]
+        if correct_answer not in val["answerChoices"]:
+            # Adding catch
+            continue
+        correct_answer = val["answerChoices"][correct_answer]["rawText"]
+        question = val["beingAsked"]["processedText"]
+        for _, mc in val["answerChoices"].items():
+            question += "\n" + mc["idStructural"] + " " + mc["processedText"]
+        all_qs.append((key, question, correct_answer))
+    return all_qs
+
+
+def extract_head_questions(sample):
+    all_qs = []
+    for q in sample["data"]:
+        question = q["qtext"]
+        for mc in q["answers"]:
+            question += "\n" + f"{str(mc['aid'])}." + " " + mc["atext"]
+
+        for answer in q["answers"]:
+            if str(answer["aid"]) == str(q["ra"]):
+                atext = answer["atext"]
+        correct_answer = f"{str(q['ra'])}." + " " + atext
+        all_qs.append((q["qid"], question, correct_answer))
+    return all_qs
 
 
 class Experiment:
@@ -85,20 +115,6 @@ class Experiment:
     def prepare_prompt(self, prompt, questions):
         prompt = ["\n".join([prompt, q + "\n", "Answer:"]) for q in questions]
         return self.tokenizer(prompt, return_tensors="pt", padding=True)
-
-    def extract_questions(self, sample):
-        all_qs = []
-        for key, val in sample["questions"]["nonDiagramQuestions"].items():
-            correct_answer = val["correctAnswer"]["processedText"]
-            if correct_answer not in val["answerChoices"]:
-                # Adding catch
-                continue
-            correct_answer = val["answerChoices"][correct_answer]["rawText"]
-            question = val["beingAsked"]["processedText"]
-            for _, mc in val["answerChoices"].items():
-                question += "\n" + mc["idStructural"] + " " + mc["processedText"]
-            all_qs.append((key, question, correct_answer))
-        return all_qs
 
     @torch.no_grad()
     def generate(self, inputs, max_length=20, use_cache=True):
@@ -157,13 +173,18 @@ class Experiment:
         text_outputs = self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
         return text_outputs, logits
 
-    def run_experiment(self, dataset_path: str, split: str):
+    def run_experiment(self, dataset_name: str, dataset_path: str, split: str):
         with open(dataset_path, "rb") as file:
             dataset = json.load(file)
+        if dataset_name == "head_qa":
+            dataset = dataset["exams"].values()
 
         results = {}
         for sample_idx, sample in tqdm(list(enumerate(dataset))):
-            sample = self.extract_questions(sample)
+            if dataset_name == "head_qa":
+                sample = extract_head_questions(sample)
+            else:
+                sample = extract_tqa_questions(sample)
 
             for idx in range(0, len(sample), BATCH_SIZE):
                 batch_sample = sample[idx : idx + BATCH_SIZE]
@@ -204,20 +225,27 @@ class Experiment:
 
         return results
 
-    def save_results(self, results, split):  # To do: make more specific than pickle
+    def save_results(self, dataset, results, split):
         """
         Save results as pickle file
         """
-        result_file = os.path.join(self.experiment_log_dir, f"results_{split}.pkl")
+        result_file = os.path.join(
+            self.experiment_log_dir, f"{dataset}_results_{split}.pkl"
+        )
         with open(result_file, "wb") as f:
             pickle.dump(results, f)
 
-    def run(self, dataset_path: str, **kwargs):
+    def run(self, dataset_name: str, dataset_path: str, **kwargs):
         """
         Run experiment
         """
-        split = os.path.basename(dataset_path).split("_")[-1].split(".")[0]
-        results = self.run_experiment(dataset_path, split, **kwargs)
-        self.save_results(results, split)
+        splits = os.path.basename(dataset_path).split(".")[0].split("_")
+        split = ""
+        if "train" in splits:
+            split = "train"
+        elif "test" in splits:
+            split = "test"
+        results = self.run_experiment(dataset_name, dataset_path, split, **kwargs)
+        self.save_results(dataset_name, results, split)
 
         return results

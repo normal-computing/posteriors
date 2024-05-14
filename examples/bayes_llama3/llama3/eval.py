@@ -6,14 +6,12 @@ import torch
 from tqdm import tqdm
 from ml_collections.config_dict import ConfigDict, FrozenConfigDict
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import numpy as np
-from scipy import special
 
 from llama3.modules.bayesllama import BayesLlamaForCausalLM
 from llama3.utils.load_utils import load_ensemble
 
 
-PROMPT = "Answer the following multiple choice question very succintly.\n"
+PROMPT = """Answer the following multiple choice question very succintly.\n"""
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 1
@@ -95,7 +93,7 @@ class Experiment:
         self.model.to(DEVICE)
 
     def prepare_prompt(self, prompt, questions):
-        prompt = ["\n".join([prompt, q + "\n", "Answer:"]) for q in questions]
+        prompt = ["\n".join([prompt, q + "\n", "Answer:\n"]) for q in questions]
         return self.tokenizer(prompt, return_tensors="pt", padding=True)
 
     @torch.no_grad()
@@ -139,12 +137,12 @@ class Experiment:
         epistemic_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
         total_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
         for _ in range(max_length):
-            outputs = self.model(**inputs, return_dict=True, use_cache=use_cache)
+            outputs = self.model(**inputs, return_dict=False, use_cache=use_cache)
 
             if "attention_mask" in inputs:
                 del inputs["attention_mask"]
 
-            logits = outputs.logits[:, -1]
+            logits = outputs[0][:, -1]
             probs = torch.softmax(logits, dim=-1)
             next_token = probs.argmax(-1).unsqueeze(-1)
 
@@ -154,7 +152,7 @@ class Experiment:
                 epistemic_uncertainties[idx].append(eunc.item())
 
             if use_cache:
-                inputs["past_key_values"] = outputs.past_key_values
+                inputs["past_key_values"] = outputs[1]
                 inputs["input_ids"] = next_token
             else:
                 inputs["input_ids"] = torch.cat(

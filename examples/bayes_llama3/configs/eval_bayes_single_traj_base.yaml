@@ -1,5 +1,5 @@
 logs_dir: "./experiments"
-dataset_path:
+dataset_path: 
   tqa:
     - /home/paperspace/Projects/posteriors/datasets/tqa_train_val_test/test/tqa_v2_test.json
     # - /home/paperspace/Projects/posteriors/datasets/tqa_train_val_test/train/tqa_v1_train.json
@@ -9,9 +9,9 @@ dataset_path:
 
 # Experiment
 experiment_config:
-  eval_pretrained_model: true
   experiment_name: question-answer-test
   chat_model: false
-  n_tokens: 3
-  tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
-  pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
+  n_tokens: 5
+  tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B
+  pretrained_model_name_or_path: Meta-Llama-3-8B
+  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/single_traj

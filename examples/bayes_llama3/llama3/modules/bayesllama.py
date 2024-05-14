@@ -299,16 +299,14 @@ class BayesLlamaForCausalLM(LlamaForCausalLM):
         else:
             logits = self.lm_head(hidden_states)
 
-        logits = logits.float()
         # logits are size (n_ensemble, batch_size, seq_len, vocab_size)
-        # mean over n_ensemble to get (batch_size, seq_len, vocab_size)
-        mean_logits = logits.mean(dim=0)
+        logits = logits.float()
 
         if not return_dict:
-            return ((mean_logits, logits),) + outputs[1:]
+            return (logits,) + outputs[1:]
 
         return CausalLMOutputWithPast(
-            logits=(mean_logits, logits),  # return logits from all bayesian layers
+            logits=logits,  # return logits from all bayesian layers
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,

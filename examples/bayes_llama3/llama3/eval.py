@@ -20,30 +20,12 @@ BATCH_SIZE = 1
 eps = 1e-5
 
 
-def compute_uncertainties(logits):
-    # There is no notion of batch size in this function
-    # Logits is a list of logits where each idx corresponds to the ith token output
-    # The shape at index i is just (n ensemble, vocab size)
-    normalize_logits = lambda x: x / np.sum(x, axis=-1, keepdims=True)
-    avg_ensemble = lambda x: np.mean(x, axis=0)
-    apply_softmax = lambda x: special.softmax(x, axis=-1)
-
-    calc_total_uncertainty = lambda x: -np.mean(x * np.log(x + eps))
-    calc_aleatoric_uncertainty = lambda x: -np.mean(x * np.log(x + eps), axis=-1)
-
-    probs = list(
-        map(normalize_logits, map(apply_softmax, logits))
-    )  # List[(n ensemble, vocab size)]
-    expected_probs = list(map(avg_ensemble, probs))  # List[(vocab size, )]
-
-    total_uncertainty = list(map(calc_total_uncertainty, expected_probs))
-    aleatoric_uncertainty_per_ensemble = list(map(calc_aleatoric_uncertainty, probs))
-    aleatoric_uncertainty = [np.mean(uc) for uc in aleatoric_uncertainty_per_ensemble]
-    epistemic_uncertainty = [
-        t - a for t, a in zip(total_uncertainty, aleatoric_uncertainty)
-    ]
-
-    return total_uncertainty, aleatoric_uncertainty, epistemic_uncertainty
+def logits_to_uncertainties(eprobs):
+    probs = eprobs.mean(0)
+    total_uncertainty = -torch.sum(probs * torch.log(probs), -1)
+    aleatoric_uncertainty = -(eprobs * torch.log(eprobs)).sum(-1).mean(0)
+    epistemic_uncertainty = total_uncertainty - aleatoric_uncertainty
+    return total_uncertainty, epistemic_uncertainty
 
 
 def extract_tqa_questions(sample):
@@ -118,19 +100,24 @@ class Experiment:
 
     @torch.no_grad()
     def generate(self, inputs, max_length=20, use_cache=True):
-        seq_out, ensemble_logits = [], [[] for _ in range(inputs["input_ids"].size(0))]
+        seq_out = []
+        epistemic_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
+        total_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
         for _ in range(max_length):
             outputs = self.model(**inputs, return_dict=False, use_cache=use_cache)
 
             if "attention_mask" in inputs:
                 del inputs["attention_mask"]
 
-            next_token = outputs[0][0][:, -1].argmax(-1).unsqueeze(-1)
-            logits = (
-                outputs[0][1].swapaxes(0, 1)[:, :, -1].cpu().numpy()
-            )  # swap to make batch dim first
-            for idx, logit in enumerate(logits):
-                ensemble_logits[idx].append(logit)
+            elogits = outputs[0][:, :, -1]
+            eprobs = torch.softmax(elogits, dim=-1)
+            probs = eprobs.mean(0)
+            next_token = probs.argmax(-1).unsqueeze(-1)
+
+            total_unc, epi_unc = logits_to_uncertainties(eprobs)
+            for idx, (tunc, eunc) in enumerate(zip(total_unc, epi_unc)):
+                total_uncertainties[idx].append(tunc)
+                epistemic_uncertainties[idx].append(eunc)
 
             if use_cache:
                 inputs["past_key_values"] = outputs[1]
@@ -144,21 +131,27 @@ class Experiment:
 
         seq_out = torch.cat(seq_out, -1)
         text_outputs = self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
-        return text_outputs, ensemble_logits
+        return text_outputs, total_uncertainties, epistemic_uncertainties
 
     @torch.no_grad()
     def generate_base(self, inputs, max_length=20, use_cache=True):
-        seq_out, logits = [], [[] for _ in range(inputs["input_ids"].size(0))]
+        seq_out = []
+        epistemic_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
+        total_uncertainties = [[] for _ in range(inputs["input_ids"].size(0))]
         for _ in range(max_length):
             outputs = self.model(**inputs, return_dict=True, use_cache=use_cache)
 
             if "attention_mask" in inputs:
                 del inputs["attention_mask"]
 
-            next_token = outputs.logits[:, -1].argmax(-1).unsqueeze(-1)
-            out_logits = outputs.logits[:, -1].cpu().numpy()
-            for idx, logit in enumerate(out_logits):
-                logits[idx].append([logit])
+            logits = outputs.logits[:, -1]
+            probs = torch.softmax(logits, dim=-1)
+            next_token = probs.argmax(-1).unsqueeze(-1)
+
+            total_unc, epi_unc = logits_to_uncertainties(probs.unsqueeze(0))
+            for idx, (tunc, eunc) in enumerate(zip(total_unc, epi_unc)):
+                total_uncertainties[idx].append(tunc)
+                epistemic_uncertainties[idx].append(eunc)
 
             if use_cache:
                 inputs["past_key_values"] = outputs.past_key_values
@@ -171,7 +164,7 @@ class Experiment:
 
         seq_out = torch.cat(seq_out, -1)
         text_outputs = self.tokenizer.batch_decode(seq_out, skip_special_tokens=True)
-        return text_outputs, logits
+        return text_outputs, total_uncertainties, epistemic_uncertainties
 
     def run_experiment(self, dataset_name: str, dataset_path: str, split: str):
         with open(dataset_path, "rb") as file:
@@ -196,28 +189,32 @@ class Experiment:
                 inputs = self.prepare_prompt(PROMPT, questions)
 
                 if self.eval_pretrained:
-                    answers, logits = self.generate_base(
-                        inputs.to(self.model.device), max_length=self.n_tokens
+                    answers, total_uncertainties, epistemic_uncertainties = (
+                        self.generate_base(
+                            inputs.to(self.model.device), max_length=self.n_tokens
+                        )
                     )
                 else:
-                    answers, logits = self.generate(
-                        inputs.to(self.model.device), max_length=self.n_tokens
+                    answers, total_uncertainties, epistemic_uncertainties = (
+                        self.generate(
+                            inputs.to(self.model.device), max_length=self.n_tokens
+                        )
                     )
 
-                for qid, answer, ca, q, logit in zip(
-                    q_ids, answers, correct_answers, questions, logits
+                for qid, answer, ca, q, tunc, eunc in zip(
+                    q_ids,
+                    answers,
+                    correct_answers,
+                    questions,
+                    total_uncertainties,
+                    epistemic_uncertainties,
                 ):
-                    total_uncertainty, aleatoric_uncertainty, epistemic_uncertainty = (
-                        compute_uncertainties(logit)
-                    )
                     results[qid] = {
                         "question": q,
                         "response": answer,
                         "expected_response": ca,
-                        # "logits": logit,
-                        "total_uncertainty": total_uncertainty,
-                        "aleatoric_uncertainty": aleatoric_uncertainty,
-                        "epistemic_uncertainty": epistemic_uncertainty,
+                        "total_uncertainty": tunc,
+                        "aleatoric_uncertainty": eunc,
                     }
 
             if sample_idx % 10 == 0:

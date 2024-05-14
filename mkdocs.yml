@@ -77,6 +77,7 @@ nav:
     - SGMCMC:
       - api/sgmcmc/sgld.md
       - api/sgmcmc/sghmc.md
+      - api/sgmcmc/sgnht.md
     - VI:
       - Diag: api/vi/diag.md
     - api/optim.md

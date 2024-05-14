@@ -1,0 +1,3 @@
+# SGNHT
+
+::: posteriors.sgmcmc.sgnht

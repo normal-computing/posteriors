@@ -12,7 +12,7 @@ class TQADataLoader(pl.LightningDataModule):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.num_workers = num_workers
-        self.train_dataset = TQADataset(**data_config, split="train")
+        self.train_dataset = TQADataset(**data_config, split="test")
 
     def train_dataloader(self):
         return DataLoader(
@@ -41,12 +41,13 @@ class TQADataset(Dataset):
         self.tokenizer.padding_side = "left"
 
         self.folder = os.path.join(folder, split)
-        with open(os.path.join(self.folder, f"tqa_v1_{split}.json")) as f:
+        version = "v2" if split == "test" else "v1"
+        with open(os.path.join(self.folder, f"tqa_{version}_{split}.json")) as f:
             qa_doc = json.load(f)
 
         if split == "train":
             self.folder = os.path.join(folder, "val")
-            with open(os.path.join(self.folder, f"tqa_v1_val.json")) as f:
+            with open(os.path.join(self.folder, f"tqa_{version}_val.json")) as f:
                 qa_doc += json.load(f)
 
         self.list_of_paragraphs = []

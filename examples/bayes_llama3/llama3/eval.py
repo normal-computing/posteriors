@@ -114,10 +114,10 @@ class Experiment:
             probs = eprobs.mean(0)
             next_token = probs.argmax(-1).unsqueeze(-1)
 
-            total_unc, epi_unc = logits_to_uncertainties(eprobs)
+            total_unc, epi_unc = logits_to_uncertainties(eprobs.cpu())
             for idx, (tunc, eunc) in enumerate(zip(total_unc, epi_unc)):
-                total_uncertainties[idx].append(tunc)
-                epistemic_uncertainties[idx].append(eunc)
+                total_uncertainties[idx].append(tunc.item())
+                epistemic_uncertainties[idx].append(eunc.item())
 
             if use_cache:
                 inputs["past_key_values"] = outputs[1]
@@ -148,10 +148,10 @@ class Experiment:
             probs = torch.softmax(logits, dim=-1)
             next_token = probs.argmax(-1).unsqueeze(-1)
 
-            total_unc, epi_unc = logits_to_uncertainties(probs.unsqueeze(0))
+            total_unc, epi_unc = logits_to_uncertainties(probs.unsqueeze(0).cpu())
             for idx, (tunc, eunc) in enumerate(zip(total_unc, epi_unc)):
-                total_uncertainties[idx].append(tunc)
-                epistemic_uncertainties[idx].append(eunc)
+                total_uncertainties[idx].append(tunc.item())
+                epistemic_uncertainties[idx].append(eunc.item())
 
             if use_cache:
                 inputs["past_key_values"] = outputs.past_key_values

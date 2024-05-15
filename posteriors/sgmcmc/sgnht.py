@@ -16,6 +16,7 @@ def build(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    sigma: float = 1.0,
     temperature: float = 1.0,
     momenta: TensorTree | float | None = None,
     xi: float = None,
@@ -25,15 +26,15 @@ def build(
     Algorithm from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf):
 
     \\begin{align}
-    θ_{t+1} &= θ_t + ε m_t \\\\
-    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε ξ_t m_t
+    θ_{t+1} &= θ_t + ε σ^{-2} m_t \\\\
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε σ^{-2} ξ_t m_t
     + N(0, ε T (2 α - ε β T) \\mathbb{I})\\\\
-    ξ_{t+1} &= ξ_t + ε (m_t^T m_t / d - T)
+    ξ_{t+1} &= ξ_t + ε (σ^{-2} d^{-1} m_t^T m_t - T)
     \\end{align}
     
     for learning rate $\\epsilon$, temperature $T$ and parameter dimension $d$.
 
-    Targets $p_T(θ, m, ξ) \\propto \\exp( (\\log p(θ) - \\frac12 m^Tm + \\frac{d}{2}(ξ - α)^2) / T)$.
+    Targets $p_T(θ, m, ξ) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm + \\frac{d}{2}(ξ - α)^2) / T)$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
     to ensure robust scaling for a large amount of data and variable batch size.
@@ -45,6 +46,7 @@ def build(
         lr: Learning rate.
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
+        sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
@@ -60,6 +62,7 @@ def build(
         lr=lr,
         alpha=alpha,
         beta=beta,
+        sigma=sigma,
         temperature=temperature,
     )
     return Transform(init_fn, update_fn)
@@ -118,6 +121,7 @@ def update(
     lr: float,
     alpha: float = 0.01,
     beta: float = 0.0,
+    sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
 ) -> SGNHTState:
@@ -126,10 +130,10 @@ def update(
     Update rule from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf):
 
     \\begin{align}
-    θ_{t+1} &= θ_t + ε m_t \\
-    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε ξ_t m_t
-    + N(0, ε T (2 α - ε β T) \\mathbb{I})\\
-    ξ_{t+1} &= ξ_t + ε (m_t^T m_t / d - T)
+    θ_{t+1} &= θ_t + ε σ^{-2} m_t \\\\
+    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε σ^{-2} ξ_t m_t
+    + N(0, ε T (2 α - ε β T) \\mathbb{I})\\\\
+    ξ_{t+1} &= ξ_t + ε (σ^{-2} d^{-1} m_t^T m_t - T)
     \\end{align}
     
     for learning rate $\\epsilon$ and temperature $T$
@@ -143,6 +147,7 @@ def update(
         lr: Learning rate.
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
+        sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
         inplace: Whether to modify state in place.
 
@@ -155,20 +160,22 @@ def update(
             state.params, batch
         )
 
+    prec = sigma**-2
+
     def transform_params(p, m):
-        return p + lr * m
+        return p + lr * prec * m
 
     def transform_momenta(m, g):
         return (
             m
             + lr * g
-            - lr * state.xi * m
+            - lr * prec * state.xi * m
             + (temperature * lr * (2 * alpha - temperature * lr * beta)) ** 0.5
             * torch.randn_like(m)
         )
 
     m_flat, _ = tree_ravel(state.momenta)
-    xi_new = state.xi + lr * (torch.mean(m_flat**2) - temperature)
+    xi_new = state.xi + lr * (prec * torch.mean(m_flat**2) - temperature)
 
     params = flexi_tree_map(
         transform_params, state.params, state.momenta, inplace=inplace

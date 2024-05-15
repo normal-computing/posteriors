@@ -34,7 +34,7 @@ def build(
     
     for learning rate $\\epsilon$, temperature $T$ and parameter dimension $d$.
 
-    Targets $p_T(θ, m, ξ) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm + \\frac{d}{2}(ξ - α)^2) / T)$.
+    Targets $p_T(θ, m, ξ) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm - \\frac{d}{2}(ξ - α)^2) / T)$.
 
     The log posterior and temperature are recommended to be [constructed in tandem](../../log_posteriors.md)
     to ensure robust scaling for a large amount of data and variable batch size.

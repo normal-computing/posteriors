@@ -8,6 +8,7 @@ momenta: 0.0
 set_temperature: False
 max_seq_len: 150
 pretrained_weights_folder: "Meta-Llama-3-8B"
+ignore_first_tokens: 250
 
 metrics_log_frequency: 5
 save_frequency: 1000

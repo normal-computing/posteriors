@@ -12,11 +12,12 @@ import torch
 PRIOR_SD = 1e3
 
 
-def log_posterior(model_func, num_data, vocab_size):
+def log_posterior(model_func, num_data, vocab_size, ignore_first):
     def fn_call(params, inputs):
         outputs = model_func(params, **inputs)
-        pred_logits = outputs.logits[:, :-1].contiguous()
-        labels = inputs["input_ids"][:, 1:].contiguous()
+
+        pred_logits = outputs.logits[:, ignore_first - 1 : -1, :].contiguous()
+        labels = inputs["input_ids"][:, ignore_first:].contiguous()
         pred_logits = pred_logits.view(-1, vocab_size)
         labels = labels.view(-1)
 
@@ -41,6 +42,7 @@ class BayesLlama(pl.LightningModule):
         alpha: float = 1e-1,
         beta: float = 0.0,
         momenta: float = 0.0,
+        ignore_first_tokens: int = 250,
         set_temperature: bool = True,
         max_seq_len: Optional[int] = None,
     ):
@@ -51,8 +53,10 @@ class BayesLlama(pl.LightningModule):
         self.beta = beta
         self.momenta = momenta
         self.set_temperature = set_temperature
-        self.max_seq_len = max_seq_len
+        self.ignore_first_tokens = ignore_first_tokens
         if max_seq_len:
+            assert ignore_first_tokens < max_seq_len
+            max_seq_len = max_seq_len - ignore_first_tokens
             self.num_data = num_data * max_seq_len
 
         self.model: nn.Module = AutoModelForCausalLM.from_pretrained(
@@ -85,7 +89,12 @@ class BayesLlama(pl.LightningModule):
         sub_params, sub_param_to_log_posterior = (
             posteriors.extract_requires_grad_and_func(
                 dict(self.model.named_parameters()),
-                log_posterior(self.functional_model, self.num_data, self.vocab_size),
+                log_posterior(
+                    self.functional_model,
+                    self.num_data,
+                    self.vocab_size,
+                    self.ignore_first_tokens,
+                ),
             )
         )
 

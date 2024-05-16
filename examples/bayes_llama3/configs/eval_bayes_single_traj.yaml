@@ -14,4 +14,4 @@ experiment_config:
   n_tokens: 5
   tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
   pretrained_model_name_or_path: Meta-Llama-3-8B-Instruct
-  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/single_traj
+  checkpoints_folder: /home/paperspace/Projects/posteriors/examples/bayes_llama3/logs/single_traj2

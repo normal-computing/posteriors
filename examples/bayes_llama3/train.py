@@ -69,6 +69,7 @@ if __name__ == "__main__":
         beta=config["beta"],
         momenta=config["momenta"],
         set_temperature=config["set_temperature"],
+        ignore_first_tokens=config["ignore_first_tokens"],
         max_seq_len=config["data_loader"]["stride_length"],
     )
 

@@ -11,9 +11,6 @@ temperatures = [0.03, 0.1, 0.3, 1.0, 3.0]
 temp_strs = [str(temp).replace(".", "-") for temp in temperatures]
 
 
-ylims = {"loss": (0.305, 0.72), "accuracy": (0.47, 0.88)}
-
-
 # [base directory, tempered bool, colors]
 
 bases = [
@@ -35,6 +32,13 @@ bases = [
 #     ["examples/imdb/results/sghmc_serial", True, ["firebrick"]],
 #     ["examples/imdb/results/sghmc_parallel/sghmc_parallel", True, ["tomato"]],
 # ]
+
+with_mle = "mle" in bases[0][0]
+
+if with_mle:
+    ylims = {"loss": (0.305, 1.1), "accuracy": (0.17, 0.88)}
+else:
+    ylims = {"loss": (0.305, 0.72), "accuracy": (0.47, 0.88)}
 
 save_name = bases[-1][0].split("/")[-1].split("_")[0]
 
@@ -95,7 +99,7 @@ def plot_metric(metric_name):
     fig, ax = plt.subplots()
     k = 0
 
-    linewidth = 3
+    linewidth = 2 if with_mle else 3
 
     for method_name, method_dict in metric_dict.items():
         if not isinstance(method_dict, dict):
@@ -142,7 +146,14 @@ def plot_metric(metric_name):
         fontsize=fontsize,
     )
     fig.tight_layout()
-    fig.savefig(f"examples/imdb/results/{save_name}_{metric_name}.png", dpi=400)
+
+    save_dir = (
+        f"examples/imdb/results/{save_name}_{metric_name}_with_mle.png"
+        if with_mle
+        else f"examples/imdb/results/{save_name}_{metric_name}.png"
+    )
+    fig.savefig(save_dir, dpi=400)
+    plt.close()
 
 
 plot_metric("loss")

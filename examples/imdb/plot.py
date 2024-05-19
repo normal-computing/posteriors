@@ -12,7 +12,6 @@ temp_strs = [str(temp).replace(".", "-") for temp in temperatures]
 
 
 # [base directory, tempered bool, colors]
-
 bases = [
     # ["examples/imdb/results/mle", False, ["grey"]],
     ["examples/imdb/results/map", False, ["grey"]],
@@ -36,7 +35,7 @@ bases = [
 with_mle = "mle" in bases[0][0]
 
 if with_mle:
-    ylims = {"loss": (0.305, 1.1), "accuracy": (0.17, 0.88)}
+    ylims = {"loss": (0.305, 1.1), "accuracy": (0.47, 0.88)}
 else:
     ylims = {"loss": (0.305, 0.72), "accuracy": (0.47, 0.88)}
 
@@ -138,12 +137,14 @@ def plot_metric(metric_name):
 
     ax.set_xlabel("Temperature", fontsize=fontsize)
     ax.set_ylabel("Test " + metric_name.title(), fontsize=fontsize)
+
+    leg_fontsize = fontsize * 0.75 if with_mle else fontsize
     ax.legend(
         frameon=True,
         framealpha=1.0,
         facecolor="white",
         edgecolor="white",
-        fontsize=fontsize,
+        fontsize=leg_fontsize,
     )
     fig.tight_layout()
 

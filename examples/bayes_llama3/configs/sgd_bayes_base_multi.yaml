@@ -1,0 +1,24 @@
+seed: 2024
+epochs: 20
+
+num_ensembles: 5
+
+learning_rate: 1e-3
+alpha: 1e-2
+beta: 0.0
+momenta: 0.0
+set_temperature: False
+max_seq_len: 150
+pretrained_weights_folder: "Meta-Llama-3-8B"
+ignore_first_tokens: 250
+
+metrics_log_frequency: 5
+save_frequency: 1000
+
+num_workers: 8
+batch_size: 10
+data_loader:
+  folder: "/home/paperspace/Projects/posteriors/datasets/tqa_train_val_test"
+  tokenizer_path: "Meta-Llama-3-8B"
+  stride_length: 300
+  stride_overlap: 100

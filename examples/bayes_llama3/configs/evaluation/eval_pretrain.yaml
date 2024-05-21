@@ -1,0 +1,7 @@
+experiment_config:
+  eval_pretrained_model: true
+  experiment_name: question-answer-test
+  chat_model: false
+  n_tokens: 3
+  tokenizer_pretrained_model_name_or_path: Meta-Llama-3-8B
+  pretrained_model_name_or_path: Meta-Llama-3-8B

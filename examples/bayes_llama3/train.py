@@ -75,6 +75,9 @@ if __name__ == "__main__":
 
     try:
         trainer.fit(model, dataloader)
+        epoch_num = trainer.current_epoch
+        final_ckpt = os.path.join(logger.log_dir, "checkpoints", f"last.ckpt")
+        trainer.save_checkpoint(final_ckpt)
     except KeyboardInterrupt as e:
         if trainer.global_rank == 0:
             if not args.debug:

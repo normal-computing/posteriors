@@ -29,8 +29,11 @@ config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""
 # Set seed
 if args.seed != 42:
     config.save_dir += f"_seed{args.seed}"
+    if config.params_dir is not None:
+        config.params_dir += f"_seed{args.seed}/state.pkl"
 else:
     args.seed = 42
+    config.params_dir += "/state.pkl"
 torch.manual_seed(args.seed)
 
 # Load model
@@ -39,6 +42,7 @@ model.to(args.device)
 
 if config.params_dir is not None:
     with open(config.params_dir, "rb") as f:
+        print(config.params_dir)
         state = pickle.load(f)
         model.load_state_dict(state.params)
 

@@ -2,11 +2,9 @@ import torch
 import posteriors
 from optree import tree_map
 
-temperature = 1.0
-
 name = "laplace_ggn"
 save_dir = "examples/imdb/results/" + name
-params_dir = "examples/imdb/results/map/state.pkl"  # directory to load state containing initialisation params
+params_dir = "examples/imdb/results/map"  # directory to load state containing initialisation params
 
 prior_sd = torch.inf
 batch_size = 32
@@ -19,20 +17,20 @@ log_metrics = {}  # dict containing names of metrics as keys and their paths in 
 display_metric = "loss"  # metric to display in tqdm progress bar
 
 log_frequency = 100  # frequency at which to log metrics
-log_window = 40  # window size for moving average
+log_window = 30  # window size for moving average
 
 n_test_samples = 50
 n_linearised_test_samples = 10000
 epsilon = 1e-3  # small value to avoid division by zero in to_sd_diag
 
 
-def to_sd_diag(state):
+def to_sd_diag(state, temperature=1.0):
     return tree_map(lambda x: torch.sqrt(temperature / (x + epsilon)), state.prec_diag)
 
 
-def forward(model, state, batch):
+def forward(model, state, batch, temperature=1.0):
     x, _ = batch
-    sd_diag = to_sd_diag(state)
+    sd_diag = to_sd_diag(state, temperature)
 
     sampled_params = posteriors.diag_normal_sample(
         state.params, sd_diag, (n_test_samples,)
@@ -47,9 +45,9 @@ def forward(model, state, batch):
     return logits
 
 
-def forward_linearized(model, state, batch):
+def forward_linearized(model, state, batch, temperature=1.0):
     x, _ = batch
-    sd_diag = to_sd_diag(state)
+    sd_diag = to_sd_diag(state, temperature)
 
     def model_func_with_aux(p, x):
         return torch.func.functional_call(model, p, x), torch.tensor([])

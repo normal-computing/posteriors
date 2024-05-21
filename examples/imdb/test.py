@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--config", type=str)
 parser.add_argument("--device", default="cpu", type=str)
 parser.add_argument("--seed", default=42, type=int)
+parser.add_argument("--temperature", default=None, type=float)
 args = parser.parse_args()
 
 
@@ -24,6 +25,13 @@ torch.manual_seed(args.seed)
 # Import configuration
 config = importlib.import_module(args.config.replace("/", ".").replace(".py", ""))
 config_dir = os.path.dirname(args.config)
+save_dir = (
+    config_dir
+    if args.temperature is None
+    else config_dir + f"_temp{str(args.temperature).replace('.', '-')}"
+)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 
 # Load data
 _, test_dataloader = load_imdb_dataset()
@@ -82,7 +90,12 @@ for batch in tqdm(test_dataloader):
         batch = tree_map(lambda x: x.to(args.device), batch)
         labels = batch[1]
 
-        forward_logits = {k: v(model, state, batch) for k, v in forward_dict.items()}
+        forward_logits = {
+            k: v(model, state, batch)
+            if args.temperature is None
+            else v(model, state, batch, args.temperature)
+            for k, v in forward_dict.items()
+        }
 
         forward_metrics = {
             k: test_metrics(logits, labels) for k, logits in forward_logits.items()
@@ -98,7 +111,7 @@ for batch in tqdm(test_dataloader):
 for forward_k, metric_dict in log_dict_forward.items():
     log_metrics(
         metric_dict,
-        config_dir,
+        save_dir,
         file_name="test_" + forward_k,
         plot=False,
     )

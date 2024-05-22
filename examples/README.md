@@ -4,6 +4,9 @@ This directory contains examples of how to use the `posteriors` package.
 - [`continual_lora`](continual_lora/): Uses `posteriors.laplace.diag_fisher` to avoid
 catastrophic forgetting in fine-tuning [Llama-2-7b](https://huggingface.co/meta-llama/Llama-2-7b-hf)
 on a series of books from the [pg19](https://huggingface.co/datasets/pg19) dataset.
+- [`imdb`](imdb/): Investigates [cold posterior effect](https://proceedings.mlr.press/v119/wenzel20a/wenzel20a.pdf)
+for a range of approximate Bayesian methods on [IMDB](https://www.tensorflow.org/api_docs/python/tf/keras/datasets/imdb/load_data)
+data.
 - [`yelp`](yelp/): Compares a host of `posteriors` methods (highlighting the easy
 exchangeability) on a sentiment analysis task adapted from the [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#train-in-native-pytorch).
 - [`continual_regression`](continual_regression.ipynb): [Variational continual learning](https://arxiv.org/abs/1710.10628)

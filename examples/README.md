@@ -1,6 +1,8 @@
 # `posteriors` examples
 
 This directory contains examples of how to use the `posteriors` package.
+- [`bayes_llama3`](bayes_llama3/): Uses `posteriors` and `lightning` to train a bayesian ensemble language model [Llama-3-8b](https://huggingface.co/meta-llama/Meta-Llama-3-8B)
+on the [TQA](https://allenai.org/data/tqa) dataset.
 - [`continual_lora`](continual_lora/): Uses `posteriors.laplace.diag_fisher` to avoid
 catastrophic forgetting in fine-tuning [Llama-2-7b](https://huggingface.co/meta-llama/Llama-2-7b-hf)
 on a series of books from the [pg19](https://huggingface.co/datasets/pg19) dataset.

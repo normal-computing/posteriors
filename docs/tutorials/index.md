@@ -19,6 +19,12 @@ to show how to use `posteriors`:
 Additionally, we provide more in depth examples in the [examples directory on GitHub](https://github.com/normal-computing/posteriors/tree/main/examples),
 many of which use larger models that require a GPU to run:
 
+[<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/bayes_llama_uncertainties_appendix.png">](https://github.com/normal-computing/posteriors/tree/main/examples/bayes_llama3)
+
+- [`bayes_llama3`](https://github.com/normal-computing/posteriors/tree/main/examples/bayes_llama3):
+Uses `posteriors` and `lightning` to train a bayesian ensemble language model [Llama-3-8b](https://huggingface.co/meta-llama/Meta-Llama-3-8B)
+on the [TQA](https://allenai.org/data/tqa) dataset.
+
 [<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/plot_B_laplace.png">](https://github.com/normal-computing/posteriors/tree/main/examples/continual_lora)
 
 - [`continual_lora`](https://github.com/normal-computing/posteriors/tree/main/examples/continual_lora):

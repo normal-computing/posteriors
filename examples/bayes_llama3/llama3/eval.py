@@ -176,7 +176,7 @@ class EvaluationEngine:
             accuracies / len(statements),
         )
 
-    def run(self):
+    def run(self, n_tokens):
         statements = [
             (scientific_statements, "en"),
             (scientific_statements_samoan, "sa"),
@@ -184,10 +184,14 @@ class EvaluationEngine:
 
         results = {}
         for statement_list, lang in statements:
-            outputs, uncertainties, loss, acc = self.run_eval(statement_list)
+            outputs, uncertainties, loss, acc = self.run_eval(
+                statement_list, n_tokens=n_tokens
+            )
             results[lang] = {
                 "outputs": outputs,
                 "uncertainties": uncertainties,
                 "loss": loss,
                 "acc": acc,
             }
+
+        return results

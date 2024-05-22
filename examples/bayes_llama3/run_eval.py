@@ -11,7 +11,7 @@ args = parser.parse_args()
 
 config = load_config(args.base)
 experiment = EvaluationEngine(config["experiment_config"])
-results = experiment.run_eval(n_tokens=1)
+results = experiment.run(n_tokens=1)
 
 with open(args.output, "wb") as f:
     pickle.dump(results, f)

@@ -76,8 +76,10 @@ class EvaluationEngine:
                 del inputs["attention_mask"]
 
             if is_base:
+                # outputs is of shape (batch size, seq length, vocab size)
                 elogits = outputs[0][:, -1].unsqueeze(0)
             else:
+                # outputs is of shape (ensemble size, batch size, seq length, vocab size)
                 elogits = outputs[0][:, :, -1]
 
             eprobs = torch.softmax(elogits, dim=-1)

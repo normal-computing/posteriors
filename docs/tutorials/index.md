@@ -32,6 +32,13 @@ on a series of books from the [pg19](https://huggingface.co/datasets/pg19) datas
 Compares a host of `posteriors` methods (highlighting the easy exchangeability) on a
 sentiment analysis task adapted from the [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#train-in-native-pytorch).
 
+[<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/cold_posterior_sghmc_loss.png">](https://github.com/normal-computing/posteriors/tree/main/examples/imdb)
+
+- [`imdb`](https://github.com/normal-computing/posteriors/tree/main/examples/imdb): Investigates [cold posterior effect](https://proceedings.mlr.press/v119/wenzel20a/wenzel20a.pdf) for a range of approximate
+Bayesian methods with a CNN-LSTM model on [IMDB](https://www.tensorflow.org/api_docs/python/tf/keras/datasets/imdb/load_data)
+data, with some interesting takeaways.
+
+
 [<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/variational_continual_learning.png">](https://github.com/normal-computing/posteriors/blob/main/examples/continual_regression.ipynb)
 
 - [`continual_regression`](https://github.com/normal-computing/posteriors/blob/main/examples/continual_regression.ipynb):

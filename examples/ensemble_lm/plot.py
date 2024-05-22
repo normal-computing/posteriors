@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import pickle
 from sklearn.metrics import roc_curve, auc
-import numpy as np
 
 
 plt.rcParams["font.family"] = "Times New Roman"
@@ -25,8 +24,8 @@ english_losses = {k: v["en"]["loss"] for k, v in results.items()}
 samoan_losses = {k: v["sa"]["loss"] for k, v in results.items()}
 
 
-def list_of_lists_to_list(l):
-    return [item for sublist in l for item in sublist]
+def list_of_lists_to_list(list_of_lists):
+    return [item for sublist in list_of_lists for item in sublist]
 
 
 english_total_uncs = {

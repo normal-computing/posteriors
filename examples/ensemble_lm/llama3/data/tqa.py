@@ -41,15 +41,15 @@ class TQADataset(Dataset):
         self.tokenizer.padding_side = "left"
 
         self.folder = os.path.join(folder, split)
-        with open(os.path.join(self.folder, f"tqa_v1_train.json")) as f:
+        with open(os.path.join(self.folder, "tqa_v1_train.json")) as f:
             qa_doc = json.load(f)
 
         self.folder = os.path.join(folder, "val")
-        with open(os.path.join(self.folder, f"tqa_v1_val.json")) as f:
+        with open(os.path.join(self.folder, "tqa_v1_val.json")) as f:
             qa_doc += json.load(f)
 
         self.folder = os.path.join(folder, "test")
-        with open(os.path.join(self.folder, f"tqa_v2_test.json")) as f:
+        with open(os.path.join(self.folder, "tqa_v2_test.json")) as f:
             qa_doc += json.load(f)
 
         self.list_of_paragraphs = []

@@ -1,6 +1,6 @@
 # Bayesian Ensemble Language Model #
 
-We create an ensemble last layer on top of Llama3 to perform uncertainty quantification. We fine-tune the last attention layer in the model and achieve a distribution over distributions by grabbing 10 copies of the weights over 10 different training trajectories.
+We create an ensemble last layer on top of Llama3 to perform uncertainty quantification. We fine-tune all the weights in the last attention layer in the model and achieve a distribution over distributions by grabbing 10 copies of the weights over 10 different training trajectories.
 
 ## Installation ##
 

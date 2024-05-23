@@ -1,5 +1,3 @@
-### Code adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py ###
-
 # coding=utf-8
 # Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
 #
@@ -19,6 +17,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# This code has been adapted from Meta and Huggingface and inherits the above lisence.
+# The original code can be found here:
+# https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py
 """PyTorch LLaMA model."""
 
 from typing import Optional, Tuple, Union, List

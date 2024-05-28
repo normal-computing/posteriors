@@ -88,14 +88,14 @@ class EKFDenseState(TransformState):
 
 def init(
     params: TensorTree,
-    init_cov: TensorTree | float = 1.0,
+    init_cov: torch.Tensor | float = 1.0,
 ) -> EKFDenseState:
     """Initialise Multivariate Normal distribution over parameters.
 
     Args:
         params: Initial mean of the Normal distribution.
-        init_cov: Initial covariance matrix
-            of the Multivariate Normal distribution. Can be tree like params or scalar.
+        init_cov: Initial covariance matrix of the Multivariate Normal distribution.
+        If it is a float, it is defined as an identity matrix scaled by that float.
 
     Returns:
         Initial EKFDenseState.

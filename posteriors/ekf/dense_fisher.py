@@ -95,7 +95,7 @@ def init(
     Args:
         params: Initial mean of the Normal distribution.
         init_cov: Initial covariance matrix of the Multivariate Normal distribution.
-        If it is a float, it is defined as an identity matrix scaled by that float.
+            If it is a float, it is defined as an identity matrix scaled by that float.
 
     Returns:
         Initial EKFDenseState.

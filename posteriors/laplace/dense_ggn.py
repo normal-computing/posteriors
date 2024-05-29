@@ -137,8 +137,8 @@ def update(
 
     with torch.no_grad(), CatchAuxError():
         ggn_batch, aux = ggn(
-            partial(forward, batch=batch),
-            partial(outer_loss, batch=batch),
+            lambda params: forward(params, batch),
+            lambda z: outer_loss(z, batch),
             forward_has_aux=True,
             loss_has_aux=False,
             normalize=False,

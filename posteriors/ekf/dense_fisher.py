@@ -149,9 +149,13 @@ def update(
         log_likelihood = per_samplify(log_likelihood)
 
     with torch.no_grad(), CatchAuxError():
-        log_liks, aux = log_likelihood(state.params, batch)
-        jac, _ = jacrev(log_likelihood, has_aux=True)(state.params, batch)
-        grad = tree_map(lambda x: x.mean(0), jac)
+        def log_likelihood_reduced(params, batch):
+            per_samp_log_lik, internal_aux = log_likelihood(params, batch)
+            return per_samp_log_lik.mean(), internal_aux
+
+        grad, (log_liks, aux) = grad_and_value(log_likelihood_reduced, has_aux=True)(
+            state.params, batch
+        )
         fisher, _ = empirical_fisher(
             lambda p: log_likelihood(p, batch), has_aux=True, normalize=True
         )(state.params)

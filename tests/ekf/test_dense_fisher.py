@@ -51,18 +51,8 @@ def test_ekf_dense():
     num_samples = 1000
     samples = ekf.dense_fisher.sample(state, (num_samples,))
 
-    # Reshaping the samples after raveling them does not return the correct order. This is because,
-    # on raveling, all the samples under "a" are added to the list left to right, only then followed by
-    # the samples under parameter "b". Reshaping therefore has whole rows of "a" samples before "b" samples begin.
-    # Really, we want each 2D "a" sample followed by a 1D "b" sample, each 3-column row containing a sample of each param in this way.
-    # Therefore, we have to carefully column stack the result of raveling each parameter and reshaping them.
-    # This is all to aid in computing the sample covariance.
-    k = list(samples.keys())[0]  # get first sample to start column stacking
-    samples_copy = tree_ravel(samples[k])[0].reshape(num_samples, samples[k].shape[1])
-    for k in list(samples.keys())[1:]:
-        v = tree_ravel(samples[k])[0].reshape(num_samples, samples[k].shape[1])
-        samples_copy = torch.column_stack((samples_copy, v))
-    samples_cov = torch.cov(samples_copy.T)
+    flat_samples = torch.vmap(lambda s: tree_ravel(s)[0])(samples)
+    samples_cov = torch.cov(flat_samples.T)
 
     mean_copy = tree_map(lambda x: x.clone(), state.params)
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)

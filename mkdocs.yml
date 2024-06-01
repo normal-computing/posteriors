@@ -68,8 +68,8 @@ nav:
   - API:
     - api/index.md
     - EKF:
-      - Diagonal Fisher: api/ekf/diag_fisher.md
       - Dense Fisher: api/ekf/dense_fisher.md
+      - Diagonal Fisher: api/ekf/diag_fisher.md
     - Laplace:
       - Dense Fisher: api/laplace/dense_fisher.md
       - Dense GGN: api/laplace/dense_ggn.md

@@ -1,6 +1,10 @@
 # API
 
 ### Extended Kalman filter (EKF)
+- [`ekf.dense_fisher`](ekf/dense_fisher.md) applies an online Bayesian update based 
+on a Taylor approximation of the log-likelihood. Uses the empirical Fisher
+information matrix as a positive-definite alternative to the Hessian.
+Natural gradient descent equivalence following [Ollivier, 2019](https://arxiv.org/abs/1703.00209).
 - [`ekf.diag_fisher`](ekf/diag_fisher.md) applies an online Bayesian update based 
 on a Taylor approximation of the log-likelihood. Uses the diagonal empirical Fisher
 information matrix as a positive-definite alternative to the Hessian.

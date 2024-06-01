@@ -1,8 +1,7 @@
 from typing import Any
 from functools import partial
 import torch
-from torch.func import jacrev
-from optree import tree_map
+from torch.func import grad_and_value
 from dataclasses import dataclass
 from optree.integration.torch import tree_ravel
 
@@ -149,6 +148,7 @@ def update(
         log_likelihood = per_samplify(log_likelihood)
 
     with torch.no_grad(), CatchAuxError():
+
         def log_likelihood_reduced(params, batch):
             per_samp_log_lik, internal_aux = log_likelihood(params, batch)
             return per_samp_log_lik.mean(), internal_aux

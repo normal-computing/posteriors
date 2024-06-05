@@ -82,7 +82,7 @@ def update(
     batch: TensorTree,
     loss_fn: LogProbFn,
     optimizer: torchopt.base.GradientTransformation,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> TorchOptState:
     """Update the [TorchOpt](https://github.com/metaopt/torchopt) optimizer state.
 

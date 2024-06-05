@@ -100,7 +100,7 @@ def update(
     batch: Any,
     log_posterior: LogProbFn,
     per_sample: bool = False,
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> DenseLaplaceState:
     """Adds empirical Fisher information matrix of covariance summed over
     given batch.

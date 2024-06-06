@@ -8,6 +8,7 @@
 | [**Friends**](#friends)
 | [**Contributing**](#contributing)
 | [**Documentation**](https://normal-computing.github.io/posteriors/)
+| [**Paper**](https://arxiv.org/abs/2406.00104)
 
 ## What is `posteriors`?
 

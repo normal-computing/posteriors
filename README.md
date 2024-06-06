@@ -7,6 +7,7 @@
 | [**Methods**](#methods)
 | [**Friends**](#friends)
 | [**Contributing**](#contributing)
+| [**Citation**](#citation)
 | [**Documentation**](https://normal-computing.github.io/posteriors/)
 | [**Paper**](https://arxiv.org/abs/2406.00104)
 

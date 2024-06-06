@@ -121,3 +121,17 @@ You can report a bug or request a feature by [creating a new issue on GitHub](ht
 
 
 If you want to contribute code, please check the [contributing guide](https://normal-computing.github.io/posteriors/contributing).
+
+
+## Citation
+
+If you use `posteriors` in your research, please cite the library using the following BibTeX entry:
+
+```bibtex
+@article{duffield2024scalable,
+  title={Scalable Bayesian Learning with posteriors},
+  author={Duffield, Samuel and Donatella, Kaelan and Chiu, Johnathan and Klett, Phoebe and Simpson, Daniel},
+  journal={arXiv preprint arXiv:2406.00104},
+  year={2024}
+}
+```

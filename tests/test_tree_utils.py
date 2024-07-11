@@ -39,7 +39,7 @@ def test_tree_extract():
     def check_func(x):
         return x[0] < 2.0
 
-    result = tree_extract(check_func, params)
+    result = tree_extract(params, check_func)
 
     expected = {
         "a": torch.tensor([1.0, 2.0]),
@@ -69,7 +69,7 @@ def test_tree_insert():
     def check_func(x):
         return x[0] < 2.0
 
-    params2 = tree_insert(check_func, params, sub_params)
+    params2 = tree_insert(params, sub_params, check_func)
 
     expected = {
         "a": torch.tensor([5.0, 6.0]),
@@ -78,6 +78,13 @@ def test_tree_insert():
 
     for key in expected:
         assert torch.equal(params2[key], expected[key])
+        assert torch.equal(params[key], params_static[key])
+
+    # Check default check_func
+    params3 = tree_insert(params, sub_params)
+
+    for key in expected:
+        assert torch.equal(params3[key], sub_params[key])
         assert torch.equal(params[key], params_static[key])
 
 
@@ -95,7 +102,7 @@ def test_tree_insert_():
     def check_func(x):
         return x[0] < 2.0
 
-    params2 = tree_insert_(check_func, params, sub_params)
+    params2 = tree_insert_(params, sub_params, check_func)
 
     expected = {
         "a": torch.tensor([5.0, 6.0]),
@@ -105,6 +112,13 @@ def test_tree_insert_():
     for key in expected:
         assert torch.equal(params2[key], expected[key])
         assert torch.equal(params[key], params2[key])
+
+    # Check default check_func
+    params3 = tree_insert_(params, sub_params)
+
+    for key in expected:
+        assert torch.equal(params3[key], sub_params[key])
+        assert torch.equal(params[key], params3[key])
 
 
 def test_extract_requires_grad():

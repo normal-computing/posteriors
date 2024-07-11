@@ -23,10 +23,10 @@ pre-commit install
 mkdocs serve
 ```
 and navigate to [`http://localhost:8000/`](`http://localhost:8000/`) in your browser.[^1]
-5. Make sure to run the tests and linter:
+5. Make sure to run the linter, tests and check coverage:
 ```
-python -m pytest
 pre-commit run --all-files
+python -m pytest --cov=posteriors --cov-report term-missing
 ```
 6. Commit your changes and push your new branch to your fork.
 7. Open a [pull request on GitHub](https://github.com/normal-computing/posteriors/pulls).

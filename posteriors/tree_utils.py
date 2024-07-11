@@ -23,13 +23,16 @@ def tree_size(tree: TensorTree) -> int:
     return tree_reduce(torch.add, tree_map(lambda x: ensure_tensor(x).numel(), tree))
 
 
-def tree_extract(f: Callable[[torch.tensor], bool], tree: TensorTree) -> TensorTree:
+def tree_extract(
+    tree: TensorTree,
+    f: Callable[[torch.tensor], bool],
+) -> TensorTree:
     """Extracts values from a PyTree where f returns True.
     False values are replaced with empty tensors.
 
     Args:
-        f: A function that takes a PyTree element and returns True or False.
         tree: A PyTree.
+        f: A function that takes a PyTree element and returns True or False.
 
     Returns:
         A PyTree with the same structure as tree where f returns True.
@@ -38,15 +41,18 @@ def tree_extract(f: Callable[[torch.tensor], bool], tree: TensorTree) -> TensorT
 
 
 def tree_insert(
-    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
+    full_tree: TensorTree,
+    sub_tree: TensorTree,
+    f: Callable[[torch.tensor], bool] = lambda _: True,
 ) -> TensorTree:
     """Inserts sub_tree into full_tree where full_tree tensors evaluate f to True.
     Both PyTrees must have the same structure.
 
     Args:
-        f: A function that takes a PyTree element and returns True or False.
         full_tree: A PyTree to insert sub_tree into.
         sub_tree: A PyTree to insert into full_tree.
+        f: A function that takes a PyTree element and returns True or False.
+            Defaults to lambda _: True. I.e. insert on all leaves.
 
     Returns:
         A PyTree with sub_tree inserted into full_tree.
@@ -59,15 +65,18 @@ def tree_insert(
 
 
 def tree_insert_(
-    f: Callable[[torch.tensor], bool], full_tree: TensorTree, sub_tree: TensorTree
+    full_tree: TensorTree,
+    sub_tree: TensorTree,
+    f: Callable[[torch.tensor], bool] = lambda _: True,
 ) -> TensorTree:
     """Inserts sub_tree into full_tree in-place where full_tree tensors evaluate
     f to True. Both PyTrees must have the same structure.
 
     Args:
-        f: A function that takes a PyTree element and returns True or False.
         full_tree: A PyTree to insert sub_tree into.
         sub_tree: A PyTree to insert into full_tree.
+        f: A function that takes a PyTree element and returns True or False.
+            Defaults to lambda _: True. I.e. insert on all leaves.
 
     Returns:
         A pointer to full_tree with sub_tree inserted.
@@ -89,7 +98,7 @@ def extract_requires_grad(tree: TensorTree) -> TensorTree:
     Returns:
         A PyTree of tensors that require gradients.
     """
-    return tree_extract(lambda x: x.requires_grad, tree)
+    return tree_extract(tree, lambda x: x.requires_grad)
 
 
 def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
@@ -103,7 +112,7 @@ def insert_requires_grad(full_tree: TensorTree, sub_tree: TensorTree) -> TensorT
     Returns:
         A PyTree with sub_tree inserted into full_tree.
     """
-    return tree_insert(lambda x: x.requires_grad, full_tree, sub_tree)
+    return tree_insert(full_tree, sub_tree, lambda x: x.requires_grad)
 
 
 def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> TensorTree:
@@ -117,7 +126,7 @@ def insert_requires_grad_(full_tree: TensorTree, sub_tree: TensorTree) -> Tensor
     Returns:
         A pointer to full_tree with sub_tree inserted.
     """
-    return tree_insert_(lambda x: x.requires_grad, full_tree, sub_tree)
+    return tree_insert_(full_tree, sub_tree, lambda x: x.requires_grad)
 
 
 def extract_requires_grad_and_func(

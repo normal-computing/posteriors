@@ -105,16 +105,16 @@ def load_model(
     if params_dir is not None:
         state = pickle.load(open(params_dir, "rb"))
         params = tree_insert(
-            lambda x: x.numel() == 0,
             state.params,
             dict(model.named_parameters()),
+            lambda x: x.numel() == 0,
         )
         if last_layer_params_dir is not None:
             last_layer_state = pickle.load(open(last_layer_params_dir, "rb"))
             params = tree_insert(
-                lambda x: x.numel() == 0,
                 last_layer_state.params,
                 params,
+                lambda x: x.numel() == 0,
             )
 
         model.load_state_dict(params)

@@ -79,7 +79,7 @@ def test_ggn_vmap():
 
     # Test sampling
     num_samples = 10000
-    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(
+    laplace_state.prec.data += 0.1 * torch.eye(
         flat_params.shape[0]
     )  # regularize to ensure PSD and reduce variance
 

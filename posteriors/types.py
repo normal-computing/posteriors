@@ -1,7 +1,5 @@
-from typing import Protocol, Any, TypeAlias, Tuple, Callable
-from dataclasses import dataclass, asdict
+from typing import Protocol, Any, TypeAlias, Tuple, Callable, NamedTuple
 from optree.typing import PyTreeTypeVar
-from optree import register_pytree_node_class, tree_flatten, tree_unflatten
 from optree import registry
 from torch import Tensor
 
@@ -14,18 +12,16 @@ OuterLogProbFn = Callable[[TensorTree, TensorTree], float]
 namespace = registry.__GLOBAL_NAMESPACE
 
 
-@register_pytree_node_class(namespace=namespace)
-class TransformState:
-    """A `posteriors` transform state is a `dataclass` containing the required
+class TransformState(NamedTuple):
+    """A `posteriors` transform state is a `NamedTuple` containing the required
     information for the posteriors iterative algorithm defined by the `init` and
     `update` functions.
 
-    Inherit the `TransformState` class to add the new `state` class to the optree
-    PyNode registry to support functions like `optree.tree_map(lambda x: x**2, state)`.
+    Inherit the `NamedTuple` class (not `TransformState`) when defining a new
+    algorithm state, just make sure to include the `params` and `aux` fields.
 
     ```
-    @dataclass
-    class AlgorithmState(TransformState):
+    class AlgorithmState(NamedTuple):
         params: TensorTree
         algorithm_info: Any
         aux: Any
@@ -34,17 +30,6 @@ class TransformState:
 
     params: TensorTree
     aux: Any
-
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-        register_pytree_node_class(cls, namespace=namespace)
-
-    def tree_flatten(self):
-        return tree_flatten(asdict(self))
-
-    @classmethod
-    def tree_unflatten(cls, metadata, children):
-        return cls(**tree_unflatten(metadata, children))
 
 
 class InitFn(Protocol):
@@ -59,7 +44,7 @@ class InitFn(Protocol):
         ```
 
         where params is a PyTree of parameters. The produced `state` is a
-        `TransformState` (and `dataclass`) containing the required information for the
+        `TransformState` (`NamedTuple`) containing the required information for the
         posteriors iterative algorithm defined by the `init` and `update` functions.
 
         Note that this represents the `init` function as stored in a `Transform`
@@ -70,7 +55,7 @@ class InitFn(Protocol):
             params: PyTree containing initial value of parameters.
 
         Returns:
-            The initial state (dataclass).
+            The initial state (`NamedTuple`).
         """
 
 
@@ -87,7 +72,7 @@ class UpdateFn(Protocol):
         state = update(state, batch, inplace=False)
         ```
 
-        where state is a `dataclass` containing the required information for the
+        where state is a `NamedTuple` containing the required information for the
         posteriors iterative algorithm defined by the `init` and `update` functions.
 
         Note that this represents the `update` function as stored in a `Transform`
@@ -100,12 +85,11 @@ class UpdateFn(Protocol):
             inplace: Whether to modify state using inplace operations. Defaults to True.
 
         Returns:
-            The transformed state (dataclass).
+            The transformed state (`NamedTuple`).
         """
 
 
-@dataclass(frozen=True)
-class Transform:
+class Transform(NamedTuple):
     """A transform contains `init` and `update` functions defining an iterative
         algorithm.
 

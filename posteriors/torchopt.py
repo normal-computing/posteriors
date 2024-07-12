@@ -1,11 +1,11 @@
-from typing import Any
+from typing import Any, NamedTuple
 from functools import partial
 import torch
 import torchopt
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
+from posteriors.tree_utils import tree_insert_
 
 
 def build(
@@ -37,8 +37,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class TorchOptState(TransformState):
+class TorchOptState(NamedTuple):
     """State of a [TorchOpt](https://github.com/metaopt/torchopt) optimizer.
 
     Contains the parameters, the optimizer state for the TorchOpt optimizer,
@@ -53,7 +52,7 @@ class TorchOptState(TransformState):
 
     params: TensorTree
     opt_state: torchopt.typing.OptState
-    loss: torch.tensor = None
+    loss: torch.tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -108,7 +107,7 @@ def update(
     updates, opt_state = optimizer.update(grads, opt_state, params=params)
     params = torchopt.apply_updates(params, updates, inplace=inplace)
     if inplace:
-        state.loss = loss.detach()
-        state.aux = aux
-        return state
+        tree_insert_(state.loss, loss.detach())
+        return state._replace(aux=aux)
+
     return TorchOptState(params, opt_state, loss, aux)

@@ -1,11 +1,10 @@
-from typing import Any
+from typing import Any, NamedTuple
 from functools import partial
 import torch
 from torch.func import grad_and_value
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.tree_utils import flexi_tree_map
+from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import CatchAuxError
 
 
@@ -49,8 +48,7 @@ def build(
     return Transform(init, update_fn)
 
 
-@dataclass
-class SGLDState(TransformState):
+class SGLDState(NamedTuple):
     """State encoding params for SGLD.
 
     Args:
@@ -60,7 +58,7 @@ class SGLDState(TransformState):
     """
 
     params: TensorTree
-    log_posterior: torch.tensor = None
+    log_posterior: torch.tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -124,7 +122,6 @@ def update(
     params = flexi_tree_map(transform_params, state.params, grads, inplace=inplace)
 
     if inplace:
-        state.log_posterior = log_post.detach()
-        state.aux = aux
-        return state
+        tree_insert_(state.log_posterior, log_post.detach())
+        return state._replace(aux=aux)
     return SGLDState(params, log_post.detach(), aux)

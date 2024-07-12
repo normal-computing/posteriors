@@ -1,8 +1,7 @@
 from functools import partial
-from typing import Any
+from typing import Any, NamedTuple
 import torch
 from optree import tree_map
-from dataclasses import dataclass
 from optree.integration.torch import tree_ravel
 
 from posteriors.types import (
@@ -10,7 +9,6 @@ from posteriors.types import (
     Transform,
     ForwardFn,
     OuterLogProbFn,
-    TransformState,
 )
 from posteriors.utils import (
     tree_size,
@@ -67,8 +65,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class DenseLaplaceState(TransformState):
+class DenseLaplaceState(NamedTuple):
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
 
@@ -145,9 +142,8 @@ def update(
         )(state.params)
 
     if inplace:
-        state.prec += ggn_batch
-        state.aux = aux
-        return state
+        state.prec.data += ggn_batch
+        return state._replace(aux=aux)
     else:
         return DenseLaplaceState(state.params, state.prec + ggn_batch, aux)
 

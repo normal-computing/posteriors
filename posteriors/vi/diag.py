@@ -1,12 +1,12 @@
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Tuple, NamedTuple
 from functools import partial
 import torch
 from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.tree_utils import tree_insert_
 from posteriors.utils import (
     diag_normal_log_prob,
     diag_normal_sample,
@@ -61,8 +61,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class VIDiagState(TransformState):
+class VIDiagState(NamedTuple):
     """State encoding a diagonal Normal variational distribution over parameters.
 
     Args:
@@ -78,7 +77,7 @@ class VIDiagState(TransformState):
     params: TensorTree
     log_sd_diag: TensorTree
     opt_state: torchopt.typing.OptState
-    nelbo: torch.tensor = None
+    nelbo: torch.tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -170,9 +169,9 @@ def update(
     )
 
     if inplace:
-        state.nelbo = nelbo_val.detach()
-        state.aux = aux
-        return state
+        tree_insert_(state.nelbo, nelbo_val.detach())
+        return state._replace(aux=aux)
+
     return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach(), aux)
 
 

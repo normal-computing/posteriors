@@ -1,13 +1,12 @@
-from typing import Any
+from typing import Any, NamedTuple
 from functools import partial
 import torch
 from torch.func import grad_and_value
-from dataclasses import dataclass
 from optree.integration.torch import tree_ravel
 
-from posteriors.tree_utils import tree_size
+from posteriors.tree_utils import tree_size, tree_insert_
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import (
     per_samplify,
     empirical_fisher,
@@ -67,8 +66,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class EKFDenseState(TransformState):
+class EKFDenseState(NamedTuple):
     """State encoding a Normal distribution over parameters.
 
     Args:
@@ -81,7 +79,7 @@ class EKFDenseState(TransformState):
 
     params: TensorTree
     cov: torch.Tensor
-    log_likelihood: float = 0
+    log_likelihood: torch.Tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -170,11 +168,11 @@ def update(
         update_mean = mu_unravel_f(update_mean)
 
     if inplace:
-        state.params = update_mean
-        state.cov = update_cov
-        state.log_likelihood = log_liks.mean().detach()
-        state.aux = aux
-        return state
+        tree_insert_(state.params, update_mean)
+        tree_insert_(state.cov, update_cov)
+        tree_insert_(state.log_likelihood, log_liks.mean().detach())
+        return state._replace(aux=aux)
+
     return EKFDenseState(update_mean, update_cov, log_liks.mean().detach(), aux)
 
 

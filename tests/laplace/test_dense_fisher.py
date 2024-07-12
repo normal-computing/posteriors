@@ -98,7 +98,7 @@ def test_dense_fisher_vmap():
 
     # Test sampling
     num_samples = 10000
-    laplace_state.prec = laplace_state.prec + 0.1 * torch.eye(
+    laplace_state.prec.data += 0.1 * torch.eye(
         num_params
     )  # regularize to ensure PSD and reduce variance
 

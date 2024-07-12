@@ -16,7 +16,6 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 import lightning as L
 import torchopt
-from dataclasses import asdict
 
 import posteriors
 
@@ -100,7 +99,7 @@ class LitAutoEncoderUQ(L.LightningModule):
         # it is independent of forward
         self.state = self.transform.update(self.state, batch, inplace=True)
         # Logging to TensorBoard (if installed) by default
-        for k, v in asdict(self.state).items():
+        for k, v in self.state._asdict().items():
             if isinstance(v, float) or (isinstance(v, torch.Tensor) and v.numel() == 1):
                 self.log(k, v)
 

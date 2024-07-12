@@ -1,32 +1,38 @@
 import torch
-from dataclasses import dataclass
-import optree
 
+from posteriors.tree_utils import tree_insert_
 from posteriors.types import TransformState
 
 
 def test_TransformState():
-    @dataclass
-    class s(TransformState):
-        params: torch.Tensor
-        aux: torch.Tensor
-        b: dict
+    s = TransformState(params=torch.ones(3), aux=None)
 
-    a = s(torch.ones(3), aux=torch.ones(3), b={"tens": torch.ones(3)})
+    params_new = torch.ones(3) * 2
+    aux_new = ["dsadsa", torch.ones(3)]
 
-    children, metadata = optree.tree_flatten(a)
+    def update_state(state, params_new, aux_new):
+        tree_insert_(state.params, params_new)
+        return state._replace(aux=aux_new)
 
-    assert len(children) == 3
-    assert len(metadata) == 3
+    state_new = update_state(s, params_new, aux_new)
 
-    a2 = optree.tree_unflatten(metadata, children)
-    children2, metadata2 = optree.tree_flatten(a2)
+    assert torch.allclose(state_new.params, params_new)
+    assert state_new.aux == aux_new
 
-    for i, j in zip(children, children2):
-        assert torch.allclose(i, j)
+    # Check params updated in-place
+    assert torch.allclose(s.params, params_new)
 
-    y = optree.tree_map(lambda x: x * 2, a)
-    children_y, metadata_y = optree.tree_flatten(y)
+    # aux never updated in-place as it is not guaranteed to be a TensorTree
+    assert s.aux is None
 
-    for i, j in zip(children, children_y):
-        assert torch.allclose(i * 2, j)
+    # Check works with vmap
+    def init(params, aux=None):
+        return TransformState(params=params, aux=aux)
+
+    multi_params_new = torch.ones(5, 3)
+    multi_aux_new = torch.ones(5, 3)
+
+    multi_state_new = torch.vmap(init)(multi_params_new, multi_aux_new)
+
+    assert torch.allclose(multi_state_new.params, multi_params_new)
+    assert torch.allclose(multi_state_new.aux, multi_aux_new)

@@ -70,7 +70,7 @@ def build(
 class EKFDiagState(NamedTuple):
     """State encoding a diagonal Normal distribution over parameters.
 
-    Args:
+    Attributes:
         params: Mean of the Normal distribution.
         sd_diag: Square-root diagonal of the covariance matrix of the
             Normal distribution.

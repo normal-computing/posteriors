@@ -43,7 +43,7 @@ class TorchOptState(NamedTuple):
     Contains the parameters, the optimizer state for the TorchOpt optimizer,
     loss value, and auxiliary information.
 
-    Args:
+    Attributes:
         params: Parameters to be optimized.
         opt_state: TorchOpt optimizer state.
         loss: Loss value.

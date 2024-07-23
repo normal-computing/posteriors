@@ -51,7 +51,7 @@ def build(
 class SGLDState(NamedTuple):
     """State encoding params for SGLD.
 
-    Args:
+    Attributes:
         params: Parameters.
         log_posterior: Log posterior evaluation.
         aux: Auxiliary information from the log_posterior call.

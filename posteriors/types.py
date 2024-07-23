@@ -26,6 +26,10 @@ class TransformState(NamedTuple):
         algorithm_info: Any
         aux: Any
     ```
+
+    Attributes:
+        params: PyTree containing the current value of parameters.
+        aux: Auxiliary information from the model call.
     """
 
     params: TensorTree
@@ -104,7 +108,7 @@ class Transform(NamedTuple):
     `build` function, the internal `init` and `update` functions in the
     algorithm module can and likely will have additional arguments.
 
-    Args:
+    Attributes:
         init: The init function.
         update: The update function.
 

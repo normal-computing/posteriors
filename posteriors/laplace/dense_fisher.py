@@ -58,7 +58,7 @@ class DenseLaplaceState(NamedTuple):
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
 
-    Args:
+    Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.

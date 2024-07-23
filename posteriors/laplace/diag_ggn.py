@@ -67,7 +67,7 @@ def build(
 class DiagLaplaceState(NamedTuple):
     """State encoding a diagonal Normal distribution over parameters.
 
-    Args:
+    Attributes:
         params: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.

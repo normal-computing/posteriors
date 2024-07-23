@@ -69,7 +69,7 @@ def build(
 class EKFDenseState(NamedTuple):
     """State encoding a Normal distribution over parameters.
 
-    Args:
+    Attributes:
         params: Mean of the Normal distribution.
         cov: Covariance matrix of the
             Normal distribution.

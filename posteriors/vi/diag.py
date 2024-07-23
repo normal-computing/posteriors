@@ -64,7 +64,7 @@ def build(
 class VIDiagState(NamedTuple):
     """State encoding a diagonal Normal variational distribution over parameters.
 
-    Args:
+    Attributes:
         params: Mean of the variational distribution.
         log_sd_diag: Log of the square-root diagonal of the covariance matrix of the
             variational distribution.

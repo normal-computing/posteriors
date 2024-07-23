@@ -67,7 +67,7 @@ def build(
 class SGHMCState(NamedTuple):
     """State encoding params and momenta for SGHMC.
 
-    Args:
+    Attributes:
         params: Parameters.
         momenta: Momenta for each parameter.
         log_posterior: Log posterior evaluation.

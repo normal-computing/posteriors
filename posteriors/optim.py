@@ -39,7 +39,7 @@ def build(
 class OptimState(NamedTuple):
     """State of an optimizer from [torch.optim](https://pytorch.org/docs/stable/optim.html).
 
-    Args:
+    Attributes:
         params: Parameters to be optimized.
         optimizer: torch.optim optimizer instance.
         loss: Loss value.

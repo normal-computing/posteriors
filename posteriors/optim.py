@@ -1,10 +1,10 @@
-from typing import Type, Any
+from typing import Type, Any, NamedTuple
 from functools import partial
 import torch
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
+from posteriors.tree_utils import tree_insert_
 
 
 def build(
@@ -36,11 +36,10 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class OptimState(TransformState):
+class OptimState(NamedTuple):
     """State of an optimizer from [torch.optim](https://pytorch.org/docs/stable/optim.html).
 
-    Args:
+    Attributes:
         params: Parameters to be optimized.
         optimizer: torch.optim optimizer instance.
         loss: Loss value.
@@ -49,7 +48,7 @@ class OptimState(TransformState):
 
     params: TensorTree
     optimizer: torch.optim.Optimizer
-    loss: torch.tensor = None
+    loss: torch.tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -104,6 +103,5 @@ def update(
         loss, aux = loss_fn(state.params, batch)
     loss.backward()
     state.optimizer.step()
-    state.loss = loss
-    state.aux = aux
-    return state
+    tree_insert_(state.loss, loss.detach())
+    return state._replace(aux=aux)

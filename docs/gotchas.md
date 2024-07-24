@@ -70,6 +70,29 @@ state2 = transform.update(state, batch, inplace=True)
 # state is updated and state2 is a pointer to state
 ```
 
+When adding a new algorithm, in-place support can be achieved by modifying `TensorTree`s
+via the [`flexi_tree_map`](https://normal-computing.github.io/posteriors/api/tree_utils/#posteriors.tree_utils.flexi_tree_map) function:
+
+```python
+from posteriors.tree_utils import flexi_tree_map
+
+new_state = flexi_tree_map(lambda x: x + 1, state, inplace=True)
+```
+
+As `posteriors` transform states are immutable `NamedTuple`s, in-place modification of
+`TensorTree` leaves can be achieved by modifying the data of the tensor directly with [`tree_insert_`](https://normal-computing.github.io/posteriors/api/tree_utils/#posteriors.tree_utils.tree_insert_):
+
+```python
+from posteriors.tree_utils import tree_insert_
+
+tree_insert_(state.log_posterior, log_post.detach())
+```
+
+However, the `aux` component of the `TransformState` is not guaranteed to be a `TensorTree`,
+and so in-place modification of `aux` is not supported. Using `state._replace(aux=aux)`
+will return a state with all `TensorTree` pointing to the same memory as input `state`,
+but with a new `aux` component (`aux` is not modified in the input `state` object).
+
 
 ## `torch.tensor` with autograd
 

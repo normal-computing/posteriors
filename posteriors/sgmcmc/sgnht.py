@@ -1,13 +1,12 @@
-from typing import Any
+from typing import Any, NamedTuple
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
-from posteriors.tree_utils import flexi_tree_map
+from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
 
 
@@ -68,11 +67,10 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class SGNHTState(TransformState):
+class SGNHTState(NamedTuple):
     """State encoding params and momenta for SGNHT.
 
-    Args:
+    Attributes:
         params: Parameters.
         momenta: Momenta for each parameter.
         log_posterior: Log posterior evaluation.
@@ -81,13 +79,15 @@ class SGNHTState(TransformState):
 
     params: TensorTree
     momenta: TensorTree
-    xi: float
-    log_posterior: torch.tensor = None
+    xi: torch.tensor = torch.tensor([])
+    log_posterior: torch.tensor = torch.tensor([])
     aux: Any = None
 
 
 def init(
-    params: TensorTree, momenta: TensorTree | float | None = None, xi: float = 0.01
+    params: TensorTree,
+    momenta: TensorTree | float | None = None,
+    xi: float | torch.Tensor = 0.01,
 ) -> SGNHTState:
     """Initialise momenta for SGNHT.
 
@@ -111,7 +111,7 @@ def init(
             params,
         )
 
-    return SGNHTState(params, momenta, xi)
+    return SGNHTState(params, momenta, torch.tensor(xi))
 
 
 def update(
@@ -183,8 +183,7 @@ def update(
     momenta = flexi_tree_map(transform_momenta, state.momenta, grads, inplace=inplace)
 
     if inplace:
-        state.xi = xi_new
-        state.log_posterior = log_post.detach()
-        state.aux = aux
-        return state
+        tree_insert_(state.xi, xi_new)
+        tree_insert_(state.log_posterior, log_post.detach())
+        return state._replace(aux=aux)
     return SGNHTState(params, momenta, xi_new, log_post.detach(), aux)

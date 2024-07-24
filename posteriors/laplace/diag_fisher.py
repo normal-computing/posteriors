@@ -1,11 +1,10 @@
 from functools import partial
-from typing import Any
+from typing import Any, NamedTuple
 import torch
 from torch.func import jacrev
 from optree import tree_map
-from dataclasses import dataclass
 
-from posteriors.types import TensorTree, Transform, LogProbFn, TransformState
+from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map
 from posteriors.utils import (
     diag_normal_sample,
@@ -54,11 +53,10 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@dataclass
-class DiagLaplaceState(TransformState):
+class DiagLaplaceState(NamedTuple):
     """State encoding a diagonal Normal distribution over parameters.
 
-    Args:
+    Attributes:
         params: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
         aux: Auxiliary information from the log_posterior call.
@@ -134,8 +132,7 @@ def update(
     )
 
     if inplace:
-        state.aux = aux
-        return state
+        return state._replace(aux=aux)
     return DiagLaplaceState(state.params, prec_diag, aux)
 
 

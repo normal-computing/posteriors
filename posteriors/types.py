@@ -17,8 +17,8 @@ class TransformState(NamedTuple):
     information for the posteriors iterative algorithm defined by the `init` and
     `update` functions.
 
-    Inherit the `NamedTuple` class (not `TransformState`) when defining a new
-    algorithm state, just make sure to include the `params` and `aux` fields.
+    Inherit the `NamedTuple` class when defining a new algorithm state, just make sure
+    to include the `params` and `aux` fields.
 
     ```
     class AlgorithmState(NamedTuple):

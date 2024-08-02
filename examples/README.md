@@ -9,6 +9,9 @@ on a series of books from the [pg19](https://huggingface.co/datasets/pg19) datas
 - [`imdb`](imdb/): Investigates [cold posterior effect](https://proceedings.mlr.press/v119/wenzel20a/wenzel20a.pdf)
 for a range of approximate Bayesian methods on [IMDB](https://www.tensorflow.org/api_docs/python/tf/keras/datasets/imdb/load_data)
 data.
+- ['pyro_pima_indians`](pyro_pima_indians/): Uses `pyro` to define a Bayesian logistic
+regression model for the [Pima Indians Diabetes Database](https://www.kaggle.com/uciml/pima-indians-diabetes-database).
+Compares `posteriors` methods against `pyro` and `blackjax`.
 - [`yelp`](yelp/): Compares a host of `posteriors` methods (highlighting the easy
 exchangeability) on a sentiment analysis task adapted from the [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#train-in-native-pytorch).
 - [`continual_regression`](continual_regression.ipynb): [Variational continual learning](https://arxiv.org/abs/1710.10628)

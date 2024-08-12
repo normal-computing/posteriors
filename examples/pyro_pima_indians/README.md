@@ -1,4 +1,4 @@
-# Using `posteriors` with `pyro`
+# Using `posteriors` with `pyro` #
 
 In this example, we show how to use `posteriors` with [`pyro`](https://pyro.ai/) to define a Bayesian logistic regression model for the [Pima Indians Diabetes Database](https://www.kaggle.com/uciml/pima-indians-diabetes-database). The model can then be used to automatically generate
 a `log_posterior` function that can be directly passed to `posteriors`.

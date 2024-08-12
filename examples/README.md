@@ -12,7 +12,7 @@ data.
 - [`pyro_pima_indians`](pyro_pima_indians/): Uses `pyro` to define a Bayesian logistic
 regression model for the [Pima Indians Diabetes Database](https://www.kaggle.com/uciml/pima-indians-diabetes-database).
 Compares `posteriors` methods against `pyro` and `blackjax`.
-See [`pyro_pima_indians_vi.ipynb`](/pyro_pima_indians_vi.ipynb) for a more accessible lightweight notebook.
+See [`pyro_pima_indians_vi.ipynb`](pyro_pima_indians_vi.ipynb) for a more accessible lightweight notebook.
 - [`yelp`](yelp/): Compares a host of `posteriors` methods (highlighting the easy
 exchangeability) on a sentiment analysis task adapted from the [Hugging Face tutorial](https://huggingface.co/docs/transformers/training#train-in-native-pytorch).
 - [`continual_regression`](continual_regression.ipynb): [Variational continual learning](https://arxiv.org/abs/1710.10628)
@@ -24,7 +24,7 @@ to infer the skills of Premier League football teams.
 - [`lightning_autoencoder.py`](lightning_autoencoder.py): Easily adapt the autoencoder
 example from the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html)
 to use UQ methods with `posteriors` and logging + device handling with `lightning`.
-- [`pyro_pima_indians_vi.ipynb`](/pyro_pima_indians_vi.ipynb): A more accessible
+- [`pyro_pima_indians_vi.ipynb`](pyro_pima_indians_vi.ipynb): A more accessible
 notebook demonstrating the use of `posteriors` with a `pyro` defined Bayesian logistic regression model.
 
 

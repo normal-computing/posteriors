@@ -51,3 +51,9 @@ data, with some interesting takeaways.
 [Variational continual learning](https://arxiv.org/abs/1710.10628) notebook for a simple
 regression task that's easy to visualize.
 
+
+[<img style="float: right; width: 6em" src="https://storage.googleapis.com/posteriors/pyro_posteriors.png">](https://github.com/normal-computing/posteriors/blob/main/examples/pyro_pima_indians_vi.ipynb)
+
+- [`pyro_pima_indians_sghmc`](https://github.com/normal-computing/posteriors/blob/main/examples/pyro_pima_indians_sghmc.ipynb):
+An accessible notebook demonstrating the use of `posteriors` with a [`pyro`](https://pyro.ai)-defined Bayesian logistic regression model, as well as convergence diagnostics from [`pyro`](https://pyro.ai).
+

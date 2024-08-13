@@ -24,8 +24,9 @@ to infer the skills of Premier League football teams.
 - [`lightning_autoencoder.py`](lightning_autoencoder.py): Easily adapt the autoencoder
 example from the [Lightning tutorial](https://lightning.ai/docs/pytorch/stable/starter/introduction.html)
 to use UQ methods with `posteriors` and logging + device handling with `lightning`.
-- [`pyro_pima_indians_vi.ipynb`](pyro_pima_indians_vi.ipynb): A more accessible
+- [`pyro_pima_indians_sghmc.ipynb`](pyro_pima_indians_sghmc.ipynb): A more accessible
 notebook demonstrating the use of `posteriors` with a `pyro` defined Bayesian logistic regression model.
+As well as convergence diagnostics from `pyro`.
 
 
 Further information is available within the specific example directories or files.

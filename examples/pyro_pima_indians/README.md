@@ -6,7 +6,7 @@ a `log_posterior` function that can be directly passed to `posteriors`.
 This specific model is small with 8 dimensions and 768 data points.
 
 The code in this folder involves running over multiple seeds and collecting time and KSD metrics.
-A more accessible notebook demonstrating the use of `posteriors` with `pyro` can be found in [examples/pyro_pima_indians_vi.ipynb](../pyro_pima_indians_vi.ipynb).
+A more accessible notebook demonstrating the use of `posteriors` with `pyro` can be found in [examples/pyro_pima_indians_sghmc.ipynb](../pyro_pima_indians_sghmc.ipynb).
 
 
 ## Results

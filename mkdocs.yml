@@ -73,6 +73,7 @@ nav:
     - Laplace:
       - Dense Fisher: api/laplace/dense_fisher.md
       - Dense GGN: api/laplace/dense_ggn.md
+      - Dense Hessian: api/laplace/dense_hessian.md
       - Diagonal Fisher: api/laplace/diag_fisher.md
       - Diagonal GGN: api/laplace/diag_ggn.md
     - SGMCMC:

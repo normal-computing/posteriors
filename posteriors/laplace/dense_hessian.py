@@ -17,8 +17,14 @@ from torch.func import jacrev, jacfwd
 def build(
     log_posterior: LogProbFn,
     init_prec: torch.Tensor | float = 0.0,
+    epsilon: float = 0.0,
+    rescale: float = 1.0,
 ) -> Transform:
     """Builds a transform for dense Hessian Laplace.
+
+    **Warning:**
+    The Hessian is not guaranteed to be positive definite,
+    so setting epsilon > 0 ought to be considered.
 
     Args:
         log_posterior: Function that takes parameters and input batch and
@@ -27,12 +33,21 @@ def build(
         init_prec: Initial precision matrix.
             If it is a float, it is defined as an identity matrix
             scaled by that float.
+        epsilon: Added to the diagonal of the Hessian
+            for numerical stability.
+        rescale: Value to multiply the Hessian by
+            (i.e. to normalize by batch size)
 
     Returns:
         Hessian Laplace transform instance.
     """
     init_fn = partial(init, init_prec=init_prec)
-    update_fn = partial(update, log_posterior=log_posterior)
+    update_fn = partial(
+        update,
+        log_posterior=log_posterior,
+        epsilon=epsilon,
+        rescale=rescale,
+    )
     return Transform(init_fn, update_fn)
 
 
@@ -84,6 +99,10 @@ def update(
     inplace: bool = False,
 ) -> DenseLaplaceState:
     """Adds the Hessian of the negative log-posterior over given batch.
+
+    **Warning:**
+    The Hessian is not guaranteed to be positive definite,
+    so setting epsilon > 0 ought to be considered.
 
     Args:
         state: Current state.

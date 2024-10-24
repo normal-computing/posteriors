@@ -890,3 +890,51 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
+
+
+def cholesky_from_log_flat(log_chol_flat, num_params):
+    """Returns Cholesky matrix from a flat representation of its nonzero elements.
+    The input is assumed to have taken the log of the diagonal elements of the original Cholesky matrix.
+
+    Args:
+        log_chol_flat: Flat representation of nonzero Cholesky matrix elements.
+            The corresponding diagonal elements are the logs.
+        num_params: Width of the desired Cholesky matrix.
+
+    Returns:
+        Lower triangular Cholesky matrix.
+    """
+
+    tril_indices = torch.tril_indices(num_params, num_params)
+    chol_exp = torch.zeros((num_params, num_params), device=log_chol_flat.device)
+    chol_exp[tril_indices[0], tril_indices[1]] = log_chol_flat
+    diag_indices = torch.arange(num_params)
+    # Exponentiate diagonal elements to ensure positivity.
+    chol_exp[diag_indices, diag_indices] = torch.exp(
+        chol_exp[diag_indices, diag_indices]
+    )
+    return chol_exp
+
+
+def cholesky_to_log_flat(chol):
+    """Returns flat representation of the nonzero Cholesky matrix elements.
+    The logarithm of the diagonal of the input is taken.
+
+    Args:
+        chol: Lower triangular Cholesky matrix.
+
+    Returns:
+        Flat representation of the nonzero Cholesky matrix elements
+        with the logs of the diagonal values.
+    """
+    num_params = chol.shape[0]
+    tril_indices = torch.tril_indices(num_params, num_params)
+    chol_flat = chol[tril_indices[0], tril_indices[1]].clone()
+
+    # The positions of the diagonal elements in L_params
+    diag_positions = torch.cumsum(torch.arange(1, num_params + 1), dim=0) - 1
+    chol_flat[diag_positions] = torch.log(
+        chol[torch.arange(num_params), torch.arange(num_params)]
+    )
+
+    return chol_flat

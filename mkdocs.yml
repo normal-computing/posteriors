@@ -81,6 +81,7 @@ nav:
       - api/sgmcmc/sghmc.md
       - api/sgmcmc/sgnht.md
     - VI:
+      - Dense: api/vi/dense.md
       - Diag: api/vi/diag.md
     - api/optim.md
     - TorchOpt: api/torchopt.md

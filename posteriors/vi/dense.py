@@ -45,7 +45,6 @@ def build(
         stl: Whether to use the stick-the-landing estimator
             from (Roeder et al](https://arxiv.org/abs/1703.09194).
         init_cov: Initial covariance matrix of the variational distribution.
-        Can be a tensor matching params or scalar.
 
     Returns:
         Dense VI transform instance.

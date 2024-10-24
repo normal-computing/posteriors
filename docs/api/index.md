@@ -39,10 +39,12 @@ For an overview and unifying framework for SGMCMC methods, see [Ma et al, 2015](
 
 
 ### Variational inference (VI)
-- [`vi.diag`](vi/diag.md) implements a diagonal Gaussian variational distribution.
+- [`vi.dense`](vi/dense.md) implements a Gaussian variational distribution.
 Expects a [`torchopt`](https://github.com/metaopt/torchopt) optimizer for handling the
-minimization of the NELBO. Also find `vi.diag.nelbo` for simply calculating the NELBO 
-with respect to a `log_posterior` and diagonal Gaussian distribution.
+minimization of the NELBO. Also find `vi.dense.nelbo` for simply calculating the NELBO 
+with respect to a `log_posterior` and Gaussian distribution.
+- [`vi.diag`](vi/diag.md) same as `vi.dense` but uses the diagonal of the Gaussian
+variational distribution.
 
 A review of variational inference can be found in [Blei et al, 2017](https://arxiv.org/abs/1601.00670).
 

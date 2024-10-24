@@ -167,10 +167,10 @@ def update(
         params=[state.params, state.log_chol],
         inplace=inplace,
     )
-    mean, L_params = torchopt.apply_updates(
+    mean, log_chol = torchopt.apply_updates(
         (state.params, state.log_chol), updates, inplace=inplace
     )
-    chol = cholesky_from_log_flat(L_params, state.cov.shape[0])
+    chol = cholesky_from_log_flat(log_chol, state.cov.shape[0])
     cov = chol @ chol.T
 
     if inplace:
@@ -178,7 +178,7 @@ def update(
         tree_insert_(state.cov, cov)
         return state._replace(aux=aux)
 
-    return VIDenseState(mean, cov, L_params, opt_state, nelbo_val.detach(), aux)
+    return VIDenseState(mean, cov, log_chol, opt_state, nelbo_val.detach(), aux)
 
 
 def nelbo(

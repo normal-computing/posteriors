@@ -109,7 +109,6 @@ def init(
         optimizer: TorchOpt functional optimizer for updating the variational
             parameters. Make sure to use lower case like torchopt.adam()
         init_cov: Initial covariance matrix of the variational distribution.
-        Can be a tree matching params or scalar.
 
     Returns:
         Initial DenseVIState.
@@ -213,8 +212,9 @@ def nelbo(
 
     Args:
         mean: Mean of the variational distribution.
-        sd_diag: Square-root diagonal of the covariance matrix of the
-            variational distribution.
+        log_chol: Flat representation of the nonzero values of the Cholesky
+            of the covariance matrix of the variational distribution. The
+            log of the diagonal is taken.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).

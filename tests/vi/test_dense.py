@@ -142,11 +142,13 @@ def _test_vi_dense(optimizer_cls, stl):
     # Test sample
     mean_copy = tree_map(lambda x: x.clone(), state.params)
     samples = vi.dense.sample(state, (1000,))
+    flat_samples = torch.vmap(lambda s: tree_ravel(s)[0])(samples)
+    samples_cov = torch.cov(flat_samples.T)
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
     for key in samples_mean:
         assert torch.allclose(samples_mean[key], state.params[key], atol=1e-1)
         assert not torch.allclose(samples_mean[key], mean_copy[key])
-    assert torch.allclose(state.cov, target_cov, atol=0.5)
+    assert torch.allclose(state.cov, samples_cov, atol=2e-1)
 
 
 def test_vi_dense_sgd():

@@ -892,7 +892,9 @@ def is_scalar(x: Any) -> bool:
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
 
 
-def cholesky_from_log_flat(log_chol_flat, num_params):
+def cholesky_from_log_flat(
+    log_chol_flat: torch.Tensor, num_params: int
+) -> torch.Tensor:
     """Returns Cholesky matrix from a flat representation of its nonzero elements.
     The input is assumed to have taken the log of the diagonal elements of the original Cholesky matrix.
 
@@ -916,7 +918,7 @@ def cholesky_from_log_flat(log_chol_flat, num_params):
     return chol_exp
 
 
-def cholesky_to_log_flat(chol):
+def cholesky_to_log_flat(chol: torch.Tensor) -> torch.Tensor:
     """Returns flat representation of the nonzero Cholesky matrix elements.
     The logarithm of the diagonal of the input is taken.
 

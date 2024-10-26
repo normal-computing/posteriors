@@ -182,7 +182,7 @@ def update(
 
 def nelbo(
     mean: dict,
-    L_flat: torch.Tensor,
+    L_factor: torch.Tensor,
     batch: Any,
     log_posterior: LogProbFn,
     temperature: float = 1.0,
@@ -227,7 +227,7 @@ def nelbo(
 
     mean_flat, unravel_func = tree_ravel(mean)
     num_params = mean_flat.shape[0]
-    L = L_from_flat(L_flat, num_params)
+    L = L_from_flat(L_factor, num_params)
     cov = L @ L.T
     dist = torch.distributions.MultivariateNormal(
         loc=mean_flat,
@@ -240,7 +240,7 @@ def nelbo(
 
     if stl:
         mean_flat.detach()
-        L = L_from_flat(L_flat.detach(), num_params)
+        L = L_from_flat(L_factor.detach(), num_params)
         cov = L @ L.T
         # Redefine distribution to sample from after stl
         dist = torch.distributions.MultivariateNormal(

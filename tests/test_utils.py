@@ -19,8 +19,8 @@ from posteriors import (
     diag_normal_sample,
     per_samplify,
     is_scalar,
-    cholesky_from_log_flat,
-    cholesky_to_log_flat,
+    L_from_flat,
+    L_to_flat,
 )
 from posteriors.utils import NO_AUX_ERROR_MSG, NON_TENSOR_AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
@@ -807,34 +807,28 @@ def test_is_scalar():
     assert not is_scalar(torch.ones(2))
 
 
-def test_cholesky_from_log_flat():
-    exp_0_0 = torch.exp(torch.tensor(1.0)).item()
-    exp_1_1 = torch.exp(torch.tensor(2.2)).item()
-    exp_2_2 = torch.exp(torch.tensor(5.5)).item()
+def test_L_from_flat():
     expected_L = torch.Tensor(
         [
-            [exp_0_0, 0.0, 0.0],
-            [-4.1, exp_1_1, 0.0],
-            [-1.7, 4.4, exp_2_2],
+            [1.0, 0.0, 0.0],
+            [-4.1, 2.2, 0.0],
+            [-1.7, 4.4, -5.5],
         ]
     )
-    L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, 5.5])
+    L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
     num_params = expected_L.shape[0]
-    L = cholesky_from_log_flat(L_flat, num_params)
+    L = L_from_flat(L_flat, num_params)
     assert torch.allclose(expected_L, L)
 
 
-def test_cholesky_to_log_flat():
-    exp_0_0 = torch.exp(torch.tensor(1.0)).item()
-    exp_1_1 = torch.exp(torch.tensor(2.2)).item()
-    exp_2_2 = torch.exp(torch.tensor(5.5)).item()
+def test_L_to_flat():
     L = torch.Tensor(
         [
-            [exp_0_0, 0.0, 0.0],
-            [-4.1, exp_1_1, 0.0],
-            [-1.7, 4.4, exp_2_2],
+            [1.0, 0.0, 0.0],
+            [-4.1, 2.2, 0.0],
+            [-1.7, 4.4, -5.5],
         ]
     )
-    expected_L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, 5.5])
-    L_flat = cholesky_to_log_flat(L)
+    expected_L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
+    L_flat = L_to_flat(L)
     assert torch.allclose(expected_L_flat, L_flat)

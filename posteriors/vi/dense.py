@@ -11,8 +11,8 @@ from posteriors.tree_utils import tree_size, tree_insert_
 from posteriors.utils import (
     is_scalar,
     CatchAuxError,
-    cholesky_from_log_flat,
-    cholesky_to_log_flat,
+    L_from_flat,
+    L_to_flat,
 )
 
 
@@ -67,9 +67,8 @@ class VIDenseState(NamedTuple):
     Attributes:
         params: Mean of the variational distribution.
         cov: Covariance matrix of the variational distribution.
-        log_chol: Flat representation of the nonzero values of the Cholesky
-            of the covariance matrix of the variational distribution. The
-            log of the diagonal is taken.
+        L_factor: Flat representation of the nonzero values of the lower
+            triangular matrix $L$ satisfying $LL^T$ = cov.
         opt_state: TorchOpt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
@@ -78,7 +77,7 @@ class VIDenseState(NamedTuple):
 
     params: TensorTree
     cov: torch.Tensor
-    log_chol: torch.Tensor
+    L_factor: torch.Tensor
     opt_state: torchopt.typing.OptState
     nelbo: torch.tensor = torch.tensor([])
     aux: Any = None
@@ -117,11 +116,11 @@ def init(
     if is_scalar(init_cov):
         init_cov = init_cov * torch.eye(num_params, requires_grad=True)
 
-    init_chol = torch.linalg.cholesky(init_cov)
-    init_log_chol = cholesky_to_log_flat(init_chol)
+    init_L = torch.linalg.cholesky(init_cov)
+    init_L = L_to_flat(init_L)
 
-    opt_state = optimizer.init([params, init_log_chol])
-    return VIDenseState(params, init_cov, init_log_chol, opt_state)
+    opt_state = optimizer.init([params, init_L])
+    return VIDenseState(params, init_cov, init_L, opt_state)
 
 
 def update(
@@ -153,37 +152,37 @@ def update(
         Updated DenseVIState.
     """
 
-    def nelbo_log_chol(m, chol):
-        return nelbo(m, chol, batch, log_posterior, temperature, n_samples, stl)
+    def nelbo_L_factor(m, L_flat):
+        return nelbo(m, L_flat, batch, log_posterior, temperature, n_samples, stl)
 
     with torch.no_grad(), CatchAuxError():
         nelbo_grads, (nelbo_val, aux) = grad_and_value(
-            nelbo_log_chol, argnums=(0, 1), has_aux=True
-        )(state.params, state.log_chol)
+            nelbo_L_factor, argnums=(0, 1), has_aux=True
+        )(state.params, state.L_factor)
 
     updates, opt_state = optimizer.update(
         nelbo_grads,
         state.opt_state,
-        params=[state.params, state.log_chol],
+        params=[state.params, state.L_factor],
         inplace=inplace,
     )
-    mean, log_chol = torchopt.apply_updates(
-        (state.params, state.log_chol), updates, inplace=inplace
+    mean, L_factor = torchopt.apply_updates(
+        (state.params, state.L_factor), updates, inplace=inplace
     )
-    chol = cholesky_from_log_flat(log_chol, state.cov.shape[0])
-    cov = chol @ chol.T
+    L = L_from_flat(L_factor, state.cov.shape[0])
+    cov = L @ L.T
 
     if inplace:
         tree_insert_(state.nelbo, nelbo_val.detach())
         tree_insert_(state.cov, cov)
         return state._replace(aux=aux)
 
-    return VIDenseState(mean, cov, log_chol, opt_state, nelbo_val.detach(), aux)
+    return VIDenseState(mean, cov, L_factor, opt_state, nelbo_val.detach(), aux)
 
 
 def nelbo(
     mean: dict,
-    log_chol: torch.Tensor,
+    L_flat: torch.Tensor,
     batch: Any,
     log_posterior: LogProbFn,
     temperature: float = 1.0,
@@ -211,9 +210,9 @@ def nelbo(
 
     Args:
         mean: Mean of the variational distribution.
-        log_chol: Flat representation of the nonzero values of the Cholesky
-            of the covariance matrix of the variational distribution. The
-            log of the diagonal is taken.
+        L_factor: Flat representation of the nonzero values of the lower
+            triangular matrix $L$ satisfying $LL^T$ = cov, where cov
+            is the covariance matrix of the variational distribution.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior (which can be unnormalised).
@@ -228,8 +227,8 @@ def nelbo(
 
     mean_flat, unravel_func = tree_ravel(mean)
     num_params = mean_flat.shape[0]
-    chol = cholesky_from_log_flat(log_chol, num_params)
-    cov = chol @ chol.T
+    L = L_from_flat(L_flat, num_params)
+    cov = L @ L.T
     dist = torch.distributions.MultivariateNormal(
         loc=mean_flat,
         covariance_matrix=cov,
@@ -241,9 +240,8 @@ def nelbo(
 
     if stl:
         mean_flat.detach()
-        chol = log_chol.detach()
-        chol = cholesky_from_log_flat(chol, num_params)
-        cov = chol @ chol.T
+        L = L_from_flat(L_flat.detach(), num_params)
+        cov = L @ L.T
         # Redefine distribution to sample from after stl
         dist = torch.distributions.MultivariateNormal(
             loc=mean_flat,

@@ -6,13 +6,13 @@ from optree.integration.torch import tree_ravel
 
 from posteriors import vi
 from posteriors.tree_utils import tree_size
-from posteriors.utils import cholesky_to_log_flat
+from posteriors.utils import L_to_flat
 
 
 def test_nelbo():
     target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
     num_params = tree_size(target_mean)
-    L = torch.abs(torch.randn(num_params, num_params))
+    L = torch.randn(num_params, num_params)
     L = torch.tril(L)
     target_cov = L @ L.T
 
@@ -26,7 +26,7 @@ def test_nelbo():
     batch = torch.arange(10).reshape(-1, 1)
     target_nelbo_100, _ = vi.dense.nelbo(
         target_mean,
-        cholesky_to_log_flat(L),
+        L_to_flat(L),
         batch,
         log_prob,
         n_samples=100,
@@ -34,10 +34,10 @@ def test_nelbo():
     assert torch.isclose(target_nelbo_100, torch.tensor(0.0), atol=1e-6)
 
     bad_mean = tree_map(lambda x: torch.zeros_like(x), target_mean)
-    bad_chol = torch.tril(torch.eye(num_params))
+    bad_L = torch.tril(torch.eye(num_params))
 
     bad_nelbo_100, _ = vi.dense.nelbo(
-        bad_mean, cholesky_to_log_flat(bad_chol), batch, log_prob, n_samples=100
+        bad_mean, L_to_flat(bad_L), batch, log_prob, n_samples=100
     )
     assert bad_nelbo_100 > target_nelbo_100
 
@@ -46,7 +46,7 @@ def _test_vi_dense(optimizer_cls, stl):
     torch.manual_seed(43)
     target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
     num_params = tree_size(target_mean)
-    L = torch.abs(torch.randn(num_params, num_params, requires_grad=True))
+    L = torch.randn(num_params, num_params, requires_grad=True)
     L = torch.tril(L)
     target_cov = L @ L.T
 
@@ -65,13 +65,13 @@ def _test_vi_dense(optimizer_cls, stl):
 
     state = vi.dense.init(init_mean, optimizer)
 
-    init_log_chol = state.log_chol
+    init_L_factor = state.L_factor
 
     batch = torch.arange(3).reshape(-1, 1)
 
     nelbo_init, _ = vi.dense.nelbo(
         state.params,
-        init_log_chol,
+        init_L_factor,
         batch,
         log_prob,
         n_samples=n_vi_samps_large,
@@ -79,7 +79,7 @@ def _test_vi_dense(optimizer_cls, stl):
 
     nelbo_target, _ = vi.dense.nelbo(
         target_mean,
-        cholesky_to_log_flat(L),
+        L_to_flat(L),
         batch,
         log_prob,
         n_samples=n_vi_samps_large,

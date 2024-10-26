@@ -33,8 +33,6 @@ packages = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F821", "E402"]
 
-[tool.pytest.ini_options]
-addopts = "-n auto"
 
 [build-system]
 requires = ["setuptools>=64"]

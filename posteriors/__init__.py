@@ -18,6 +18,8 @@ from posteriors.utils import diag_normal_log_prob
 from posteriors.utils import diag_normal_sample
 from posteriors.utils import per_samplify
 from posteriors.utils import is_scalar
+from posteriors.utils import L_from_flat
+from posteriors.utils import L_to_flat
 
 from posteriors.tree_utils import tree_size
 from posteriors.tree_utils import tree_extract

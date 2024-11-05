@@ -19,6 +19,8 @@ from posteriors import (
     diag_normal_sample,
     per_samplify,
     is_scalar,
+    L_from_flat,
+    L_to_flat,
 )
 from posteriors.utils import NO_AUX_ERROR_MSG, NON_TENSOR_AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
@@ -803,3 +805,29 @@ def test_is_scalar():
     assert is_scalar(torch.tensor(1.0))
     assert is_scalar(torch.ones(1, 1))
     assert not is_scalar(torch.ones(2))
+
+
+def test_L_from_flat():
+    expected_L = torch.Tensor(
+        [
+            [1.0, 0.0, 0.0],
+            [-4.1, 2.2, 0.0],
+            [-1.7, 4.4, -5.5],
+        ]
+    )
+    L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
+    L = L_from_flat(L_flat)
+    assert torch.allclose(expected_L, L)
+
+
+def test_L_to_flat():
+    L = torch.Tensor(
+        [
+            [1.0, 0.0, 0.0],
+            [-4.1, 2.2, 0.0],
+            [-1.7, 4.4, -5.5],
+        ]
+    )
+    expected_L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
+    L_flat = L_to_flat(L)
+    assert torch.allclose(expected_L_flat, L_flat)

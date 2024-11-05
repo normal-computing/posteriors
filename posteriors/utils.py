@@ -890,3 +890,38 @@ def is_scalar(x: Any) -> bool:
         True if x is a scalar.
     """
     return isinstance(x, (int, float)) or (torch.is_tensor(x) and x.numel() == 1)
+
+
+def L_from_flat(L_flat: torch.Tensor) -> torch.Tensor:
+    """Returns lower triangular matrix from a flat representation of its nonzero elements.
+
+    Args:
+        L_flat: Flat representation of nonzero lower triangular matrix elements.
+
+    Returns:
+        Lower triangular matrix.
+    """
+    k = torch.tensor(L_flat.shape[0], dtype=L_flat.dtype, device=L_flat.device)
+    n = (-1 + (1 + 8 * k).sqrt()) / 2
+    num_params = round(n.item())
+
+    tril_indices = torch.tril_indices(num_params, num_params)
+    L = torch.zeros((num_params, num_params), device=L_flat.device)
+    L[tril_indices[0], tril_indices[1]] = L_flat
+    return L
+
+
+def L_to_flat(L: torch.Tensor) -> torch.Tensor:
+    """Returns flat representation of the nonzero elements of a lower triangular matrix.
+
+    Args:
+        L: Lower triangular matrix.
+
+    Returns:
+        Flat representation of the nonzero lower triangular matrix elements.
+    """
+
+    num_params = L.shape[0]
+    tril_indices = torch.tril_indices(num_params, num_params)
+    L_flat = L[tril_indices[0], tril_indices[1]].clone()
+    return L_flat

@@ -43,7 +43,7 @@ def build(
         temperature: Temperature to rescale (divide) log_posterior.
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
-            from (Roeder et al](https://arxiv.org/abs/1703.09194).
+            from [Roeder et al](https://arxiv.org/abs/1703.09194).
         init_L: Initial lower triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$.
 
     Returns:
@@ -246,8 +246,9 @@ def nelbo(
     # Don't use vmap for single sample, since vmap doesn't work with lots of models
     if n_samples == 1:
         single_param = tree_map(lambda x: x[0], sampled_params_tree)
+        single_param_flat, _ = tree_ravel(single_param)
         log_p, aux = log_posterior(single_param, batch)
-        log_q = dist.log_prob(single_param)
+        log_q = dist.log_prob(single_param_flat)
 
     else:
         log_p, aux = vmap(log_posterior, (0, None), (0, 0))(sampled_params_tree, batch)

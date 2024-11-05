@@ -42,7 +42,7 @@ def test_nelbo():
     assert bad_nelbo_100 > target_nelbo_100
 
 
-def _test_vi_dense(optimizer_cls, stl):
+def _test_vi_dense(optimizer_cls, stl, n_vi_samps):
     torch.manual_seed(43)
     target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
     num_params = tree_size(target_mean)
@@ -61,7 +61,7 @@ def _test_vi_dense(optimizer_cls, stl):
 
     init_mean = tree_map(lambda x: torch.zeros_like(x, requires_grad=True), target_mean)
 
-    optimizer = optimizer_cls(lr=7.5e-3)
+    optimizer = optimizer_cls(lr=1e-2)
 
     state = vi.dense.init(init_mean, optimizer)
 
@@ -88,8 +88,7 @@ def _test_vi_dense(optimizer_cls, stl):
     assert torch.isclose(nelbo_target, torch.tensor(0.0), atol=1e-6)
     assert nelbo_init > nelbo_target
 
-    n_steps = 500
-    n_vi_samps = 5
+    n_steps = 1000
 
     transform = vi.dense.build(
         log_prob,
@@ -145,7 +144,7 @@ def _test_vi_dense(optimizer_cls, stl):
 
     # Test sample
     mean_copy = tree_map(lambda x: x.clone(), state.params)
-    samples = vi.dense.sample(state, (1000,))
+    samples = vi.dense.sample(state, (5000,))
     flat_samples = torch.vmap(lambda s: tree_ravel(s)[0])(samples)
     samples_cov = torch.cov(flat_samples.T)
     samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
@@ -158,16 +157,16 @@ def _test_vi_dense(optimizer_cls, stl):
 
 
 def test_vi_dense_sgd():
-    _test_vi_dense(torchopt.sgd, False)
+    _test_vi_dense(torchopt.sgd, False, 5)
 
 
 def test_vi_dense_adamw():
-    _test_vi_dense(torchopt.adamw, False)
+    _test_vi_dense(torchopt.adamw, False, 1)
 
 
 def test_vi_dense_sgd_stl():
-    _test_vi_dense(torchopt.sgd, True)
+    _test_vi_dense(torchopt.sgd, True, 1)
 
 
 def test_vi_dense_adamw_stl():
-    _test_vi_dense(torchopt.adamw, True)
+    _test_vi_dense(torchopt.adamw, True, 5)

@@ -246,8 +246,9 @@ def nelbo(
     # Don't use vmap for single sample, since vmap doesn't work with lots of models
     if n_samples == 1:
         single_param = tree_map(lambda x: x[0], sampled_params_tree)
+        single_param_flat, _ = tree_ravel(single_param)
         log_p, aux = log_posterior(single_param, batch)
-        log_q = dist.log_prob(single_param)
+        log_q = dist.log_prob(single_param_flat)
 
     else:
         log_p, aux = vmap(log_posterior, (0, None), (0, 0))(sampled_params_tree, batch)

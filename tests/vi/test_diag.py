@@ -37,7 +37,7 @@ def test_nelbo():
     assert bad_nelbo_100 > target_nelbo_100
 
 
-def _test_vi_diag(optimizer_cls, stl):
+def _test_vi_diag(optimizer_cls, stl, n_vi_samps):
     torch.manual_seed(42)
     target_mean = {"a": torch.randn(2, 1), "b": torch.randn(1, 1)}
     target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
@@ -78,7 +78,6 @@ def _test_vi_diag(optimizer_cls, stl):
     assert nelbo_init > nelbo_target
 
     n_steps = 500
-    n_vi_samps = 5
 
     transform = vi.diag.build(
         batch_normal_log_prob_spec,
@@ -141,16 +140,16 @@ def _test_vi_diag(optimizer_cls, stl):
 
 
 def test_vi_diag_sgd():
-    _test_vi_diag(torchopt.sgd, False)
+    _test_vi_diag(torchopt.sgd, False, 5)
 
 
 def test_vi_diag_adamw():
-    _test_vi_diag(torchopt.adamw, False)
+    _test_vi_diag(torchopt.adamw, False, 1)
 
 
 def test_vi_diag_sgd_stl():
-    _test_vi_diag(torchopt.sgd, True)
+    _test_vi_diag(torchopt.sgd, True, 1)
 
 
 def test_vi_diag_adamw_stl():
-    _test_vi_diag(torchopt.adamw, True)
+    _test_vi_diag(torchopt.adamw, True, 5)

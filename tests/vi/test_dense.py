@@ -6,7 +6,7 @@ from optree.integration.torch import tree_ravel
 
 from posteriors import vi
 from posteriors.tree_utils import tree_size
-from posteriors.utils import L_to_flat
+from posteriors.utils import L_from_flat, L_to_flat
 
 
 def test_nelbo():
@@ -118,7 +118,9 @@ def _test_vi_dense(optimizer_cls, stl):
         assert torch.allclose(
             init_mean[key], init_mean_copy[key]
         )  # check init_mean was left untouched
-    assert torch.allclose(state.cov, target_cov, atol=0.5)
+    state_L = L_from_flat(state.L_factor)
+    state_cov = state_L @ state_L.T
+    assert torch.allclose(state_cov, target_cov, atol=0.5)
 
     # Test inplace = True
     state = transform.init(init_mean)
@@ -137,7 +139,9 @@ def _test_vi_dense(optimizer_cls, stl):
         assert torch.allclose(
             state.params[key], init_mean[key]
         )  # check init_mean was updated in place
-    assert torch.allclose(state.cov, target_cov, atol=0.5)
+    state_L = L_from_flat(state.L_factor)
+    state_cov = state_L @ state_L.T
+    assert torch.allclose(state_cov, target_cov, atol=0.5)
 
     # Test sample
     mean_copy = tree_map(lambda x: x.clone(), state.params)
@@ -148,7 +152,9 @@ def _test_vi_dense(optimizer_cls, stl):
     for key in samples_mean:
         assert torch.allclose(samples_mean[key], state.params[key], atol=1e-1)
         assert not torch.allclose(samples_mean[key], mean_copy[key])
-    assert torch.allclose(state.cov, samples_cov, atol=2e-1)
+    state_L = L_from_flat(state.L_factor)
+    state_cov = state_L @ state_L.T
+    assert torch.allclose(state_cov, samples_cov, atol=2e-1)
 
 
 def test_vi_dense_sgd():

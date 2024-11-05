@@ -22,7 +22,7 @@ def build(
     temperature: float = 1.0,
     n_samples: int = 1,
     stl: bool = True,
-    init_cov: torch.Tensor | float = 1.0,
+    init_L: torch.Tensor | float = 1.0,
 ) -> Transform:
     """Builds a transform for variational inference with a Normal
     distribution over parameters.
@@ -44,12 +44,12 @@ def build(
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
             from (Roeder et al](https://arxiv.org/abs/1703.09194).
-        init_cov: Initial covariance matrix of the variational distribution.
+        init_L: Initial lower triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$.
 
     Returns:
         Dense VI transform instance.
     """
-    init_fn = partial(init, optimizer=optimizer, init_cov=init_cov)
+    init_fn = partial(init, optimizer=optimizer, init_L=init_L)
     update_fn = partial(
         update,
         log_posterior=log_posterior,
@@ -66,9 +66,9 @@ class VIDenseState(NamedTuple):
 
     Attributes:
         params: Mean of the variational distribution.
-        cov: Covariance matrix of the variational distribution.
         L_factor: Flat representation of the nonzero values of the lower
-            triangular matrix $L$ satisfying $LL^T$ = cov.
+            triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$, where $\\Sigma$
+            is the covariance matrix of the variational distribution.
         opt_state: TorchOpt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
@@ -76,7 +76,6 @@ class VIDenseState(NamedTuple):
     """
 
     params: TensorTree
-    cov: torch.Tensor
     L_factor: torch.Tensor
     opt_state: torchopt.typing.OptState
     nelbo: torch.tensor = torch.tensor([])
@@ -86,7 +85,7 @@ class VIDenseState(NamedTuple):
 def init(
     params: TensorTree,
     optimizer: torchopt.base.GradientTransformation,
-    init_cov: torch.Tensor | float = 1.0,
+    init_L: torch.Tensor | float = 1.0,
 ) -> VIDenseState:
     """Initialise diagonal Normal variational distribution over parameters.
 
@@ -106,21 +105,20 @@ def init(
         params: Initial mean of the variational distribution.
         optimizer: TorchOpt functional optimizer for updating the variational
             parameters. Make sure to use lower case like torchopt.adam()
-        init_cov: Initial covariance matrix of the variational distribution.
+        init_L: Initial lower triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$,
+            where $\\Sigma$ is the covariance matrix of the variational distribution.
 
     Returns:
         Initial DenseVIState.
     """
 
     num_params = tree_size(params)
-    if is_scalar(init_cov):
-        init_cov = init_cov * torch.eye(num_params, requires_grad=True)
+    if is_scalar(init_L):
+        init_L = init_L * torch.eye(num_params, requires_grad=True)
 
-    init_L = torch.linalg.cholesky(init_cov)
     init_L = L_to_flat(init_L)
-
     opt_state = optimizer.init([params, init_L])
-    return VIDenseState(params, init_cov, init_L, opt_state)
+    return VIDenseState(params, init_L, opt_state)
 
 
 def update(
@@ -169,15 +167,12 @@ def update(
     mean, L_factor = torchopt.apply_updates(
         (state.params, state.L_factor), updates, inplace=inplace
     )
-    L = L_from_flat(L_factor, state.cov.shape[0])
-    cov = L @ L.T
 
     if inplace:
         tree_insert_(state.nelbo, nelbo_val.detach())
-        tree_insert_(state.cov, cov)
         return state._replace(aux=aux)
 
-    return VIDenseState(mean, cov, L_factor, opt_state, nelbo_val.detach(), aux)
+    return VIDenseState(mean, L_factor, opt_state, nelbo_val.detach(), aux)
 
 
 def nelbo(
@@ -211,7 +206,7 @@ def nelbo(
     Args:
         mean: Mean of the variational distribution.
         L_factor: Flat representation of the nonzero values of the lower
-            triangular matrix $L$ satisfying $LL^T$ = cov, where cov
+            triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$, where $\\Sigma$
             is the covariance matrix of the variational distribution.
         batch: Input data to log_posterior.
         log_posterior: Function that takes parameters and input batch and
@@ -226,8 +221,7 @@ def nelbo(
     """
 
     mean_flat, unravel_func = tree_ravel(mean)
-    num_params = mean_flat.shape[0]
-    L = L_from_flat(L_factor, num_params)
+    L = L_from_flat(L_factor)
     cov = L @ L.T
     dist = torch.distributions.MultivariateNormal(
         loc=mean_flat,
@@ -240,7 +234,7 @@ def nelbo(
 
     if stl:
         mean_flat.detach()
-        L = L_from_flat(L_factor.detach(), num_params)
+        L = L_from_flat(L_factor.detach())
         cov = L @ L.T
         # Redefine distribution to sample from after stl
         dist = torch.distributions.MultivariateNormal(
@@ -276,10 +270,12 @@ def sample(
     """
 
     mean_flat, unravel_func = tree_ravel(state.params)
+    L = L_from_flat(state.L_factor)
+    cov = L @ L.T
 
     samples = torch.distributions.MultivariateNormal(
         loc=mean_flat,
-        covariance_matrix=state.cov,
+        covariance_matrix=cov,
         validate_args=False,
     ).rsample(sample_shape)
 

@@ -816,8 +816,7 @@ def test_L_from_flat():
         ]
     )
     L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
-    num_params = expected_L.shape[0]
-    L = L_from_flat(L_flat, num_params)
+    L = L_from_flat(L_flat)
     assert torch.allclose(expected_L, L)
 
 

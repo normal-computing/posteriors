@@ -42,7 +42,7 @@ def build(
         temperature: Temperature to rescale (divide) log_posterior.
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
-            from (Roeder et al](https://arxiv.org/abs/1703.09194).
+            from [Roeder et al](https://arxiv.org/abs/1703.09194).
         init_log_sds: Initial log of the square-root diagonal of the covariance matrix
             of the variational distribution. Can be a tree matching params or scalar.
 

@@ -43,7 +43,7 @@ def build(
         temperature: Temperature to rescale (divide) log_posterior.
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
-            from (Roeder et al](https://arxiv.org/abs/1703.09194).
+            from [Roeder et al](https://arxiv.org/abs/1703.09194).
         init_L: Initial lower triangular matrix $L$ satisfying $LL^T$ = $\\Sigma$.
 
     Returns:

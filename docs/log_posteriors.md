@@ -98,8 +98,11 @@ either $N$ or $n$ increaase.
         log_prior = diag_normal_log_prob(params, sd=1., normalize=False)
         mean_log_lik = Categorical(logits=logits).log_prob(batch['labels']).mean()
         mean_log_post = log_prior / num_data + mean_log_lik
-        return mean_log_post
+        return mean_log_post, torch.tensor([])
     ```
+
+    See [auxiliary information](#auxiliary-information) for why we return an
+    additional empty tensor.
 
 The issue with running Bayesian methods (such as VI or SGHMC) on this mean log posterior
 function is that naive application will result in approximating the tempered posterior

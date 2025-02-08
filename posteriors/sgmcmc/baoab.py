@@ -20,7 +20,7 @@ def build(
     """Builds BAOAB transform, although technically we implement
     BBAOA so that we only compute the gradient once per iteration.
 
-    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/book/10.1007/978-3-319-16375-8):
+    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8):
 
     \\begin{align}
     m_{t+1/2} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}), \\\\
@@ -158,15 +158,16 @@ def update(
     def BB_step(m, g):
         return m + lr * g
 
-    def O_step(p, m):
+    def A_step(p, m):
         return p + (lr / 2) * prec * m
 
-    def A_step(m):
+    def O_step(m):
         return torch.exp(-gamma * lr) * m + zeta2 * sigma * torch.randn_like(m)
 
     momenta = flexi_tree_map(BB_step, state.momenta, grads, inplace=inplace)
-    params = flexi_tree_map(O_step, state.params, momenta, inplace=inplace)
-    momenta = flexi_tree_map(A_step, momenta, inplace=inplace)
+    params = flexi_tree_map(A_step, state.params, momenta, inplace=inplace)
+    momenta = flexi_tree_map(O_step, momenta, inplace=inplace)
+    params = flexi_tree_map(A_step, params, momenta, inplace=inplace)
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())

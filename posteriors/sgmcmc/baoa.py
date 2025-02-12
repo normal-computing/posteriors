@@ -85,7 +85,7 @@ class BAOAState(NamedTuple):
     aux: Any = None
 
 
-def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOBState:
+def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAState:
     """Initialise momenta for BAOA.
 
     Args:

@@ -17,10 +17,11 @@ def build(
     temperature: float = 1.0,
     momenta: TensorTree | float | None = None,
 ) -> Transform:
-    """Builds BAOAB transform, although technically we implement
-    BBAOA so that we only compute the gradient once per iteration.
+    """Builds BAOA transform.
 
-    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8):
+    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8),
+    where it is called ABAO and is conjugate to BAOAB but uses a single gradient
+    evaluation per iteration:
 
     \\begin{align}
     m_{t+1/2} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}), \\\\
@@ -31,6 +32,10 @@ def build(
  
     for learning rate $\\epsilon$, temperature $T$, transformed friction $γ = α σ^{-2}$
     and transformed noise variance$ζ^2 = T(1 - e^{-2γε})$.
+    
+    The implementation of BAOA instead of BAOAB means that the update is not reversible,
+    but as we don't do any Metropolis-Hastings or momenta reversal the algorithm
+    is functionally equivalent to BAOAB.
 
     Targets $p_T(θ, m) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm) / T)$
     with temperature $T$.
@@ -64,8 +69,8 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class BAOABState(NamedTuple):
-    """State encoding params and momenta for BAOAB.
+class BAOAState(NamedTuple):
+    """State encoding params and momenta for BAOA.
 
     Attributes:
         params: Parameters.
@@ -76,12 +81,12 @@ class BAOABState(NamedTuple):
 
     params: TensorTree
     momenta: TensorTree
-    log_posterior: torch.tensor = torch.tensor([])
+    log_posterior: torch.Tensor = torch.tensor([])
     aux: Any = None
 
 
-def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOABState:
-    """Initialise momenta for BAOAB.
+def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOBState:
+    """Initialise momenta for BAOA.
 
     Args:
         params: Parameters for which to initialise.
@@ -102,11 +107,11 @@ def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAB
             params,
         )
 
-    return BAOABState(params, momenta)
+    return BAOAState(params, momenta)
 
 
 def update(
-    state: BAOABState,
+    state: BAOAState,
     batch: Any,
     log_posterior: LogProbFn,
     lr: float,
@@ -114,12 +119,13 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> BAOABState:
-    """Updates parameters and momenta for BAOAB, although technically we implement
-    BBAOA so that we only compute the gradient once per iteration.
+) -> BAOAState:
+    """Updates parameters and momenta for BAOA.
     
-    Update rule from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/book/10.1007/978-3-319-16375-8):
-
+    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8),
+    where it is called ABAO and is conjugate to BAOAB but uses a single gradient
+    evaluation per iteration:
+    
     \\begin{align}
     m_{t+1/2} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}), \\\\
     θ_{t+1/2} &= θ_t + (ε / 2) σ^{-2} m_{t+1/2}, \\\\
@@ -129,7 +135,7 @@ def update(
     
     for learning rate $\\epsilon$, temperature $T$, $γ = α σ^{-2}$
     and $ζ^2 = T(1 - e^{-2γε})$.
-
+    
     Args:
         state: SGHMCState containing params and momenta.
         batch: Data batch to be send to log_posterior.
@@ -172,4 +178,4 @@ def update(
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
         return state._replace(aux=aux)
-    return BAOABState(params, momenta, log_post.detach(), aux)
+    return BAOAState(params, momenta, log_post.detach(), aux)

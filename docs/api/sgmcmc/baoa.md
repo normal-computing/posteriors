@@ -1,0 +1,3 @@
+# BAOA
+
+::: posteriors.sgmcmc.baoa

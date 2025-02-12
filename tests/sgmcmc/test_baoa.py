@@ -3,12 +3,12 @@ import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 
-from posteriors.sgmcmc import baoab
+from posteriors.sgmcmc import baoa
 
 from tests.scenarios import batch_normal_log_prob
 
 
-def test_baoab():
+def test_baoa():
     torch.manual_seed(42)
     target_mean = {"a": torch.randn(2, 1) + 10, "b": torch.randn(1, 1) + 10}
     target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
@@ -29,21 +29,21 @@ def test_baoab():
     params = tree_map(lambda x: torch.zeros_like(x), target_mean)
     init_params_copy = tree_map(lambda x: x.clone(), params)
 
-    sampler = baoab.build(batch_normal_log_prob_spec, lr=lr, alpha=alpha)
+    sampler = baoa.build(batch_normal_log_prob_spec, lr=lr, alpha=alpha)
 
     # Test inplace = False
-    baoab_state = sampler.init(params)
+    baoa_state = sampler.init(params)
     log_posts = []
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        baoab_state = sampler.update(baoab_state, batch, inplace=False)
+        baoa_state = sampler.update(baoa_state, batch, inplace=False)
 
         all_params = tree_map(
-            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoab_state.params
+            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoa_state.params
         )
 
-        log_posts.append(baoab_state.log_posterior.item())
+        log_posts.append(baoa_state.log_posterior.item())
 
     burnin = 1000
     all_params_flat = torch.vmap(lambda x: tree_ravel(x)[0])(all_params)
@@ -58,18 +58,18 @@ def test_baoab():
     )  # Check that the parameters are not updated
 
     # Test inplace = True
-    baoab_state = sampler.init(params, momenta=0.0)
+    baoa_state = sampler.init(params, momenta=0.0)
     log_posts = []
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        baoab_state = sampler.update(baoab_state, batch, inplace=True)
+        baoa_state = sampler.update(baoa_state, batch, inplace=True)
 
         all_params = tree_map(
-            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoab_state.params
+            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoa_state.params
         )
 
-        log_posts.append(baoab_state.log_posterior.item())
+        log_posts.append(baoa_state.log_posterior.item())
 
     burnin = 1000
     all_params_flat = torch.vmap(lambda x: tree_ravel(x)[0])(all_params)

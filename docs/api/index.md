@@ -34,7 +34,7 @@ Monte Carlo (SGHMC) algorithm from [Chen et al, 2014](https://arxiv.org/abs/1402
 - [`sgmcmc.sgnht`](sgmcmc/sgnht.md) implements the stochastic gradient Nosé-Hoover
 thermostat (SGNHT) algorithm from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf),
 (SGHMC with adaptive friction coefficient).
-- [`sgmcmc.baoab`](sgmcmc/baoab.md) implements the BAOAB integrator for SGHMC
+- [`sgmcmc.baoa`](sgmcmc/baoa.md) implements the BAOA integrator for SGHMC
 from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/book/10.1007/978-3-319-16375-8).
 
 For an overview and unifying framework for SGMCMC methods, see [Ma et al, 2015](https://arxiv.org/abs/1506.04696).

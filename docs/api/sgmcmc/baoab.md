@@ -1,3 +1,0 @@
-# BAOAB
-
-::: posteriors.sgmcmc.baoab

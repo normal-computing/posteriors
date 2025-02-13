@@ -126,17 +126,9 @@ def update(
     inplace: bool = False,
 ) -> SGNHTState:
     """Updates parameters, momenta and xi for SGNHT.
-    
-    Update rule from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf):
 
-    \\begin{align}
-    θ_{t+1} &= θ_t + ε σ^{-2} m_t \\\\
-    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε σ^{-2} ξ_t m_t
-    + N(0, ε T (2 α - ε β T) \\mathbb{I})\\\\
-    ξ_{t+1} &= ξ_t + ε (σ^{-2} d^{-1} m_t^T m_t - T)
-    \\end{align}
-    
-    for learning rate $\\epsilon$ and temperature $T$
+    Update rule from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf),
+    see [build](sgnht.md#posteriors.sgmcmc.sgnht.build) for details.
 
     Args:
         state: SGNHTState containing params, momenta and xi.

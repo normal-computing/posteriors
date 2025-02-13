@@ -86,11 +86,8 @@ def update(
 ) -> SGLDState:
     """Updates parameters for SGLD.
 
-    Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf):
-    $$
-    θ_{t+1} = θ_t + ε \\nabla \\log p(θ_t, \\text{batch}) + N(0, ε  (2 - ε β) T \\mathbb{I})
-    $$
-    for lr $\\epsilon$ and temperature $T$.
+    Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf),
+    see [build](sgld.md#posteriors.sgmcmc.sgld.build) for details.
 
     Args:
         state: SGLDState containing params.

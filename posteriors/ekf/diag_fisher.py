@@ -117,15 +117,8 @@ def update(
     inplace: bool = False,
 ) -> EKFDiagState:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
-    The approximate Bayesian update is based on the linearization
-    $$
-    \\log p(θ | y) ≈ \\log p(θ) +  ε g(μ)ᵀ(θ - μ) +  \\frac12 ε (θ - μ)^T F_d(μ) (θ - μ)
-    $$
-    where $μ$ is the mean of the prior distribution, $ε$ is the learning rate
-    (or equivalently the likelihood inverse temperature),
-    $g(μ)$ is the gradient of the log likelihood at μ and $F_d(μ)$ is the diagonal
-    empirical Fisher information matrix at $μ$ for data $y$. Completing the square
-    regains a diagonal Normal distribution over the parameters.
+
+    See [build](diag_fisher.md#posteriors.ekf.diag_fisher.build) for details.
 
     Args:
         state: Current state.

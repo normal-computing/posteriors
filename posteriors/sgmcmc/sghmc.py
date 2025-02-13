@@ -117,16 +117,9 @@ def update(
     inplace: bool = False,
 ) -> SGHMCState:
     """Updates parameters and momenta for SGHMC.
-    
-    Update rule from [Chen et al, 2014](https://arxiv.org/abs/1402.4102):
 
-    \\begin{align}
-    θ_{t+1} &= θ_t + ε σ^{-2} m_t \\\\
-    m_{t+1} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}) - ε σ^{-2} α m_t
-    + N(0, ε T (2 α - ε β T) \\mathbb{I})\\
-    \\end{align}
-    
-    for learning rate $\\epsilon$ and temperature $T$
+    Update rule from [Chen et al, 2014](https://arxiv.org/abs/1402.4102),
+    see [build](sghmc.md#posteriors.sgmcmc.sghmc.build) for details.
 
     Args:
         state: SGHMCState containing params and momenta.

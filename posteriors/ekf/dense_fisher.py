@@ -114,14 +114,8 @@ def update(
     inplace: bool = False,
 ) -> EKFDenseState:
     """Applies an extended Kalman Filter update to the Multivariate Normal distribution.
-    The approximate Bayesian update is based on the linearization
-    $$
-    \\log p(θ | y) ≈ \\log p(θ) +  ε g(μ)ᵀ(θ - μ) +  \\frac12 ε (θ - μ)^T F(μ) (θ - μ)
-    $$
-    where $μ$ is the mean of the prior distribution, $ε$ is the learning rate
-    (or equivalently the likelihood inverse temperature),
-    $g(μ)$ is the gradient of the log likelihood at μ and $F(μ)$ is the
-    empirical Fisher information matrix at $μ$ for data $y$.
+
+    See [build](dense_fisher.md#posteriors.ekf.dense_fisher.build) for details.
 
     Args:
         state: Current state.

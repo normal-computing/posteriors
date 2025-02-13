@@ -19,10 +19,14 @@ def build(
 ) -> Transform:
     """Builds BAOA transform.
 
-    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8),
-    where it is called ABAO and is conjugate to BAOAB but uses a single gradient
-    evaluation per iteration:
+    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8).
 
+    BAOA is conjugate to BAOAB (in Leimkuhler and Matthews' terminology) but requires
+    only a single gradient evaluation per iteration.
+    The two are equivalent when analyzing functions of the parameter trajectory.
+    Unlike BAOAB, BAOA is not reversible, but since we don't apply Metropolis-Hastings 
+    or momenta reversal, the algorithm remains functionally identical to BAOAB.
+    
     \\begin{align}
     m_{t+1/2} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}), \\\\
     θ_{t+1/2} &= θ_t + (ε / 2) σ^{-2} m_{t+1/2}, \\\\
@@ -32,10 +36,6 @@ def build(
  
     for learning rate $\\epsilon$, temperature $T$, transformed friction $γ = α σ^{-2}$
     and transformed noise variance$ζ^2 = T(1 - e^{-2γε})$.
-    
-    The implementation of BAOA instead of BAOAB means that the update is not reversible,
-    but as we don't do any Metropolis-Hastings or momenta reversal the algorithm
-    is functionally equivalent to BAOAB.
 
     Targets $p_T(θ, m) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm) / T)$
     with temperature $T$.
@@ -121,21 +121,11 @@ def update(
     inplace: bool = False,
 ) -> BAOAState:
     """Updates parameters and momenta for BAOA.
-    
-    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8),
-    where it is called ABAO and is conjugate to BAOAB but uses a single gradient
-    evaluation per iteration:
-    
-    \\begin{align}
-    m_{t+1/2} &= m_t + ε \\nabla \\log p(θ_t, \\text{batch}), \\\\
-    θ_{t+1/2} &= θ_t + (ε / 2) σ^{-2} m_{t+1/2}, \\\\
-    m_{t+1} &= e^{-h γ} m_{t+1/2} + N(0, ζ^2 σ^2), \\\\
-    θ_{t+1} &= θ_{t+1/2} + (ε / 2) σ^{-2} m_{t+1} \\
-    \\end{align}
-    
-    for learning rate $\\epsilon$, temperature $T$, $γ = α σ^{-2}$
-    and $ζ^2 = T(1 - e^{-2γε})$.
-    
+
+    Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8).
+
+    See [build](baoa.md#posteriors.sgmcmc.baoa.build) for more details.
+
     Args:
         state: SGHMCState containing params and momenta.
         batch: Data batch to be send to log_posterior.

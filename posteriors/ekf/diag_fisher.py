@@ -1,8 +1,9 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 from torch.func import jacrev
 from optree import tree_map
+from tensordict import TensorClass, NonTensorData
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
@@ -67,7 +68,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class EKFDiagState(NamedTuple):
+class EKFDiagState(TensorClass["frozen"]):
     """State encoding a diagonal Normal distribution over parameters.
 
     Attributes:
@@ -81,7 +82,7 @@ class EKFDiagState(NamedTuple):
     params: TensorTree
     sd_diag: TensorTree
     log_likelihood: torch.Tensor = torch.tensor([])
-    aux: Any = None
+    aux: NonTensorData = None
 
 
 def init(
@@ -168,7 +169,7 @@ def update(
 
     if inplace:
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
-        return state._replace(aux=aux)
+        return state.replace(aux=NonTensorData(aux))
 
     return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
 

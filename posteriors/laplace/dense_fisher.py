@@ -1,9 +1,9 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-
+from tensordict import TensorClass, NonTensorData
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import tree_size
 from posteriors.utils import (
@@ -54,7 +54,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class DenseLaplaceState(NamedTuple):
+class DenseLaplaceState(TensorClass["frozen"]):
     """State encoding a Normal distribution over parameters,
     with a dense precision matrix
 
@@ -66,7 +66,7 @@ class DenseLaplaceState(NamedTuple):
 
     params: TensorTree
     prec: torch.Tensor
-    aux: Any = None
+    aux: NonTensorData = None
 
 
 def init(
@@ -129,7 +129,7 @@ def update(
 
     if inplace:
         state.prec.data += fisher
-        return state._replace(aux=aux)
+        return state.replace(aux=NonTensorData(aux))
     else:
         return DenseLaplaceState(state.params, state.prec + fisher, aux)
 

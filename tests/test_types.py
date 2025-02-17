@@ -1,7 +1,12 @@
 import torch
+from tensordict import TensorClass, NonTensorData
 
 from posteriors.tree_utils import tree_insert_
-from posteriors.types import TransformState
+
+
+class TransformState(TensorClass["frozen"]):
+    params: torch.Tensor
+    aux: NonTensorData
 
 
 def test_TransformState():
@@ -12,7 +17,8 @@ def test_TransformState():
 
     def update_state(state, params_new, aux_new):
         tree_insert_(state.params, params_new)
-        return state._replace(aux=aux_new)
+        # return state
+        return state.replace(aux=NonTensorData(aux_new))
 
     state_new = update_state(s, params_new, aux_new)
 

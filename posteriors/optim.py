@@ -1,7 +1,7 @@
 from typing import Type, Any
 from functools import partial
 import torch
-from tensordict import tensorclass
+from tensordict import TensorClass, NonTensorData
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
@@ -37,8 +37,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@tensorclass(frozen=True)
-class OptimState:
+class OptimState(TensorClass["frozen"]):
     """State of an optimizer from [torch.optim](https://pytorch.org/docs/stable/optim.html).
 
     Attributes:
@@ -51,7 +50,7 @@ class OptimState:
     params: TensorTree
     optimizer: torch.optim.Optimizer
     loss: torch.Tensor = torch.tensor([])
-    aux: Any = None
+    aux: NonTensorData = None
 
 
 def init(
@@ -106,4 +105,4 @@ def update(
     loss.backward()
     state.optimizer.step()
     tree_insert_(state.loss, loss.detach())
-    return state.replace(aux=aux)
+    return state.replace(aux=NonTensorData(aux))

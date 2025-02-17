@@ -5,7 +5,7 @@ from torch.func import grad_and_value, vmap
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 import torchopt
-from tensordict import tensorclass
+from tensordict import TensorClass, NonTensorData
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import tree_size, tree_insert_
@@ -62,8 +62,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@tensorclass(frozen=True)
-class VIDenseState:
+class VIDenseState(TensorClass["frozen"]):
     """State encoding a diagonal Normal variational distribution over parameters.
 
     Attributes:
@@ -81,7 +80,7 @@ class VIDenseState:
     L_factor: torch.Tensor
     opt_state: torchopt.typing.OptState
     nelbo: torch.Tensor = torch.tensor([])
-    aux: Any = None
+    aux: NonTensorData = None
 
 
 def init(
@@ -172,7 +171,7 @@ def update(
 
     if inplace:
         tree_insert_(state.nelbo, nelbo_val.detach())
-        return state.replace(aux=aux)
+        return state.replace(aux=NonTensorData(aux))
 
     return VIDenseState(mean, L_factor, opt_state, nelbo_val.detach(), aux)
 

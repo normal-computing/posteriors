@@ -8,6 +8,7 @@ from typing import (
 )
 from optree.typing import PyTreeTypeVar
 from torch import Tensor
+from tensordict import TensorClass
 
 TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
 
@@ -20,7 +21,7 @@ class InitFn(Protocol):
     @staticmethod
     def __call__(
         params: TensorTree,
-    ) -> TensorTree:
+    ) -> TensorClass:
         """Initiate a posteriors state with unified API:
 
         ```
@@ -48,10 +49,10 @@ class InitFn(Protocol):
 class UpdateFn(Protocol):
     @staticmethod
     def __call__(
-        state: TensorTree,
+        state: TensorClass,
         batch: Any,
         inplace: bool = False,
-    ) -> TensorTree:
+    ) -> TensorClass:
         """Transform a posteriors state with unified API:
 
         ```

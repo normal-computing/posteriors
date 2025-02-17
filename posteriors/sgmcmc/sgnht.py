@@ -4,7 +4,7 @@ import torch
 from torch.func import grad_and_value
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from tensordict import tensorclass
+from tensordict import TensorClass, NonTensorData
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
@@ -67,8 +67,7 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-@tensorclass(frozen=True)
-class SGNHTState:
+class SGNHTState(TensorClass["frozen"]):
     """State encoding params and momenta for SGNHT.
 
     Attributes:
@@ -82,7 +81,7 @@ class SGNHTState:
     momenta: TensorTree
     xi: torch.Tensor = torch.tensor([])
     log_posterior: torch.Tensor = torch.tensor([])
-    aux: Any = None
+    aux: NonTensorData = None
 
 
 def init(
@@ -178,5 +177,5 @@ def update(
     if inplace:
         tree_insert_(state.xi, xi_new)
         tree_insert_(state.log_posterior, log_post.detach())
-        return state.replace(aux=aux)
+        return state.replace(aux=NonTensorData(aux))
     return SGNHTState(params, momenta, xi_new, log_post.detach(), aux)

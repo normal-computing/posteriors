@@ -29,7 +29,7 @@ class InitFn(Protocol):
         ```
 
         where params is a PyTree of parameters. The produced `state` is a
-        `tensordict.tensorclass` containing the required information for the
+        `tensordict.TensorClass` containing the required information for the
         posteriors iterative algorithm defined by the `init` and `update` functions.
 
         Note that this represents the `init` function as stored in a `Transform`
@@ -43,7 +43,7 @@ class InitFn(Protocol):
             The initial state, a `tensordict.tensorclass` with `params` and `aux`
             attributes but possibly other attributes too.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class UpdateFn(Protocol):
@@ -59,8 +59,9 @@ class UpdateFn(Protocol):
         state = update(state, batch, inplace=False)
         ```
 
-        where state is a `tensordict.tensorclass` containing the required information for the
-        posteriors iterative algorithm defined by the `init` and `update` functions.
+        where state is a `tensordict.TensorClass` containing the required information
+        for the posteriors iterative algorithm defined by the `init` and `update`
+        functions.
 
         Note that this represents the `update` function as stored in a `Transform`
         returned by an algorithm's `build` function, the internal `update` function in
@@ -76,7 +77,7 @@ class UpdateFn(Protocol):
             attributes but possibly other attributes too. Must be of the same type as
             the input state.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class Transform(NamedTuple):

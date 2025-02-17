@@ -1,11 +1,11 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree.integration.torch import tree_ravel
+from tensordict import tensorclass
 
 from posteriors.tree_utils import tree_size, tree_insert_
-
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import (
     per_samplify,
@@ -66,7 +66,8 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class EKFDenseState(NamedTuple):
+@tensorclass(frozen=True)
+class EKFDenseState:
     """State encoding a Normal distribution over parameters.
 
     Attributes:
@@ -165,7 +166,7 @@ def update(
         tree_insert_(state.params, update_mean)
         tree_insert_(state.cov, update_cov)
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
-        return state._replace(aux=aux)
+        return state.replace(aux=aux)
 
     return EKFDenseState(update_mean, update_cov, log_liks.mean().detach(), aux)
 

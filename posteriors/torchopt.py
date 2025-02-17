@@ -1,7 +1,8 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 import torchopt
+from tensordict import tensorclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
@@ -37,7 +38,8 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class TorchOptState(NamedTuple):
+@tensorclass(frozen=True)
+class TorchOptState:
     """State of a [TorchOpt](https://github.com/metaopt/torchopt) optimizer.
 
     Contains the parameters, the optimizer state for the TorchOpt optimizer,
@@ -52,7 +54,7 @@ class TorchOptState(NamedTuple):
 
     params: TensorTree
     opt_state: torchopt.typing.OptState
-    loss: torch.tensor = torch.tensor([])
+    loss: torch.Tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -108,6 +110,6 @@ def update(
     params = torchopt.apply_updates(params, updates, inplace=inplace)
     if inplace:
         tree_insert_(state.loss, loss.detach())
-        return state._replace(aux=aux)
+        return state.replace(aux=aux)
 
     return TorchOptState(params, opt_state, loss, aux)

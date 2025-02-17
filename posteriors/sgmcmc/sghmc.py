@@ -1,8 +1,9 @@
-from typing import Any, NamedTuple
+from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
+from tensordict import tensorclass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
@@ -64,7 +65,8 @@ def build(
     return Transform(init_fn, update_fn)
 
 
-class SGHMCState(NamedTuple):
+@tensorclass(frozen=True)
+class SGHMCState:
     """State encoding params and momenta for SGHMC.
 
     Attributes:
@@ -76,7 +78,7 @@ class SGHMCState(NamedTuple):
 
     params: TensorTree
     momenta: TensorTree
-    log_posterior: torch.tensor = torch.tensor([])
+    log_posterior: torch.Tensor = torch.tensor([])
     aux: Any = None
 
 
@@ -164,5 +166,5 @@ def update(
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
-        return state._replace(aux=aux)
+        return state.replace(aux=aux)
     return SGHMCState(params, momenta, log_post.detach(), aux)

@@ -73,6 +73,7 @@ class SGNHTState(TensorClass["frozen"]):
     Attributes:
         params: Parameters.
         momenta: Momenta for each parameter.
+        xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
         aux: Auxiliary information from the log_posterior call.
     """

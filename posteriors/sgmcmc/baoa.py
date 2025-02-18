@@ -56,7 +56,7 @@ def build(
             Defaults to random iid samples from N(0, 1).
 
     Returns:
-        SGHMC transform instance.
+        BAOA transform instance.
     """
     init_fn = partial(init, momenta=momenta)
     update_fn = partial(
@@ -95,7 +95,7 @@ def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAS
             Defaults to random iid samples from N(0, 1).
 
     Returns:
-        Initial SGHMCState containing momenta.
+        Initial BAOAState containing momenta.
     """
     if momenta is None:
         momenta = tree_map(
@@ -128,7 +128,7 @@ def update(
     See [build](baoa.md#posteriors.sgmcmc.baoa.build) for more details.
 
     Args:
-        state: SGHMCState containing params and momenta.
+        state: BAOAState containing params and momenta.
         batch: Data batch to be send to log_posterior.
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)

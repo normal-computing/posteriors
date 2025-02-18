@@ -81,6 +81,7 @@ nav:
       - api/sgmcmc/sghmc.md
       - api/sgmcmc/sgnht.md
       - api/sgmcmc/baoa.md
+      - api/sgmcmc/baoa_nht.md
     - VI:
       - Dense: api/vi/dense.md
       - Diag: api/vi/diag.md

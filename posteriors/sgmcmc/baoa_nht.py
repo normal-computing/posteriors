@@ -80,6 +80,7 @@ class BAOANHTState(TensorClass["frozen"]):
     Attributes:
         params: Parameters.
         momenta: Momenta for each parameter.
+        xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
         aux: Auxiliary information from the log_posterior call.
     """
@@ -91,16 +92,21 @@ class BAOANHTState(TensorClass["frozen"]):
     aux: NonTensorData = None
 
 
-def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOANHTState:
-    """Initialise momenta for BAOA.
+def init(
+    params: TensorTree,
+    momenta: TensorTree | float | None = None,
+    xi: float | torch.Tensor = 0.01,
+) -> BAOANHTState:
+    """Initialise momenta for BAOA-NHT.
 
     Args:
         params: Parameters for which to initialise.
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
+        xi: Initial value for scalar thermostat ξ.
 
     Returns:
-        Initial SGHMCState containing momenta.
+        Initial BAOANHTState containing params, momenta and xi (thermostat).
     """
     if momenta is None:
         momenta = tree_map(
@@ -113,7 +119,7 @@ def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAN
             params,
         )
 
-    return BAOANHTState(params, momenta)
+    return BAOANHTState(params, momenta, torch.tensor(xi))
 
 
 def update(

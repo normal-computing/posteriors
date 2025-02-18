@@ -99,7 +99,7 @@ def init(
         xi: Initial value for scalar thermostat ξ.
 
     Returns:
-        Initial SGNHTState containing momenta.
+        Initial SGNHTState containing params, momenta and xi (thermostat).
     """
     if momenta is None:
         momenta = tree_map(

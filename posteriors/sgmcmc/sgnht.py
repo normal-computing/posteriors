@@ -73,6 +73,7 @@ class SGNHTState(TensorClass["frozen"]):
     Attributes:
         params: Parameters.
         momenta: Momenta for each parameter.
+        xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
         aux: Auxiliary information from the log_posterior call.
     """
@@ -98,7 +99,7 @@ def init(
         xi: Initial value for scalar thermostat ξ.
 
     Returns:
-        Initial SGNHTState containing momenta.
+        Initial SGNHTState containing params, momenta and xi (thermostat).
     """
     if momenta is None:
         momenta = tree_map(

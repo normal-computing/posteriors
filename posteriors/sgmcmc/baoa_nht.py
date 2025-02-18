@@ -3,10 +3,11 @@ from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
+from optree.integration.torch import tree_ravel
 from tensordict import TensorClass, NonTensorData
 
 from posteriors.types import TensorTree, Transform, LogProbFn
-from posteriors.tree_utils import flexi_tree_map, tree_insert_
+from posteriors.tree_utils import flexi_tree_map, tree_insert_, tree_size
 from posteriors.utils import is_scalar, CatchAuxError
 
 
@@ -160,8 +161,8 @@ def update(
         )
 
     prec = sigma**-2
-    gamma = torch.tensor(alpha * prec)
-    zeta2 = (temperature * (1 - torch.exp(-2 * gamma * lr))) ** 0.5
+
+    d = tree_size(state.params)
 
     def BB_step(m, g):
         return m + lr * g
@@ -169,15 +170,30 @@ def update(
     def A_step(p, m):
         return p + (lr / 2) * prec * m
 
-    def O_step(m):
-        return torch.exp(-gamma * lr) * m + zeta2 * sigma * torch.randn_like(m)
+    def thermostat_step(xi, m):
+        m_flat, _ = tree_ravel(m)
+        return xi + (lr / 2) * (prec * torch.mean(m_flat**2) - temperature)
+
+    def scale_momenta(m, xi):
+        return torch.exp(-xi * lr / 2) * m
+
+    def O_thermostat_step(xi):
+        return (
+            torch.exp(-alpha * lr) * xi
+            + torch.randn_like(xi)
+            * (temperature / d * (1 - torch.exp(-2 * alpha * lr))) ** 0.5
+        )
 
     momenta = flexi_tree_map(BB_step, state.momenta, grads, inplace=inplace)
     params = flexi_tree_map(A_step, state.params, momenta, inplace=inplace)
-    momenta = flexi_tree_map(O_step, momenta, inplace=inplace)
+    xi = thermostat_step(state.xi, momenta)
+    momenta = flexi_tree_map(scale_momenta, momenta, xi, inplace=inplace)
+    xi = O_thermostat_step(xi)
+    momenta = flexi_tree_map(scale_momenta, momenta, xi, inplace=inplace)
     params = flexi_tree_map(A_step, params, momenta, inplace=inplace)
 
     if inplace:
+        tree_insert_(state.xi, xi)
         tree_insert_(state.log_posterior, log_post.detach())
         return state.replace(aux=NonTensorData(aux))
-    return BAOANHTState(params, momenta, log_post.detach(), aux)
+    return BAOANHTState(params, momenta, xi, log_post.detach(), aux)

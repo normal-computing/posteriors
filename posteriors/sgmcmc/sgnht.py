@@ -18,7 +18,7 @@ def build(
     sigma: float = 1.0,
     temperature: float = 1.0,
     momenta: TensorTree | float | None = None,
-    xi: float = None,
+    xi: float | None = None,
 ) -> Transform:
     """Builds SGNHT transform.
 

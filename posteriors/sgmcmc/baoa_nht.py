@@ -18,6 +18,7 @@ def build(
     sigma: float = 1.0,
     temperature: float = 1.0,
     momenta: TensorTree | float | None = None,
+    xi: float | None = None,
 ) -> Transform:
     """Builds BAOA-NHT transform.
 
@@ -59,11 +60,12 @@ def build(
         temperature: Temperature of the joint parameter + momenta distribution.
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
+        xi: Initial value for scalar thermostat ξ. Defaults to `alpha`.
 
     Returns:
         BAOA-NHT transform instance.
     """
-    init_fn = partial(init, momenta=momenta)
+    init_fn = partial(init, momenta=momenta, xi=xi or alpha)
     update_fn = partial(
         update,
         log_posterior=log_posterior,
@@ -161,7 +163,7 @@ def update(
         )
 
     prec = sigma**-2
-
+    alpha = torch.as_tensor(alpha)
     d = tree_size(state.params)
 
     def BB_step(m, g):
@@ -187,9 +189,9 @@ def update(
     momenta = flexi_tree_map(BB_step, state.momenta, grads, inplace=inplace)
     params = flexi_tree_map(A_step, state.params, momenta, inplace=inplace)
     xi = thermostat_step(state.xi, momenta)
-    momenta = flexi_tree_map(scale_momenta, momenta, xi, inplace=inplace)
+    momenta = flexi_tree_map(partial(scale_momenta, xi=xi), momenta, inplace=inplace)
     xi = O_thermostat_step(xi)
-    momenta = flexi_tree_map(scale_momenta, momenta, xi, inplace=inplace)
+    momenta = flexi_tree_map(partial(scale_momenta, xi=xi), momenta, inplace=inplace)
     params = flexi_tree_map(A_step, params, momenta, inplace=inplace)
 
     if inplace:

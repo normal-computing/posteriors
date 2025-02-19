@@ -10,11 +10,14 @@ from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_, tree_size
 from posteriors.utils import is_scalar, CatchAuxError
 
+# TODO: Add alpha code (friction for momenta)
+
 
 def build(
     log_posterior: LogProbFn,
     lr: float,
     alpha: float = 0.01,
+    gamma: float = 0.01,
     sigma: float = 1.0,
     temperature: float = 1.0,
     momenta: TensorTree | float | None = None,
@@ -36,13 +39,13 @@ def build(
     θ_{t+1/2} &= θ_t + (ε / 2) σ^{-2} m_{t+1/2}, \\\\
     ξ_{t+1/2} &= ξ_t + (ε / 2) (σ^{-2} d^{-1} m_t^T m_t - T), \\\\
     \\tilde{m}_{t+1/2} &= e^{-ε/2 ξ_{t+1/2}} m_{t+1/2}, \\\\
-    \\tilde{ξ}_{t+1/2} &= e^{-α ε}ξ_{t+1/2} + N(0, d^{-1}T (1 - e^{-2α ε})), \\\\
+    \\tilde{ξ}_{t+1/2} &= e^{-γ ε}ξ_{t+1/2} + N(0, d^{-1}T (1 - e^{-2γ ε})), \\\\
     m_{t+1} &= e^{-ε/2 \\tilde{ξ}_{t+1/2}} \\tilde{m}_{t+1/2}, \\\\
     ξ_{t+1} &= \\tilde{ξ}_{t+1/2} + (ε / 2) (σ^{-2} d^{-1} m_{t+1}^T m_{t+1} - T), \\\\
     θ_{t+1} &= θ_{t+1/2} + (ε / 2) σ^{-2} m_{t+1},
     \\end{align}
  
-    for learning rate $\\epsilon$, temperature $T$, thermostat friction $α$
+    for learning rate $\\epsilon$, temperature $T$, thermostat friction $γ$
     and momenta noise variance $σ^2$.
 
     Targets $p_T(θ, m, ξ) \\propto \\exp( (\\log p(θ) - \\frac{1}{2σ^2} m^Tm - \\frac{d}{2}ξ^2) / T)$.
@@ -55,22 +58,23 @@ def build(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
-        alpha: Friction coefficient.
+        alpha: Friction coefficient for the momenta.
+        gamma: Friction coefficient for the thermostat.
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
-        xi: Initial value for scalar thermostat ξ. Defaults to `alpha`.
+        xi: Initial value for scalar thermostat ξ. Defaults to `gamma`.
 
     Returns:
         BAOA-NHT transform instance.
     """
-    init_fn = partial(init, momenta=momenta, xi=xi or alpha)
+    init_fn = partial(init, momenta=momenta, xi=xi or gamma)
     update_fn = partial(
         update,
         log_posterior=log_posterior,
         lr=lr,
-        alpha=alpha,
+        gamma=gamma,
         sigma=sigma,
         temperature=temperature,
     )
@@ -130,7 +134,7 @@ def update(
     batch: Any,
     log_posterior: LogProbFn,
     lr: float,
-    alpha: float = 0.01,
+    gamma: float = 0.01,
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
@@ -148,7 +152,7 @@ def update(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
-        alpha: Friction coefficient.
+        gamma: Friction coefficient.
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
         inplace: Whether to modify state in place.
@@ -163,7 +167,7 @@ def update(
         )
 
     prec = sigma**-2
-    alpha = torch.as_tensor(alpha)
+    gamma = torch.as_tensor(gamma)
     d = tree_size(state.params)
 
     def BB_step(m, g):
@@ -181,9 +185,9 @@ def update(
 
     def O_thermostat_step(xi):
         return (
-            torch.exp(-alpha * lr) * xi
+            torch.exp(-gamma * lr) * xi
             + torch.randn_like(xi)
-            * (temperature / d * (1 - torch.exp(-2 * alpha * lr))) ** 0.5
+            * (temperature / d * (1 - torch.exp(-2 * gamma * lr))) ** 0.5
         )
 
     momenta = flexi_tree_map(BB_step, state.momenta, grads, inplace=inplace)

@@ -8,8 +8,18 @@ hide:
 <center>
 
 
-<span style="font-size:8em; font-weight:bold; color:grey">
-<img style="vertical-align: middle;", src=https://storage.googleapis.com/posteriors/logo.png width=120>
+<!-- <span style="font-size: clamp(2em, 10vw, 10em); font-weight:bold; color:grey; white-space: nowrap;"> -->
+<span style="
+  font-size: clamp(2em, 10vw, 8em);  /* Min: 2em, scale up with viewport width, max: 8em */
+  font-weight: bold;
+  color: grey;
+  white-space: nowrap;
+">
+<img 
+    src="https://storage.googleapis.com/posteriors/logo.png"
+    alt="posteriors-logo"
+    style="height: 1.5em; vertical-align: middle;"
+  />
 &nbsp;
 posteriors
 </span>

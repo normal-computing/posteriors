@@ -38,7 +38,7 @@ def test_sghmc():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sghmc_state = sampler.update(sghmc_state, batch, inplace=False)
+        sghmc_state, _ = sampler.update(sghmc_state, batch, inplace=False)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sghmc_state.params
@@ -64,7 +64,7 @@ def test_sghmc():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sghmc_state = sampler.update(sghmc_state, batch, inplace=True)
+        sghmc_state, _ = sampler.update(sghmc_state, batch, inplace=True)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sghmc_state.params

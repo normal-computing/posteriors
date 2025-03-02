@@ -38,7 +38,7 @@ for temp in temperatures:
                 spec_base + file for file in os.listdir(spec_base) if match_str in file
             ]
 
-        save_dir = save_dir_base + f"_seed{k+1}" + f"_temp{temp_str}/"
+        save_dir = save_dir_base + f"_seed{k + 1}" + f"_temp{temp_str}/"
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -49,10 +49,6 @@ for temp in temperatures:
 
         # Load states
         states = [pickle.load(open(d, "rb")) for d in load_paths]
-
-        # Delete auxiliary info
-        for s in states:
-            del s.aux
 
         # Move states to cpu
         states = tree_map(lambda x: x.detach().to("cpu"), states)

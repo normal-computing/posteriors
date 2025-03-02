@@ -57,7 +57,7 @@ transform = posteriors.vi.diag.build(
 state = transform.init(params)
 
 for batch in train_loader:
-    state = transform.update(state, batch)
+    state, aux = transform.update(state, batch)
 ```
 Here:
 
@@ -67,7 +67,8 @@ Here:
 - `state` is a [`NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
     encoding the state of the algorithm, including `params` and `aux` attributes.
 - `init` constructs the iteration-varying `state` based on the model parameters `params`.
-- `update` updates the `state` based on a new `batch` of data.
+- `update` updates the `state` based on a new `batch` of data and also returns
+   any auxiliary information from the model call.
 
 
 We've here used `posteriors.vi.diag` but we could easily swap to any of the other

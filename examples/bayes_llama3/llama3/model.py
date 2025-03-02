@@ -82,8 +82,8 @@ class BayesLlama(pl.LightningModule):
 
     def training_step(self, batch):
         inputs = {key: val.to(self.device) for key, val in batch.items()}
-        self.state = self.transform.update(self.state, inputs)
-        self.log("loss", self.state.aux, prog_bar=True)
+        self.state, loss = self.transform.update(self.state, inputs)
+        self.log("loss", loss, prog_bar=True)
 
     def configure_optimizers(self):
         sub_params, sub_param_to_log_posterior = (

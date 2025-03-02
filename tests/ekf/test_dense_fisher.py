@@ -27,7 +27,7 @@ def test_ekf_dense():
     state = transform.init(init_mean)
     log_liks = []
     for _ in range(n_steps):
-        state = transform.update(state, batch, inplace=False)
+        state, _ = transform.update(state, batch, inplace=False)
         log_liks.append(state.log_likelihood.item())
 
     assert log_liks[0] < log_liks[-1]
@@ -42,17 +42,13 @@ def test_ekf_dense():
     state = transform.init(init_mean)
     log_liks = []
     for _ in range(n_steps):
-        new_state = transform.update(state, batch, inplace=True)
+        transform.update(state, batch, inplace=True)
         log_liks.append(state.log_likelihood.item())
 
     for key in state.params:
         assert torch.allclose(state.params[key], target_mean[key], atol=1e-1)
         assert not torch.allclose(state.params[key], init_mean_copy[key])
         assert not torch.allclose(init_mean[key], init_mean_copy[key])
-
-    assert (
-        state.aux != new_state.aux
-    )  # aux not changed in-place as not guaranteed to be a TensorTree
 
     # Test sample
     num_samples = 1000

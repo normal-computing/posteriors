@@ -17,11 +17,16 @@ Model calls can be expensive, and they might provide more information than just 
 output value (and gradient). In order to avoid, losing this information `posteriors`
 enforces the `log_posterior` or `log_likelihood` functions to have a
 `log_posterior(params, batch) -> log_prob, aux` signature, where the second element
-contains any auxiliary information, such as 
-predictions or alternative metrics.
+contains any auxiliary information, such as predictions or alternative metrics.
+Although note the auxiliary information should be a `TensorTree` (a requirement
+to work with `torch.func.grad` and friends).
 
-`posteriors` algorithms will store this information in `state.aux`.
+The `update` function of a `posteriors` transform will output a tuple of the new state
+and the auxiliary information output by the `log_posterior` or `log_likelihood` function.
 
+See the **In code** boxes below for example code snippets on how to construct a
+`log_posterior` function and use it with a `posteriors` transform.
+    
 
 ## Gradient Ascent
 
@@ -139,7 +144,7 @@ Note that with this support, optimization can often be obtained by simply settin
     vi_state = vi_transform.init(params)
 
     for batch in dataloader:
-        vi_state = vi_transform.update(vi_state, batch)
+        vi_state, aux = vi_transform.update(vi_state, batch)
     ```
 
 Alternatively, we can rescale the log posterior  `log_post = mean_log_post * num_data`

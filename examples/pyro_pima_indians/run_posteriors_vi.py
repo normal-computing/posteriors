@@ -53,7 +53,7 @@ for r in range(repeats):
     update = torch.compile(transform.update) if comp else transform.update
 
     for i in tqdm(range(steps_vi)):
-        state = update(state, batches[i])
+        state, _ = update(state, batches[i])
         nelbos_r[i] = state.nelbo
 
     posteriors_vi_time = time() - posteriors_vi_time

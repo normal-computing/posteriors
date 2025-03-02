@@ -1,7 +1,7 @@
 from typing import Type, Any
 from functools import partial
 import torch
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
@@ -20,7 +20,7 @@ def build(
     state = transform.init(params)
 
     for batch in dataloader:
-        state = transform.update(state, batch)
+        state, aux = transform.update(state, batch)
     ```
 
     Args:
@@ -44,13 +44,11 @@ class OptimState(TensorClass["frozen"]):
         params: Parameters to be optimized.
         optimizer: torch.optim optimizer instance.
         loss: Loss value.
-        aux: Auxiliary information from the loss function call.
     """
 
     params: TensorTree
     optimizer: torch.optim.Optimizer
     loss: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -82,7 +80,7 @@ def update(
     batch: TensorTree,
     loss_fn: LogProbFn,
     inplace: bool = True,
-) -> OptimState:
+) -> tuple[OptimState, Any]:
     """Perform a single update step of a [torch.optim](https://pytorch.org/docs/stable/optim.html)
     optimizer.
 
@@ -95,7 +93,7 @@ def update(
             inplace=False not supported for posteriors.optim
 
     Returns:
-        Updated OptimState.
+        Updated OptimState and auxiliary information.
     """
     if not inplace:
         raise NotImplementedError("inplace=False not supported for posteriors.optim")
@@ -105,4 +103,4 @@ def update(
     loss.backward()
     state.optimizer.step()
     tree_insert_(state.loss, loss.detach())
-    return state.replace(aux=NonTensorData(aux))
+    return state, aux

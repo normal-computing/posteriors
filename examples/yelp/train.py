@@ -57,7 +57,7 @@ if "temperature" in config.config_args and config.config_args["temperature"] is 
 
 # Extract model parameters
 num_params = posteriors.tree_size(params).item()
-print(f"Number of parameters: {num_params/1e6:.3f}M")
+print(f"Number of parameters: {num_params / 1e6:.3f}M")
 
 # Build transform
 transform = config.method.build(log_posterior, **config.config_args)
@@ -72,10 +72,10 @@ log_dict = {k: [] for k in config.log_metrics.keys()}
 log_bar = tqdm(total=0, position=1, bar_format="{desc}")
 for epoch in range(config.n_epochs):
     for batch in tqdm(
-        train_dataloader, desc=f"Epoch {epoch+1}/{config.n_epochs}", position=0
+        train_dataloader, desc=f"Epoch {epoch + 1}/{config.n_epochs}", position=0
     ):
         batch = tree_map(lambda x: x.to(args.device), batch)
-        state = transform.update(state, batch)
+        state, _ = transform.update(state, batch)
 
         # Update metrics
         log_dict = utils.append_metrics(log_dict, state, config.log_metrics)

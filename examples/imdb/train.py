@@ -69,7 +69,7 @@ print(f"Config saved to {config.save_dir}")
 # Extract model parameters
 params = dict(model.named_parameters())
 num_params = posteriors.tree_size(params).item()
-print(f"Number of parameters: {num_params/1e6:.3f}M")
+print(f"Number of parameters: {num_params / 1e6:.3f}M")
 
 
 # Define log posterior
@@ -113,13 +113,13 @@ log_dict = {k: [] for k in config.log_metrics.keys()} | {"loss": []}
 log_bar = tqdm(total=0, position=1, bar_format="{desc}")
 for epoch in range(args.epochs):
     for batch in tqdm(
-        train_dataloader, desc=f"Epoch {epoch+1}/{args.epochs}", position=0
+        train_dataloader, desc=f"Epoch {epoch + 1}/{args.epochs}", position=0
     ):
         batch = tree_map(lambda x: x.to(args.device), batch)
-        state = transform.update(state, batch)
+        state, aux = transform.update(state, batch)
 
         # Update metrics
-        log_dict = utils.append_metrics(log_dict, state, config.log_metrics)
+        log_dict = utils.append_metrics(log_dict, state, aux[0], config.log_metrics)
         log_bar.set_description_str(
             f"{config.display_metric}: {log_dict[config.display_metric][-1]:.2f}"
         )

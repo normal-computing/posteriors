@@ -65,7 +65,7 @@ for r in range(repeats):
     posteriors_sghmc_time = time()
 
     for i in tqdm(range(N_posteriors)):
-        state = update(state, batches[i])
+        state, _ = update(state, batches[i])
         all_params[i] = state.params
         log_posts_r[i] = state.log_posterior
 

@@ -2,7 +2,7 @@ from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
@@ -55,12 +55,10 @@ class SGLDState(TensorClass["frozen"]):
     Attributes:
         params: Parameters.
         log_posterior: Log posterior evaluation.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     log_posterior: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(params: TensorTree) -> SGLDState:
@@ -84,7 +82,7 @@ def update(
     beta: float = 0.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> SGLDState:
+) -> tuple[SGLDState, Any]:
     """Updates parameters for SGLD.
 
     Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf),
@@ -102,7 +100,8 @@ def update(
         inplace: Whether to modify state in place.
 
     Returns:
-        Updated state (which are pointers to the input state tensors if inplace=True).
+        Updated state (which are pointers to the input state tensors if inplace=True)
+        and auxiliary information.
     """
     with torch.no_grad(), CatchAuxError():
         grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
@@ -121,5 +120,5 @@ def update(
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
-        return state.replace(aux=NonTensorData(aux))
-    return SGLDState(params, log_post.detach(), aux)
+        return state, aux
+    return SGLDState(params, log_post.detach()), aux

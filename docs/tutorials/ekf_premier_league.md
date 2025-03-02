@@ -144,7 +144,7 @@ all_sds = init_sds.unsqueeze(0)
 previous_time = 0.0
 for match in dataloader:
     match_time = match["match_times"]
-    state = posteriors.ekf.diag_fisher.update(
+    state, aux = posteriors.ekf.diag_fisher.update(
         state,
         match,
         log_likelihood,

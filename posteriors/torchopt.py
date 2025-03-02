@@ -1,7 +1,8 @@
+from typing import Any
 from functools import partial
 import torch
 import torchopt
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
@@ -21,7 +22,7 @@ def build(
     state = transform.init(params)
 
     for batch in dataloader:
-        state = transform.update(state, batch)
+        state, aux = transform.update(state, batch)
     ```
 
     Args:
@@ -47,13 +48,11 @@ class TorchOptState(TensorClass["frozen"]):
         params: Parameters to be optimized.
         opt_state: TorchOpt optimizer state.
         loss: Loss value.
-        aux: Auxiliary information from the loss function call.
     """
 
     params: TensorTree
     opt_state: torchopt.typing.OptState
     loss: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -82,7 +81,7 @@ def update(
     loss_fn: LogProbFn,
     optimizer: torchopt.base.GradientTransformation,
     inplace: bool = False,
-) -> TorchOptState:
+) -> tuple[TorchOptState, Any]:
     """Update the [TorchOpt](https://github.com/metaopt/torchopt) optimizer state.
 
     Make sure to use the lower case functional optimizers e.g. `torchopt.adam()`.
@@ -96,7 +95,7 @@ def update(
         inplace: Whether to update the state in place.
 
     Returns:
-        Updated TorchOptState.
+        Updated TorchOptState and auxiliary information.
     """
     params = state.params
     opt_state = state.opt_state
@@ -108,6 +107,6 @@ def update(
     params = torchopt.apply_updates(params, updates, inplace=inplace)
     if inplace:
         tree_insert_(state.loss, loss.detach())
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
 
-    return TorchOptState(params, opt_state, loss, aux)
+    return TorchOptState(params, opt_state, loss), aux

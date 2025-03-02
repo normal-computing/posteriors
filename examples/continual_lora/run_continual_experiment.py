@@ -236,7 +236,7 @@ for episode_ind in range(config.num_tasks):
         laplace_state = laplace_transform.init(sub_params)
         for batch in tqdm.tqdm(laplace_train_dataloaders[episode_ind]):
             batch = optree.tree_map(lambda x: x.to(args.device), batch)
-            laplace_state = laplace_transform.update(
+            laplace_state, _ = laplace_transform.update(
                 laplace_state, batch, inplace=False
             )
 

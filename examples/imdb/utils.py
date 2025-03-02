@@ -37,9 +37,9 @@ def log_metrics(log_dict, save_dir, window=1, file_name="metrics", plot=True):
 
 
 # Function to append metrics to log_dict
-def append_metrics(log_dict, state, config_dict):
+def append_metrics(log_dict, state, loss, config_dict):
     for k, v in config_dict.items():
         log_dict[k].append(getattr(state, v).mean().item())
 
-    log_dict["loss"].append(state.aux[0].mean().item())
+    log_dict["loss"].append(loss.mean().item())
     return log_dict

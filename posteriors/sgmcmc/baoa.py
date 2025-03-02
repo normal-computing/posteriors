@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
@@ -77,13 +77,11 @@ class BAOAState(TensorClass["frozen"]):
         params: Parameters.
         momenta: Momenta for each parameter.
         log_posterior: Log posterior evaluation.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     momenta: TensorTree
     log_posterior: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAState:
@@ -120,7 +118,7 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> BAOAState:
+) -> tuple[BAOAState, Any]:
     """Updates parameters and momenta for BAOA.
 
     Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8).
@@ -141,7 +139,8 @@ def update(
 
     Returns:
         Updated state
-        (which are pointers to the inputted state tensors if inplace=True).
+        (which are pointers to the inputted state tensors if inplace=True)
+        and auxiliary information.
     """
     with torch.no_grad(), CatchAuxError():
         grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
@@ -168,5 +167,5 @@ def update(
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
-        return state.replace(aux=NonTensorData(aux))
-    return BAOAState(params, momenta, log_post.detach(), aux)
+        return state, aux
+    return BAOAState(params, momenta, log_post.detach()), aux

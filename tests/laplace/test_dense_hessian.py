@@ -48,7 +48,7 @@ def test_dense_hessian_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_init = laplace_state.prec
     for batch in dataloader:
-        laplace_state = transform.update(
+        laplace_state, _ = transform.update(
             laplace_state, batch, rescale=batch_size / xs.size()[0], inplace=False
         )
 
@@ -68,7 +68,7 @@ def test_dense_hessian_vmap():
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
-    laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
+    laplace_state_fb, _ = transform.update(laplace_state_fb, (xs, ys))
 
     assert torch.allclose(expected, laplace_state_fb.prec, atol=1e-5)
 
@@ -77,7 +77,7 @@ def test_dense_hessian_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = laplace_state.prec
     for batch in dataloader:
-        laplace_state = transform.update(
+        laplace_state, _ = transform.update(
             laplace_state, batch, rescale=batch_size / xs.size()[0], inplace=True
         )
 

@@ -52,16 +52,17 @@ class UpdateFn(Protocol):
         state: TensorClass,
         batch: Any,
         inplace: bool = False,
-    ) -> TensorClass:
+    ) -> tuple[TensorClass, Any]:
         """Transform a posteriors state with unified API:
 
         ```
-        state = update(state, batch, inplace=False)
+        state, aux = update(state, batch, inplace=False)
         ```
 
         where state is a `tensordict.TensorClass` containing the required information
         for the posteriors iterative algorithm defined by the `init` and `update`
-        functions.
+        functions. `aux` is an arbitrary info object returned by the
+        `log_posterior` or `log_likelihood` function.
 
         Note that this represents the `update` function as stored in a `Transform`
         returned by an algorithm's `build` function, the internal `update` function in
@@ -73,9 +74,12 @@ class UpdateFn(Protocol):
             inplace: Whether to modify state using inplace operations. Defaults to True.
 
         Returns:
-            The transformed state, a `tensordict.tensorclass` with `params` and `aux`
-            attributes but possibly other attributes too. Must be of the same type as
-            the input state.
+            Tuple of `state` and `aux`.
+                `state` is a `tensordict.tensorclass` with `params` attributes
+                but possibly other attributes too. Must be of the same type as
+                the input state.
+                `aux` is an arbitrary info object returned by the
+                `log_posterior` or `log_likelihood` function.
         """
         ...  # pragma: no cover
 
@@ -88,7 +92,7 @@ class Transform(NamedTuple):
     `init` and `update` functions have a unified API:
     ```
     state = transform.init(params)
-    state = transform.update(state, batch, inplace=False)
+    state, aux = transform.update(state, batch, inplace=False)
     ```
 
     Note that this represents the `Transform` function is returned by an algorithm's

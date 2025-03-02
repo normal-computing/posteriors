@@ -94,7 +94,7 @@ def _test_vi_diag(optimizer_cls, stl, n_vi_samps):
     state = transform.init(init_mean)
     nelbos = []
     for _ in range(n_steps):
-        state = transform.update(state, batch, inplace=False)
+        state, _ = transform.update(state, batch, inplace=False)
         nelbos.append(state.nelbo.item())
 
     last_nelbos_mean = torch.tensor(nelbos[-10:]).mean()
@@ -113,7 +113,7 @@ def _test_vi_diag(optimizer_cls, stl, n_vi_samps):
     state = transform.init(init_mean)
     nelbos = []
     for _ in range(n_steps):
-        _ = transform.update(state, batch, inplace=True)
+        transform.update(state, batch, inplace=True)
         nelbos.append(state.nelbo.item())
 
     last_nelbos_mean = torch.tensor(nelbos[-10:]).mean()

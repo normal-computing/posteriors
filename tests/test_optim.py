@@ -17,7 +17,7 @@ def test_optim_sgd():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]))
+        state, _ = transform.update(state, torch.tensor([1.0]))
 
     assert state.loss < 1e-3
     assert state.params < 1e-3
@@ -39,7 +39,7 @@ def test_optim_adamw():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]))
+        state, _ = transform.update(state, torch.tensor([1.0]))
 
     assert state.loss < 1e-3
     assert state.params < 1e-3

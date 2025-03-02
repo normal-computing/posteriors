@@ -106,7 +106,7 @@ def update(
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
     inplace: bool = False,
-) -> tuple[DiagLaplaceState, Any]:
+) -> tuple[DiagLaplaceState, TensorTree]:
     """Adds diagonal GGN matrix of covariance summed over given batch.
 
     Args:

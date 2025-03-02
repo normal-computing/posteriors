@@ -114,7 +114,7 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> tuple[SGHMCState, Any]:
+) -> tuple[SGHMCState, TensorTree]:
     """Updates parameters and momenta for SGHMC.
 
     Update rule from [Chen et al, 2014](https://arxiv.org/abs/1402.4102),

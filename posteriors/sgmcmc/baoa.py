@@ -118,7 +118,7 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> tuple[BAOAState, Any]:
+) -> tuple[BAOAState, TensorTree]:
     """Updates parameters and momenta for BAOA.
 
     Algorithm from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/ok/10.1007/978-3-319-16375-8).

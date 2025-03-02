@@ -1,4 +1,3 @@
-from typing import Any
 from functools import partial
 import torch
 import torchopt
@@ -81,7 +80,7 @@ def update(
     loss_fn: LogProbFn,
     optimizer: torchopt.base.GradientTransformation,
     inplace: bool = False,
-) -> tuple[TorchOptState, Any]:
+) -> tuple[TorchOptState, TensorTree]:
     """Update the [TorchOpt](https://github.com/metaopt/torchopt) optimizer state.
 
     Make sure to use the lower case functional optimizers e.g. `torchopt.adam()`.

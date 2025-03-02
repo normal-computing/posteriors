@@ -128,7 +128,7 @@ def update(
     n_samples: int = 1,
     stl: bool = True,
     inplace: bool = False,
-) -> tuple[VIDiagState, Any]:
+) -> tuple[VIDiagState, TensorTree]:
     """Updates the variational parameters to minimize the NELBO.
 
     Args:

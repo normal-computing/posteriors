@@ -123,7 +123,7 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> tuple[SGNHTState, Any]:
+) -> tuple[SGNHTState, TensorTree]:
     """Updates parameters, momenta and xi for SGNHT.
 
     Update rule from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf),

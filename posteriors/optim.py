@@ -80,7 +80,7 @@ def update(
     batch: TensorTree,
     loss_fn: LogProbFn,
     inplace: bool = True,
-) -> tuple[OptimState, Any]:
+) -> tuple[OptimState, TensorTree]:
     """Perform a single update step of a [torch.optim](https://pytorch.org/docs/stable/optim.html)
     optimizer.
 

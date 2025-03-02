@@ -82,7 +82,7 @@ def update(
     beta: float = 0.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> tuple[SGLDState, Any]:
+) -> tuple[SGLDState, TensorTree]:
     """Updates parameters for SGLD.
 
     Update rule from [Welling and Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf),

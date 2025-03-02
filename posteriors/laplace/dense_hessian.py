@@ -96,7 +96,7 @@ def update(
     epsilon: float = 0.0,
     rescale: float = 1.0,
     inplace: bool = False,
-) -> tuple[DenseLaplaceState, Any]:
+) -> tuple[DenseLaplaceState, TensorTree]:
     """Adds the Hessian of the negative log-posterior over given batch.
 
     **Warning:**

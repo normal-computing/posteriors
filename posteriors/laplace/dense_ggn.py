@@ -109,7 +109,7 @@ def update(
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
     inplace: bool = False,
-) -> tuple[DenseLaplaceState, Any]:
+) -> tuple[DenseLaplaceState, TensorTree]:
     """Adds GGN matrix over given batch.
 
     Args:

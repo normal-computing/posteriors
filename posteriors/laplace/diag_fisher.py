@@ -95,7 +95,7 @@ def update(
     log_posterior: LogProbFn,
     per_sample: bool = False,
     inplace: bool = False,
-) -> tuple[DiagLaplaceState, Any]:
+) -> tuple[DiagLaplaceState, TensorTree]:
     """Adds diagonal empirical Fisher information matrix of covariance summed over
     given batch.
 

@@ -110,7 +110,7 @@ def update(
     transition_cov: torch.Tensor | float = 0.0,
     per_sample: bool = False,
     inplace: bool = False,
-) -> tuple[EKFDenseState, Any]:
+) -> tuple[EKFDenseState, TensorTree]:
     """Applies an extended Kalman Filter update to the Multivariate Normal distribution.
 
     See [build](dense_fisher.md#posteriors.ekf.dense_fisher.build) for details.

@@ -114,7 +114,7 @@ def update(
     transition_sd: float = 0.0,
     per_sample: bool = False,
     inplace: bool = False,
-) -> tuple[EKFDiagState, Any]:
+) -> tuple[EKFDiagState, TensorTree]:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
 
     See [build](diag_fisher.md#posteriors.ekf.diag_fisher.build) for details.

@@ -50,7 +50,7 @@ def run_chain(batches):
         else:
             batch = batches[i]
 
-        state = transform.update(state, batch)
+        state, _ = transform.update(state, batch)
 
     return state
 

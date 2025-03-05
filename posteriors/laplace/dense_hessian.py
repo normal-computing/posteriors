@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import tree_size
@@ -59,12 +59,10 @@ class DenseLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     prec: torch.Tensor
-    aux: NonTensorData = None
 
 
 def init(
@@ -98,7 +96,7 @@ def update(
     epsilon: float = 0.0,
     rescale: float = 1.0,
     inplace: bool = False,
-) -> DenseLaplaceState:
+) -> tuple[DenseLaplaceState, TensorTree]:
     """Adds the Hessian of the negative log-posterior over given batch.
 
     **Warning:**
@@ -118,7 +116,7 @@ def update(
             state is returned.
 
     Returns:
-        Updated DenseLaplaceState.
+        Updated DenseLaplaceState and auxiliary information.
     """
     with torch.no_grad(), CatchAuxError():
         flat_params, params_unravel = tree_ravel(state.params)
@@ -133,9 +131,9 @@ def update(
 
     if inplace:
         state.prec.data += hess
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
     else:
-        return DenseLaplaceState(state.params, state.prec + hess, aux)
+        return DenseLaplaceState(state.params, state.prec + hess), aux
 
 
 def sample(

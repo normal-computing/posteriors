@@ -4,7 +4,7 @@ import torch
 from torch.func import grad_and_value, vmap
 from optree import tree_map
 import torchopt
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import tree_insert_
@@ -72,14 +72,12 @@ class VIDiagState(TensorClass["frozen"]):
         opt_state: TorchOpt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     log_sd_diag: TensorTree
     opt_state: torchopt.typing.OptState
     nelbo: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -130,7 +128,7 @@ def update(
     n_samples: int = 1,
     stl: bool = True,
     inplace: bool = False,
-) -> VIDiagState:
+) -> tuple[VIDiagState, TensorTree]:
     """Updates the variational parameters to minimize the NELBO.
 
     Args:
@@ -147,7 +145,7 @@ def update(
         inplace: Whether to modify state in place.
 
     Returns:
-        Updated DiagVIState.
+        Updated DiagVIState and auxiliary information.
     """
 
     def nelbo_log_sd(m, lsd):
@@ -171,9 +169,9 @@ def update(
 
     if inplace:
         tree_insert_(state.nelbo, nelbo_val.detach())
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
 
-    return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach(), aux)
+    return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach()), aux
 
 
 def nelbo(

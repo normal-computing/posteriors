@@ -17,7 +17,7 @@ def test_torchopt_sgd():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]), inplace=False)
+        state, _ = transform.update(state, torch.tensor([1.0]), inplace=False)
 
     assert state.loss < 1e-3
     assert state.params < 1e-3
@@ -28,7 +28,7 @@ def test_torchopt_sgd():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]), inplace=True)
+        state, _ = transform.update(state, torch.tensor([1.0]), inplace=True)
 
     assert state.loss < 1e-3
     assert state.params < 1e-3
@@ -48,7 +48,7 @@ def test_torchopt_adamw():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]), inplace=False)
+        state, _ = transform.update(state, torch.tensor([1.0]), inplace=False)
 
     assert state.loss < 1e-3
     assert state.params < 1e-3
@@ -59,7 +59,7 @@ def test_torchopt_adamw():
     state = transform.init(params)
 
     for _ in range(200):
-        state = transform.update(state, torch.tensor([1.0]), inplace=True)
+        state, _ = transform.update(state, torch.tensor([1.0]), inplace=True)
 
     assert state.loss < 1e-3
     assert state.params < 1e-3

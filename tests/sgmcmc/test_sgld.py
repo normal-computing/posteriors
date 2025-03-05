@@ -37,7 +37,7 @@ def test_sgld():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sgld_state = sampler.update(sgld_state, batch, inplace=False)
+        sgld_state, _ = sampler.update(sgld_state, batch, inplace=False)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgld_state.params
@@ -63,7 +63,7 @@ def test_sgld():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sgld_state = sampler.update(sgld_state, batch, inplace=True)
+        sgld_state, _ = sampler.update(sgld_state, batch, inplace=True)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgld_state.params

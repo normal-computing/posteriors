@@ -37,7 +37,7 @@ def test_baoa():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        baoa_state = sampler.update(baoa_state, batch, inplace=False)
+        baoa_state, _ = sampler.update(baoa_state, batch, inplace=False)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoa_state.params
@@ -63,7 +63,7 @@ def test_baoa():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        baoa_state = sampler.update(baoa_state, batch, inplace=True)
+        baoa_state, _ = sampler.update(baoa_state, batch, inplace=True)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, baoa_state.params

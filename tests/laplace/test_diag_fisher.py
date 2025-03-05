@@ -46,7 +46,7 @@ def test_diag_fisher_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=False)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=False)
 
     expected = tree_map(lambda x: torch.zeros_like(x), params)
     for x, y in zip(xs, ys):
@@ -64,7 +64,7 @@ def test_diag_fisher_vmap():
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
-    laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
+    laplace_state_fb, _ = transform.update(laplace_state_fb, (xs, ys))
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)
@@ -74,7 +74,7 @@ def test_diag_fisher_vmap():
     transform_ps = diag_fisher.build(log_posterior_per_sample, per_sample=True)
     laplace_state_ps = transform_ps.init(params)
     for batch in dataloader:
-        laplace_state_ps = transform_ps.update(
+        laplace_state_ps, _ = transform_ps.update(
             laplace_state_ps,
             batch,
             inplace=False,
@@ -90,7 +90,7 @@ def test_diag_fisher_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=True)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)

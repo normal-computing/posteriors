@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree.integration.torch import tree_ravel
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.tree_utils import tree_size, tree_insert_
 from posteriors.types import TensorTree, Transform, LogProbFn
@@ -74,13 +74,11 @@ class EKFDenseState(TensorClass["frozen"]):
         cov: Covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
-        aux: Auxiliary information from the log_likelihood call.
     """
 
     params: TensorTree
     cov: torch.Tensor
     log_likelihood: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -112,7 +110,7 @@ def update(
     transition_cov: torch.Tensor | float = 0.0,
     per_sample: bool = False,
     inplace: bool = False,
-) -> EKFDenseState:
+) -> tuple[EKFDenseState, TensorTree]:
     """Applies an extended Kalman Filter update to the Multivariate Normal distribution.
 
     See [build](dense_fisher.md#posteriors.ekf.dense_fisher.build) for details.
@@ -134,7 +132,7 @@ def update(
         inplace: Whether to update the state parameters in-place.
 
     Returns:
-        Updated EKFDenseState.
+        Updated EKFDenseState and auxiliary information.
     """
     if not per_sample:
         log_likelihood = per_samplify(log_likelihood)
@@ -165,9 +163,9 @@ def update(
         tree_insert_(state.params, update_mean)
         tree_insert_(state.cov, update_cov)
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
 
-    return EKFDenseState(update_mean, update_cov, log_liks.mean().detach(), aux)
+    return EKFDenseState(update_mean, update_cov, log_liks.mean().detach()), aux
 
 
 def sample(

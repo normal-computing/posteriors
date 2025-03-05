@@ -22,7 +22,7 @@ vi_state = vi_transform.init(torch.zeros(2))
 
 nelbos = []
 for _ in range(n_vi_steps):
-    vi_state = vi_transform.update(vi_state, None)
+    vi_state, _ = vi_transform.update(vi_state, None)
     nelbos.append(vi_state.nelbo.item())
 
 # Plot the negative ELBO
@@ -40,7 +40,7 @@ sghmc_state = sghmc_transform.init(torch.zeros(2))
 samples = torch.zeros(1, 2)
 log_posts = []
 for _ in range(n_sghmc_steps):
-    sghmc_state = sghmc_transform.update(sghmc_state, None)
+    sghmc_state, _ = sghmc_transform.update(sghmc_state, None)
     samples = torch.cat([samples, sghmc_state.params.unsqueeze(0)], axis=0)
     log_posts.append(sghmc_state.log_posterior.item())
 

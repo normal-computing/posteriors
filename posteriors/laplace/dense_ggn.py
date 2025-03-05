@@ -3,7 +3,7 @@ from typing import Any
 import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import (
     TensorTree,
@@ -73,12 +73,10 @@ class DenseLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     prec: torch.Tensor
-    aux: NonTensorData = None
 
 
 def init(
@@ -111,7 +109,7 @@ def update(
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
     inplace: bool = False,
-) -> DenseLaplaceState:
+) -> tuple[DenseLaplaceState, TensorTree]:
     """Adds GGN matrix over given batch.
 
     Args:
@@ -127,7 +125,7 @@ def update(
             is returned.
 
     Returns:
-        Updated DenseLaplaceState.
+        Updated DenseLaplaceState and auxiliary information.
     """
 
     def outer_loss(z, batch):
@@ -144,9 +142,9 @@ def update(
 
     if inplace:
         state.prec.data += ggn_batch
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
     else:
-        return DenseLaplaceState(state.params, state.prec + ggn_batch, aux)
+        return DenseLaplaceState(state.params, state.prec + ggn_batch), aux
 
 
 def sample(

@@ -51,7 +51,7 @@ class LitAutoEncoderUQ(L.LightningModule):
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
         # it is independent of forward
-        self.state = self.transform.update(self.state, batch, inplace=True)
+        self.state, _ = self.transform.update(self.state, batch, inplace=True)
         # Logging to TensorBoard (if installed) by default
         for k, v in self.state._asdict().items():
             if isinstance(v, float) or (isinstance(v, torch.Tensor) and v.numel() == 1):

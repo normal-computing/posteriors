@@ -44,7 +44,7 @@ def test_diag_ggn_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=False)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=False)
 
     flat_params, unravel_fn = tree_ravel(params)
 
@@ -67,7 +67,7 @@ def test_diag_ggn_vmap():
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
-    laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
+    laplace_state_fb, _ = transform.update(laplace_state_fb, (xs, ys))
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)
@@ -76,7 +76,7 @@ def test_diag_ggn_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=True)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
     for key in expected:
         assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)

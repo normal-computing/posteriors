@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import tree_size
 from posteriors.utils import (
@@ -61,12 +61,10 @@ class DenseLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     prec: torch.Tensor
-    aux: NonTensorData = None
 
 
 def init(
@@ -99,7 +97,7 @@ def update(
     log_posterior: LogProbFn,
     per_sample: bool = False,
     inplace: bool = False,
-) -> DenseLaplaceState:
+) -> tuple[DenseLaplaceState, TensorTree]:
     """Adds empirical Fisher information matrix of covariance summed over
     given batch.
 
@@ -117,7 +115,7 @@ def update(
             state is returned.
 
     Returns:
-        Updated DenseLaplaceState.
+        Updated DenseLaplaceState and auxiliary information.
     """
     if not per_sample:
         log_posterior = per_samplify(log_posterior)
@@ -129,9 +127,9 @@ def update(
 
     if inplace:
         state.prec.data += fisher
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
     else:
-        return DenseLaplaceState(state.params, state.prec + fisher, aux)
+        return DenseLaplaceState(state.params, state.prec + fisher), aux
 
 
 def sample(

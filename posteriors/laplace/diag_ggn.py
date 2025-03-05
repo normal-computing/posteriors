@@ -2,7 +2,7 @@ from functools import partial
 from typing import Any
 import torch
 from optree import tree_map
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import (
     TensorTree,
@@ -71,12 +71,10 @@ class DiagLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     prec_diag: TensorTree
-    aux: NonTensorData = None
 
 
 def init(
@@ -108,7 +106,7 @@ def update(
     forward: ForwardFn,
     outer_log_likelihood: OuterLogProbFn,
     inplace: bool = False,
-) -> DiagLaplaceState:
+) -> tuple[DiagLaplaceState, TensorTree]:
     """Adds diagonal GGN matrix of covariance summed over given batch.
 
     Args:
@@ -124,7 +122,7 @@ def update(
             is returned.
 
     Returns:
-        Updated DiagLaplaceState.
+        Updated DiagLaplaceState and auxiliary information.
     """
 
     def outer_loss(z, batch):
@@ -147,8 +145,8 @@ def update(
     )
 
     if inplace:
-        return state.replace(aux=NonTensorData(aux))
-    return DiagLaplaceState(state.params, prec_diag, aux)
+        return state, aux
+    return DiagLaplaceState(state.params, prec_diag), aux
 
 
 def sample(

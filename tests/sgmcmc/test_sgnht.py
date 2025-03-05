@@ -38,7 +38,7 @@ def test_sgnht():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sgnht_state = sampler.update(sgnht_state, batch, inplace=False)
+        sgnht_state, _ = sampler.update(sgnht_state, batch, inplace=False)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgnht_state.params
@@ -64,7 +64,7 @@ def test_sgnht():
     all_params = tree_map(lambda x: x.unsqueeze(0), params)
 
     for _ in range(n_steps):
-        sgnht_state = sampler.update(sgnht_state, batch, inplace=True)
+        sgnht_state, _ = sampler.update(sgnht_state, batch, inplace=True)
 
         all_params = tree_map(
             lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgnht_state.params

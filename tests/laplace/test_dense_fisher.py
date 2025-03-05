@@ -49,7 +49,7 @@ def test_dense_fisher_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_init = laplace_state.prec
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=False)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=False)
 
     num_params = tree_size(params)
     expected = torch.zeros((num_params, num_params))
@@ -70,7 +70,7 @@ def test_dense_fisher_vmap():
 
     # Also check full batch
     laplace_state_fb = transform.init(params)
-    laplace_state_fb = transform.update(laplace_state_fb, (xs, ys))
+    laplace_state_fb, _ = transform.update(laplace_state_fb, (xs, ys))
 
     assert torch.allclose(expected, laplace_state_fb.prec, atol=1e-5)
 
@@ -79,7 +79,7 @@ def test_dense_fisher_vmap():
     transform_ps = dense_fisher.build(log_posterior_per_sample, per_sample=True)
     laplace_state_ps = transform_ps.init(params)
     for batch in dataloader:
-        laplace_state_ps = transform_ps.update(
+        laplace_state_ps, _ = transform_ps.update(
             laplace_state_ps,
             batch,
         )
@@ -91,7 +91,7 @@ def test_dense_fisher_vmap():
     laplace_state = transform.init(params)
     laplace_state_prec_diag_init = laplace_state.prec
     for batch in dataloader:
-        laplace_state = transform.update(laplace_state, batch, inplace=True)
+        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
     assert torch.allclose(expected, laplace_state.prec, atol=1e-5)
     assert torch.allclose(laplace_state.prec, laplace_state_prec_diag_init, atol=1e-5)

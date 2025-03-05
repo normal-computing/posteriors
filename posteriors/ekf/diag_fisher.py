@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from torch.func import jacrev
 from optree import tree_map
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
@@ -76,13 +76,11 @@ class EKFDiagState(TensorClass["frozen"]):
         sd_diag: Square-root diagonal of the covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
-        aux: Auxiliary information from the log_likelihood call.
     """
 
     params: TensorTree
     sd_diag: TensorTree
     log_likelihood: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -116,7 +114,7 @@ def update(
     transition_sd: float = 0.0,
     per_sample: bool = False,
     inplace: bool = False,
-) -> EKFDiagState:
+) -> tuple[EKFDiagState, TensorTree]:
     """Applies an extended Kalman Filter update to the diagonal Normal distribution.
 
     See [build](diag_fisher.md#posteriors.ekf.diag_fisher.build) for details.
@@ -138,7 +136,7 @@ def update(
         inplace: Whether to update the state parameters in-place.
 
     Returns:
-        Updated EKFDiagState.
+        Updated EKFDiagState and auxiliary information.
     """
 
     if not per_sample:
@@ -169,9 +167,9 @@ def update(
 
     if inplace:
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
-        return state.replace(aux=NonTensorData(aux))
+        return state, aux
 
-    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach(), aux)
+    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach()), aux
 
 
 def sample(

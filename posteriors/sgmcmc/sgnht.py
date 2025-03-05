@@ -4,7 +4,7 @@ import torch
 from torch.func import grad_and_value
 from optree import tree_map
 from optree.integration.torch import tree_ravel
-from tensordict import TensorClass, NonTensorData
+from tensordict import TensorClass
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
@@ -75,14 +75,12 @@ class SGNHTState(TensorClass["frozen"]):
         momenta: Momenta for each parameter.
         xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
-        aux: Auxiliary information from the log_posterior call.
     """
 
     params: TensorTree
     momenta: TensorTree
     xi: torch.Tensor = torch.tensor([])
     log_posterior: torch.Tensor = torch.tensor([])
-    aux: NonTensorData = None
 
 
 def init(
@@ -125,7 +123,7 @@ def update(
     sigma: float = 1.0,
     temperature: float = 1.0,
     inplace: bool = False,
-) -> SGNHTState:
+) -> tuple[SGNHTState, TensorTree]:
     """Updates parameters, momenta and xi for SGNHT.
 
     Update rule from [Ding et al, 2014](https://proceedings.neurips.cc/paper/2014/file/21fe5b8ba755eeaece7a450849876228-Paper.pdf),
@@ -145,8 +143,8 @@ def update(
         inplace: Whether to modify state in place.
 
     Returns:
-        Updated SGNHTState
-        (which are pointers to the inputted state tensors if inplace=True).
+        Updated SGNHTState (which are pointers to the inputted state tensors if
+        inplace=True) and auxiliary information.
     """
     with torch.no_grad(), CatchAuxError():
         grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
@@ -178,5 +176,5 @@ def update(
     if inplace:
         tree_insert_(state.xi, xi_new)
         tree_insert_(state.log_posterior, log_post.detach())
-        return state.replace(aux=NonTensorData(aux))
-    return SGNHTState(params, momenta, xi_new, log_post.detach(), aux)
+        return state, aux
+    return SGNHTState(params, momenta, xi_new, log_post.detach()), aux

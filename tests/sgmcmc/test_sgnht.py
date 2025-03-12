@@ -15,7 +15,7 @@ def test_sgnht():
     temperature = 1.0
     beta = 0.0
 
-    # Run MCMC test on Gaussianå
+    # Run MCMC test on Gaussian
     run_test_sgmcmc_gaussian(
         partial(
             sgnht.build,

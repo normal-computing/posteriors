@@ -1,6 +1,5 @@
 from typing import Callable
 import torch
-from posteriors.sgmcmc import baoa
 from posteriors.types import LogProbFn, Transform
 from tests import scenarios
 

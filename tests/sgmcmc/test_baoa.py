@@ -2,25 +2,21 @@ from functools import partial
 import torch
 from posteriors.sgmcmc import baoa
 from tests import scenarios
-from tests.sgmcmc.utils import run_test_mcmc_gaussian
+from tests.sgmcmc.utils import run_test_sgmcmc_gaussian
 
 
 def test_baoa():
     torch.manual_seed(42)
 
     # Set inference parameters
-    lr = 1e-2
-    alpha = 0.01
+    lr = 1e-1
+    alpha = 0.1
     sigma = 1.0
     temperature = 1.0
-    n_steps = 10_000
-    burnin = 1_000
 
     # Run MCMC test on Gaussian
-    run_test_mcmc_gaussian(
+    run_test_sgmcmc_gaussian(
         partial(baoa.build, lr=lr, alpha=alpha, sigma=sigma, temperature=temperature),
-        n_steps=n_steps,
-        burnin=burnin,
     )
 
 

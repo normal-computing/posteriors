@@ -2,7 +2,7 @@ from functools import partial
 import torch
 from posteriors.sgmcmc import sgnht
 from tests import scenarios
-from tests.sgmcmc.utils import run_test_mcmc_gaussian
+from tests.sgmcmc.utils import run_test_sgmcmc_gaussian
 
 
 def test_sgnht():
@@ -10,17 +10,21 @@ def test_sgnht():
 
     # Set inference parameters
     lr = 1e-2
-    alpha = 0.01
+    alpha = 0.1
     sigma = 1.0
     temperature = 1.0
-    n_steps = 10_000
-    burnin = 1_000
+    beta = 0.0
 
-    # Run MCMC test on Gaussian
-    run_test_mcmc_gaussian(
-        partial(sgnht.build, lr=lr, alpha=alpha, sigma=sigma, temperature=temperature),
-        n_steps=n_steps,
-        burnin=burnin,
+    # Run MCMC test on Gaussianå
+    run_test_sgmcmc_gaussian(
+        partial(
+            sgnht.build,
+            lr=lr,
+            alpha=alpha,
+            sigma=sigma,
+            temperature=temperature,
+            beta=beta,
+        ),
     )
 
 

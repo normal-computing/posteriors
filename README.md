@@ -67,7 +67,7 @@ transform = posteriors.vi.diag.build(
 state = transform.init(params)
 
 for batch in train_loader:
-    state = transform.update(state, batch)
+    state, aux = transform.update(state, batch)
 
 ```
 

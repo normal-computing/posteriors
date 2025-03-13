@@ -23,7 +23,11 @@ def run_test_sgmcmc_gaussian(
     params = torch.randn(dim) * init_var**0.5
 
     # Run transform
-    all_states = utils.run_transform(transform, params, n_steps)
+    state = transform.init(params)
+    all_states = torch.unsqueeze(state, 0)
+    for _ in range(n_steps):
+        state, _ = transform.update(state, None)
+        all_states = torch.cat((all_states, torch.unsqueeze(state, 0)), dim=0)
 
     # Remove burnin
     all_states = all_states[burnin:]
@@ -40,7 +44,7 @@ def run_test_sgmcmc_gaussian(
 
     # Also check the KL distance between the true and
     # inferred sample Gaussian generally decreases as we get more samples.
-    cumulative_mean, cumulative_cov = utils.cumulative_mean_and_cov(all_states.params)
+    cumulative_mean, cumulative_cov = cumulative_mean_and_cov(all_states.params)
     kl_divs = torch.func.vmap(utils.kl_gaussians, in_dims=(0, 0, None, None))(
         cumulative_mean, cumulative_cov, mean, cov
     )
@@ -50,3 +54,23 @@ def run_test_sgmcmc_gaussian(
     kl_divs_spaced = kl_divs[start_num_samples::spacing]
     spaced_decreasing = kl_divs_spaced[:-1] > kl_divs_spaced[1:]
     assert spaced_decreasing.float().mean() > 0.65  # >65% of spaced KLs are decreasing
+
+
+def cumulative_mean_and_cov(xs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    n, d = xs.shape
+    out_means = torch.zeros((n, d))
+    out_covs = torch.zeros((n, d, d))
+
+    out_means[0] = xs[0]
+    out_covs[0] = torch.eye(d)
+
+    for i in range(1, n):
+        n = i + 1
+        out_means[i] = out_means[i - 1] * n / (n + 1) + xs[i] / (n + 1)
+
+        delta_n = xs[i] - out_means[i - 1]
+        out_covs[i] = (
+            out_covs[i - 1] * (n - 2) / (n - 1) + torch.outer(delta_n, delta_n) / n
+        )
+
+    return out_means, out_covs

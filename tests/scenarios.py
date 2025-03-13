@@ -46,7 +46,9 @@ def get_multivariate_normal_log_prob(
 
     def log_prob(p, batch):
         p_flat = tree_ravel(p)[0]
-        lp = MultivariateNormal(mean, scale_tril=chol_cov).log_prob(p_flat)
+        lp = MultivariateNormal(
+            mean, scale_tril=chol_cov, validate_args=False
+        ).log_prob(p_flat)
         return lp, torch.tensor([])
 
     return log_prob, (mean, cov)

@@ -4,42 +4,6 @@ from optree import tree_leaves
 from posteriors.types import Transform, TensorTree
 
 
-def run_transform(
-    transform: Transform,
-    params: TensorTree,
-    n_steps: int,
-) -> TensorTree:
-    state = transform.init(params)
-
-    all_states = torch.unsqueeze(state, 0)
-
-    for _ in range(n_steps):
-        state, _ = transform.update(state, None)
-        all_states = torch.cat((all_states, torch.unsqueeze(state, 0)), dim=0)
-
-    return all_states
-
-
-def cumulative_mean_and_cov(xs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    n, d = xs.shape
-    out_means = torch.zeros((n, d))
-    out_covs = torch.zeros((n, d, d))
-
-    out_means[0] = xs[0]
-    out_covs[0] = torch.eye(d)
-
-    for i in range(1, n):
-        n = i + 1
-        out_means[i] = out_means[i - 1] * n / (n + 1) + xs[i] / (n + 1)
-
-        delta_n = xs[i] - out_means[i - 1]
-        out_covs[i] = (
-            out_covs[i - 1] * (n - 2) / (n - 1) + torch.outer(delta_n, delta_n) / n
-        )
-
-    return out_means, out_covs
-
-
 def kl_gaussians(
     m0: torch.Tensor, c0: torch.Tensor, m1: torch.Tensor, c1: torch.Tensor
 ) -> torch.Tensor:

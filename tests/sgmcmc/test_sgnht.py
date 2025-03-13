@@ -2,6 +2,7 @@ from functools import partial
 import torch
 from posteriors.sgmcmc import sgnht
 from tests import scenarios
+from tests.utils import verify_inplace_update
 from tests.sgmcmc.utils import run_test_sgmcmc_gaussian
 
 
@@ -45,4 +46,4 @@ def test_sgnht_inplace_step():
     params = torch.randn(dim)
 
     # Verify inplace update
-    scenarios.verify_inplace_update(transform, params, None)
+    verify_inplace_update(transform, params, None)

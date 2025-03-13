@@ -175,7 +175,7 @@ def update(
 
 
 def nelbo(
-    mean: dict,
+    mean: TensorTree,
     L_factor: torch.Tensor,
     batch: Any,
     log_posterior: LogProbFn,

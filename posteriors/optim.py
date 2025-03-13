@@ -2,6 +2,7 @@ from typing import Type, Any
 from functools import partial
 import torch
 from tensordict import TensorClass
+from optree import tree_leaves
 
 from posteriors.types import TensorTree, Transform, LogProbFn
 from posteriors.utils import CatchAuxError
@@ -69,9 +70,7 @@ def init(
     Returns:
         Initial OptimState.
     """
-    opt_params = [params] if isinstance(params, torch.Tensor) else params
-
-    optimizer = optimizer_cls(opt_params, *args, **kwargs)
+    optimizer = optimizer_cls(tree_leaves(params), *args, **kwargs)
     return OptimState(params, optimizer)
 
 

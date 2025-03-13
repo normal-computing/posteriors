@@ -1,16 +1,17 @@
 from typing import (
     Protocol,
     Any,
-    TypeAlias,
     Tuple,
     Callable,
     NamedTuple,
 )
-from optree.typing import PyTreeTypeVar
+from optree import PyTree
 from torch import Tensor
 from tensordict import TensorClass
 
-TensorTree: TypeAlias = PyTreeTypeVar("TensorTree", Tensor)
+# TensorTree = PyTree with Tensor leaves.
+# See https://optree.readthedocs.io/en/latest/typing.html#optree.PyTree
+TensorTree = PyTree[Tensor]
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
@@ -52,7 +53,7 @@ class UpdateFn(Protocol):
         state: TensorClass,
         batch: Any,
         inplace: bool = False,
-    ) -> tuple[TensorClass, Any]:
+    ) -> tuple[TensorClass, TensorTree]:
         """Transform a posteriors state with unified API:
 
         ```

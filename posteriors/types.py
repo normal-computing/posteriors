@@ -1,7 +1,6 @@
 from typing import (
     Protocol,
     Any,
-    TypeAlias,
     Tuple,
     Callable,
     NamedTuple,
@@ -12,7 +11,7 @@ from tensordict import TensorClass
 
 # TensorTree = PyTree with Tensor leaves.
 # See https://optree.readthedocs.io/en/latest/typing.html#optree.PyTree
-TensorTree: TypeAlias = PyTree[Tensor]
+TensorTree = PyTree[Tensor]
 
 LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]

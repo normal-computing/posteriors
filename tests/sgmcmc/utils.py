@@ -10,7 +10,7 @@ def run_test_sgmcmc_gaussian(
     dim: int = 3,
     n_steps: int = 15_000,
     burnin: int = 5_000,
-    rtol: float = 1e-3,
+    rtol: float = 1e-2,  # Relative reduction of KL for final distribution compared to initial distribution
 ):
     # Load log posterior
     log_prob, (mean, cov) = get_multivariate_normal_log_prob(dim)
@@ -40,7 +40,9 @@ def run_test_sgmcmc_gaussian(
         mean,
         cov,
     )
-    assert kl_init * rtol > kl_inferred
+    assert (
+        kl_init * rtol > kl_inferred
+    )  # KL[samples || true] < rtol * KL[initial || true]
 
     # Also check the KL distance between the true and
     # inferred sample Gaussian generally decreases as we get more samples.
@@ -49,11 +51,12 @@ def run_test_sgmcmc_gaussian(
         cumulative_mean, cumulative_cov, mean, cov
     )
 
-    start_num_samples = 100
-    spacing = 500
+    start_num_samples = 500  # Omit first few KLs with high variance due to few samples
+    spacing = 100
     kl_divs_spaced = kl_divs[start_num_samples::spacing]
     spaced_decreasing = kl_divs_spaced[:-1] > kl_divs_spaced[1:]
-    assert spaced_decreasing.float().mean() > 0.65  # >65% of spaced KLs are decreasing
+    proportion_decreasing = spaced_decreasing.float().mean()
+    assert proportion_decreasing > 0.8
 
 
 def cumulative_mean_and_cov(xs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

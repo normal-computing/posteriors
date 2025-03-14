@@ -10,7 +10,7 @@ def test_sgld():
     torch.manual_seed(42)
 
     # Set inference parameters
-    lr = 1e-2
+    lr = 1e-3
     beta = 0.0
     temperature = 1.0
 

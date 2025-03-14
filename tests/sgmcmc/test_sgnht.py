@@ -9,10 +9,15 @@ from tests.sgmcmc.utils import run_test_sgmcmc_gaussian
 def test_sgnht():
     torch.manual_seed(42)
 
-    # Set inference parameters
-    lr = 1e-2
-    alpha = 0.1
-    sigma = 1.0
+    # Set inference parameters (with torch.optim.SGD parameterization)
+    lr = 1e-3
+    mu = 0.9
+    tau = 0.9
+
+    eps = 1 - tau
+    sigma = (lr / (1 - tau)) ** -0.5
+    alpha = (1 - mu) / lr
+
     temperature = 1.0
     beta = 0.0
 
@@ -20,7 +25,7 @@ def test_sgnht():
     run_test_sgmcmc_gaussian(
         partial(
             sgnht.build,
-            lr=lr,
+            lr=eps,
             alpha=alpha,
             sigma=sigma,
             temperature=temperature,

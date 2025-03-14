@@ -175,8 +175,8 @@ def update(
 
 
 def nelbo(
-    mean: dict,
-    sd_diag: dict,
+    mean: TensorTree,
+    sd_diag: TensorTree,
     batch: Any,
     log_posterior: LogProbFn,
     temperature: float = 1.0,

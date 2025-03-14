@@ -1,10 +1,8 @@
-from typing import Any, Tuple
 import torch
 import torch.nn as nn
-from optree import tree_map
-
-from posteriors.utils import diag_normal_log_prob, diag_normal_sample
-from posteriors.types import TensorTree
+from torch.distributions import MultivariateNormal
+from optree.integration.torch import tree_ravel
+from posteriors.types import LogProbFn
 
 
 class TestModel(nn.Module):
@@ -38,32 +36,19 @@ class TestLanguageModel(nn.Module):
         return {"logits": logits}
 
 
-def batch_normal_log_prob(
-    p: dict, batch: Any, mean: dict, sd_diag: dict
-) -> Tuple[torch.Tensor, TensorTree]:
-    return diag_normal_log_prob(p, mean, sd_diag), torch.tensor([])
+def get_multivariate_normal_log_prob(
+    dim: int,
+) -> tuple[LogProbFn, tuple[torch.Tensor, torch.Tensor]]:
+    mean = torch.randn(dim)
+    sqrt_cov = torch.randn(dim, dim)
+    cov = sqrt_cov @ sqrt_cov.T
+    chol_cov = torch.linalg.cholesky(cov)  # Lower triangular with positive diagonal
 
+    def log_prob(p, batch):
+        p_flat = tree_ravel(p)[0]
+        lp = MultivariateNormal(
+            mean, scale_tril=chol_cov, validate_args=False
+        ).log_prob(p_flat)
+        return lp, torch.tensor([])
 
-def gaussian_mixture_log_prob(
-    p: dict, batch: Any, means: dict, diag_sds: dict, weights: dict
-) -> Tuple[torch.Tensor, TensorTree]:
-    log_mixture_probs = torch.vmap(diag_normal_log_prob, in_dims=(None, 0, 0))(
-        p, means, diag_sds
-    )
-    return torch.logsumexp(log_mixture_probs + torch.log(weights)), torch.tensor([])
-
-
-def gaussian_mixture_sample(
-    means: TensorTree, diag_sds: TensorTree, weights: torch.Tensor, n_samples: int
-) -> TensorTree:
-    component_indices = torch.multinomial(weights, n_samples, replacement=True)
-
-    def get_mean(i):
-        return tree_map(lambda x: x[i], means)
-
-    def get_sd(i):
-        return tree_map(lambda x: x[i], diag_sds)
-
-    return tree_map(
-        lambda i: diag_normal_sample(get_mean(i), get_sd(i)), component_indices
-    )
+    return log_prob, (mean, cov)

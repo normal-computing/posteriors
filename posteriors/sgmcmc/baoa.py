@@ -81,7 +81,7 @@ class BAOAState(TensorClass["frozen"]):
 
     params: TensorTree
     momenta: TensorTree
-    log_posterior: torch.Tensor = torch.tensor([])
+    log_posterior: torch.Tensor = torch.tensor(torch.nan)
 
 
 def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAState:

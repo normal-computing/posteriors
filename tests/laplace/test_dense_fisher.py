@@ -3,13 +3,12 @@ import torch
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
-from optree import tree_map
-from optree.integration.torch import tree_ravel
 
 from posteriors import tree_size, empirical_fisher, diag_normal_log_prob
 from posteriors.laplace import dense_fisher
 
-from tests.scenarios import TestModel
+from tests.scenarios import TestModel, get_multivariate_normal_log_prob
+from tests.utils import verify_inplace_update
 
 
 def normal_log_likelihood(y, y_pred):
@@ -86,35 +85,38 @@ def test_dense_fisher_vmap():
 
     assert torch.allclose(laplace_state_ps.prec, laplace_state_fb.prec, atol=1e-5)
 
-    # Test inplace = True
+
+def test_dense_fisher_inplace():
+    model = TestModel()
+
+    xs = torch.randn(100, 10)
+    ys = model(xs)
+
+    batch = (xs, ys)
+
+    def log_posterior(p, b):
+        return log_posterior_n(p, b, model, len(xs))[0].mean(), torch.tensor([])
+
+    params = dict(model.named_parameters())
+
+    # Test inplace = False
     transform = dense_fisher.build(log_posterior)
-    laplace_state = transform.init(params)
-    laplace_state_prec_diag_init = laplace_state.prec
-    for batch in dataloader:
-        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
-    assert torch.allclose(expected, laplace_state.prec, atol=1e-5)
-    assert torch.allclose(laplace_state.prec, laplace_state_prec_diag_init, atol=1e-5)
+    verify_inplace_update(transform, params, batch)
 
-    # Test sampling
+
+def test_dense_fisher_sample():
+    torch.manual_seed(42)
+
+    mean, cov = get_multivariate_normal_log_prob(dim=3)[1]
+
+    state = dense_fisher.init(mean, cov.inverse())
+
     num_samples = 10000
-    laplace_state.prec.data += 0.1 * torch.eye(
-        num_params
-    )  # regularize to ensure PSD and reduce variance
+    samples = dense_fisher.sample(state, (num_samples,))
 
-    mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
-    sd_flat = torch.diag(torch.linalg.inv(laplace_state.prec)).sqrt()
+    samples_mean = samples.mean(dim=0)
+    samples_cov = torch.cov(samples.T)
 
-    samples = dense_fisher.sample(laplace_state, (num_samples,))
-
-    samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
-    samples_sd = tree_map(lambda x: x.std(dim=0), samples)
-    samples_sd_flat = tree_ravel(samples_sd)[0]
-
-    for key in samples_mean:
-        assert samples[key].shape[0] == num_samples
-        assert samples[key].shape[1:] == samples_mean[key].shape
-        assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
-        assert torch.allclose(mean_copy[key], laplace_state.params[key])
-
-    assert torch.allclose(sd_flat, samples_sd_flat, atol=1e-1)
+    assert torch.allclose(samples_cov, cov, atol=1e-1)
+    assert torch.allclose(samples_mean, state.params, atol=1e-1)

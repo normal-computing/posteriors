@@ -3,12 +3,14 @@ import torch
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
+from optree.integration.torch import tree_ravel
 from optree import tree_map
 
 from posteriors.laplace import diag_fisher
 from posteriors import diag_normal_log_prob
 
-from tests.scenarios import TestModel
+from tests.scenarios import TestModel, get_multivariate_normal_log_prob
+from tests.utils import verify_inplace_update
 
 
 def normal_log_likelihood(y, y_pred):
@@ -85,27 +87,41 @@ def test_diag_fisher_vmap():
             laplace_state_ps.prec_diag[key], laplace_state_fb.prec_diag[key], atol=1e-5
         )
 
-    # Test inplace = True
-    transform = diag_fisher.build(log_posterior)
-    laplace_state = transform.init(params)
-    laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
-    for batch in dataloader:
-        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
-    for key in expected:
-        assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)
-        assert torch.allclose(
-            laplace_state.prec_diag[key], laplace_state_prec_diag_init[key]
-        )
+def test_diag_fisher_inplace():
+    model = TestModel()
 
-    # Test sample
-    mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
-    samples = diag_fisher.sample(laplace_state, (1000,))
-    samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
-    samples_sd = tree_map(lambda x: x.std(dim=0), samples)
-    for key in samples_mean:
-        assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
-        assert torch.allclose(
-            samples_sd[key], laplace_state.prec_diag[key] ** -0.5, atol=1e-1
-        )
-        assert torch.allclose(mean_copy[key], laplace_state.params[key])
+    xs = torch.randn(100, 10)
+    ys = model(xs)
+
+    batch = (xs, ys)
+
+    def log_posterior(p, b):
+        return log_posterior_n(p, b, model, len(xs))[0].mean(), torch.tensor([])
+
+    params = dict(model.named_parameters())
+
+    verify_inplace_update(diag_fisher.build(log_posterior), params, batch)
+
+
+def test_diag_fisher_sample():
+    torch.manual_seed(42)
+
+    mean, cov = get_multivariate_normal_log_prob(dim=3)[1]
+    cov_diag = torch.diag(cov)
+
+    state = diag_fisher.init(mean, 1 / cov_diag)
+
+    num_samples = 10000
+    samples = diag_fisher.sample(state, (num_samples,))
+
+    flat_samples = torch.vmap(lambda s: tree_ravel(s)[0])(samples)
+    samples_cov = torch.cov(flat_samples.T)
+    samples_sd = torch.sqrt(torch.diag(samples_cov))
+
+    mean_copy = state.params.clone()
+    samples_mean = flat_samples.mean(dim=0)
+
+    assert torch.allclose(samples_sd, torch.sqrt(1 / state.prec_diag), atol=1e-1)
+    assert torch.allclose(samples_mean, state.params, atol=1e-1)
+    assert not torch.allclose(samples_mean, mean_copy)

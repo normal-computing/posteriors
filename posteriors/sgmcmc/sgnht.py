@@ -79,8 +79,8 @@ class SGNHTState(TensorClass["frozen"]):
 
     params: TensorTree
     momenta: TensorTree
-    xi: torch.Tensor = torch.tensor([])
-    log_posterior: torch.Tensor = torch.tensor([])
+    xi: torch.Tensor
+    log_posterior: torch.Tensor = torch.tensor(torch.nan)
 
 
 def init(

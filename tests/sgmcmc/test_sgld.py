@@ -1,84 +1,39 @@
 from functools import partial
 import torch
-from optree import tree_map
-from optree.integration.torch import tree_ravel
-
 from posteriors.sgmcmc import sgld
-
-from tests.scenarios import batch_normal_log_prob
+from tests import scenarios
+from tests.utils import verify_inplace_update
+from tests.sgmcmc.utils import run_test_sgmcmc_gaussian
 
 
 def test_sgld():
     torch.manual_seed(42)
-    target_mean = {"a": torch.randn(2, 1) + 10, "b": torch.randn(1, 1) + 10}
-    target_sds = tree_map(lambda x: torch.randn_like(x).abs(), target_mean)
 
-    target_mean_flat = tree_ravel(target_mean)[0]
-    target_cov = torch.diag(tree_ravel(target_sds)[0] ** 2)
-
-    batch = torch.arange(10).reshape(-1, 1)
-
-    batch_normal_log_prob_spec = partial(
-        batch_normal_log_prob, mean=target_mean, sd_diag=target_sds
-    )
-
-    n_steps = 10000
-    lr = 1e-2
+    # Set inference parameters
+    lr = 1e-3
     beta = 0.0
 
-    params = tree_map(lambda x: torch.zeros_like(x), target_mean)
-    init_params_copy = tree_map(lambda x: x.clone(), params)
+    # Run MCMC test on Gaussian
+    run_test_sgmcmc_gaussian(
+        partial(sgld.build, lr=lr, beta=beta),
+    )
 
-    sampler = sgld.build(batch_normal_log_prob_spec, lr=lr, beta=beta)
 
-    # Test inplace = False
-    sgld_state = sampler.init(params)
-    log_posts = []
-    all_params = tree_map(lambda x: x.unsqueeze(0), params)
+def test_sgld_inplace_step():
+    torch.manual_seed(42)
 
-    for _ in range(n_steps):
-        sgld_state, _ = sampler.update(sgld_state, batch, inplace=False)
+    # Load log posterior
+    dim = 5
+    log_prob, _ = scenarios.get_multivariate_normal_log_prob(dim)
 
-        all_params = tree_map(
-            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgld_state.params
-        )
+    # Set inference parameters
+    lr = 1e-2
 
-        log_posts.append(sgld_state.log_posterior.item())
+    # Build transform
+    transform = sgld.build(log_prob, lr)
 
-    burnin = 1000
-    all_params_flat = torch.vmap(lambda x: tree_ravel(x)[0])(all_params)
-    sampled_mean = all_params_flat[burnin:].mean(0)
-    sampled_cov = torch.cov(all_params_flat[burnin:].T)
+    # Initialise
+    params = torch.randn(dim)
 
-    assert log_posts[-1] > log_posts[0]
-    assert torch.allclose(sampled_mean, target_mean_flat, atol=1e-0, rtol=1e-1)
-    assert torch.allclose(sampled_cov, target_cov, atol=1e-0, rtol=1e-1)
-    assert tree_map(
-        lambda x, y: torch.all(x == y), params, init_params_copy
-    )  # Check that the parameters are not updated
-
-    # Test inplace = True
-    sgld_state = sampler.init(params)
-    log_posts = []
-    all_params = tree_map(lambda x: x.unsqueeze(0), params)
-
-    for _ in range(n_steps):
-        sgld_state, _ = sampler.update(sgld_state, batch, inplace=True)
-
-        all_params = tree_map(
-            lambda x, y: torch.cat((x, y.unsqueeze(0))), all_params, sgld_state.params
-        )
-
-        log_posts.append(sgld_state.log_posterior.item())
-
-    burnin = 1000
-    all_params_flat = torch.vmap(lambda x: tree_ravel(x)[0])(all_params)
-    sampled_mean = all_params_flat[burnin:].mean(0)
-    sampled_cov = torch.cov(all_params_flat[burnin:].T)
-
-    assert log_posts[-1] > log_posts[0]
-    assert torch.allclose(sampled_mean, target_mean_flat, atol=1e-0, rtol=1e-1)
-    assert torch.allclose(sampled_cov, target_cov, atol=1e-0, rtol=1e-1)
-    assert tree_map(
-        lambda x, y: torch.all(x != y), params, init_params_copy
-    )  # Check that the parameters are updated
+    # Verify inplace update
+    verify_inplace_update(transform, params, None)

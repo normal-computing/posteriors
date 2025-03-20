@@ -8,7 +8,8 @@ from optree.integration.torch import tree_ravel
 
 from posteriors.laplace import diag_ggn
 
-from tests.scenarios import TestModel
+from tests.scenarios import TestModel, get_multivariate_normal_log_prob
+from tests.utils import verify_inplace_update
 
 
 def normal_log_likelihood(y_pred, batch):
@@ -72,26 +73,39 @@ def test_diag_ggn_vmap():
     for key in expected:
         assert torch.allclose(expected[key], laplace_state_fb.prec_diag[key], atol=1e-5)
 
-    # Test inplace = True
-    laplace_state = transform.init(params)
-    laplace_state_prec_diag_init = tree_map(lambda x: x, laplace_state.prec_diag)
-    for batch in dataloader:
-        laplace_state, _ = transform.update(laplace_state, batch, inplace=True)
 
-    for key in expected:
-        assert torch.allclose(expected[key], laplace_state.prec_diag[key], atol=1e-5)
-        assert torch.allclose(
-            laplace_state.prec_diag[key], laplace_state_prec_diag_init[key]
-        )
+def test_diag_ggn_inplace():
+    model = TestModel()
 
-    # Test sample
-    mean_copy = tree_map(lambda x: x.clone(), laplace_state.params)
-    samples = diag_ggn.sample(laplace_state, (1000,))
-    samples_mean = tree_map(lambda x: x.mean(dim=0), samples)
-    samples_sd = tree_map(lambda x: x.std(dim=0), samples)
-    for key in samples_mean:
-        assert torch.allclose(samples_mean[key], laplace_state.params[key], atol=1e-1)
-        assert torch.allclose(
-            samples_sd[key], laplace_state.prec_diag[key] ** -0.5, atol=1e-1
-        )
-        assert torch.allclose(mean_copy[key], laplace_state.params[key])
+    xs = torch.randn(100, 10)
+    ys = model(xs)
+
+    batch = (xs, ys)
+    forward = partial(forward_m, model=model)
+    transform = diag_ggn.build(forward, normal_log_likelihood)
+
+    params = dict(model.named_parameters())
+    verify_inplace_update(transform, params, batch)
+
+
+def test_diag_ggn_sample():
+    torch.manual_seed(42)
+
+    mean, cov = get_multivariate_normal_log_prob(dim=3)[1]
+    cov_diag = torch.diag(cov)
+
+    state = diag_ggn.init(mean, 1 / cov_diag)
+
+    num_samples = 10000
+    samples = diag_ggn.sample(state, (num_samples,))
+
+    flat_samples = torch.vmap(lambda s: tree_ravel(s)[0])(samples)
+    samples_cov = torch.cov(flat_samples.T)
+    samples_sd = torch.sqrt(torch.diag(samples_cov))
+
+    mean_copy = state.params.clone()
+    samples_mean = flat_samples.mean(dim=0)
+
+    assert torch.allclose(samples_sd, torch.sqrt(1 / state.prec_diag), atol=1e-1)
+    assert torch.allclose(samples_mean, state.params, atol=1e-1)
+    assert not torch.allclose(samples_mean, mean_copy)

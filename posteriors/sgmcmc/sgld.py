@@ -58,7 +58,7 @@ class SGLDState(TensorClass["frozen"]):
     """
 
     params: TensorTree
-    log_posterior: torch.Tensor = torch.tensor([])
+    log_posterior: torch.Tensor = torch.tensor(torch.nan)
 
 
 def init(params: TensorTree) -> SGLDState:

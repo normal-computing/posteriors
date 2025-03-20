@@ -12,11 +12,10 @@ def test_sgld():
     # Set inference parameters
     lr = 1e-3
     beta = 0.0
-    temperature = 1.0
 
     # Run MCMC test on Gaussian
     run_test_sgmcmc_gaussian(
-        partial(sgld.build, lr=lr, beta=beta, temperature=temperature),
+        partial(sgld.build, lr=lr, beta=beta),
     )
 
 

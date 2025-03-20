@@ -18,8 +18,8 @@ def test_sghmc():
     sigma = (lr / (1 - tau)) ** -0.5
     alpha = (1 - mu) / lr
 
-    temperature = 1.0
     beta = 0.0
+    momenta = 0.0
 
     # Run MCMC test on Gaussian
     run_test_sgmcmc_gaussian(
@@ -28,8 +28,8 @@ def test_sghmc():
             lr=eps,
             alpha=alpha,
             sigma=sigma,
-            temperature=temperature,
             beta=beta,
+            momenta=momenta,
         ),
     )
 

@@ -21,6 +21,7 @@ from posteriors import (
     is_scalar,
     L_from_flat,
     L_to_flat,
+    cumulative_mean_and_cov,
 )
 from posteriors.utils import NO_AUX_ERROR_MSG, NON_TENSOR_AUX_ERROR_MSG
 from tests.scenarios import TestModel, TestLanguageModel
@@ -831,3 +832,16 @@ def test_L_to_flat():
     expected_L_flat = torch.tensor([1.0, -4.1, 2.2, -1.7, 4.4, -5.5])
     L_flat = L_to_flat(L)
     assert torch.allclose(expected_L_flat, L_flat)
+
+
+def test_cumulative_mean_and_cov():
+    xs = torch.randn(30, 5)
+    cum_means, cum_covs = cumulative_mean_and_cov(xs)
+
+    assert cum_means.shape == xs.shape
+    assert cum_covs.shape == xs.shape + (xs.shape[1],)
+
+    for i in range(xs.shape[0]):
+        assert torch.allclose(cum_means[i], xs[: i + 1].mean(0), atol=1e-7)
+        if i > 0:
+            assert torch.allclose(cum_covs[i], xs[: i + 1].T.cov(), atol=1e-7)

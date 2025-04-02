@@ -1,6 +1,7 @@
 from typing import Callable
 import torch
 from posteriors.types import LogProbFn, Transform
+from posteriors.utils import cumulative_mean_and_cov
 from tests.scenarios import get_multivariate_normal_log_prob
 from tests import utils
 
@@ -57,23 +58,3 @@ def run_test_sgmcmc_gaussian(
     spaced_decreasing = kl_divs_spaced[:-1] > kl_divs_spaced[1:]
     proportion_decreasing = spaced_decreasing.float().mean()
     assert proportion_decreasing > 0.8
-
-
-def cumulative_mean_and_cov(xs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    n, d = xs.shape
-    out_means = torch.zeros((n, d))
-    out_covs = torch.zeros((n, d, d))
-
-    out_means[0] = xs[0]
-    out_covs[0] = torch.eye(d)
-
-    for i in range(1, n):
-        n = i + 1
-        out_means[i] = out_means[i - 1] * n / (n + 1) + xs[i] / (n + 1)
-
-        delta_n = xs[i] - out_means[i - 1]
-        out_covs[i] = (
-            out_covs[i - 1] * (n - 2) / (n - 1) + torch.outer(delta_n, delta_n) / n
-        )
-
-    return out_means, out_covs

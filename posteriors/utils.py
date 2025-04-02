@@ -925,3 +925,37 @@ def L_to_flat(L: torch.Tensor) -> torch.Tensor:
     tril_indices = torch.tril_indices(num_params, num_params)
     L_flat = L[tril_indices[0], tril_indices[1]].clone()
     return L_flat
+
+
+def cumulative_mean_and_cov(xs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute the cumulative mean and covariance of a sequence of tensors.
+
+    This is a numerically efficient way to calculate the cumulative covariances
+    in particular. It costs O(n d^2) time compared to a naive O(n^2 d^2)
+    implementation.
+
+    Args:
+        xs: Sequence of tensors.
+
+    Returns:
+        Tuple of cumulative mean and covariance.
+    """
+    n, d = xs.shape
+    out_means = torch.zeros((n, d))
+    out_covs = torch.zeros((n, d, d))
+
+    out_means[0] = xs[0]
+    out_covs[0] = torch.eye(d)
+
+    for i in range(1, n):
+        n = i + 1
+        # Update mean
+        out_means[i] = out_means[i - 1] * (n - 1) / n + xs[i] / n
+
+        # Update covariance
+        delta_n = xs[i] - out_means[i - 1]
+        out_covs[i] = (
+            out_covs[i - 1] * (n - 2) / (n - 1) + torch.outer(delta_n, delta_n) / n
+        )
+
+    return out_means, out_covs

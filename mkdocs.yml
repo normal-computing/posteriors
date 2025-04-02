@@ -17,6 +17,7 @@ theme:
       primary: custom
       accent: custom
   logo: https://storage.googleapis.com/posteriors/logo_light.png
+  favicon: https://storage.googleapis.com/posteriors/logo_square.png
   icon:
     repo: fontawesome/brands/github
   features:

@@ -1,6 +1,7 @@
 from typing import Any
 from functools import partial
 import torch
+from torch import Tensor
 from torch.func import grad_and_value
 from tensordict import TensorClass
 
@@ -60,8 +61,8 @@ class SGLDState(TensorClass["frozen"]):
     """
 
     params: TensorTree
-    log_posterior: torch.Tensor = torch.tensor(torch.nan)
-    step: torch.Tensor = torch.tensor(0)
+    log_posterior: Tensor = torch.tensor(torch.nan)
+    step: Tensor = torch.tensor(0)
 
 
 def init(params: TensorTree) -> SGLDState:

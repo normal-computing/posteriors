@@ -18,13 +18,20 @@ def kl_gaussians(
 def verify_inplace_update(transform: Transform, params: TensorTree, batch: Any):
     init_state = transform.init(params)
 
+    assert init_state.step == 0
+
     # One step not inplace
     torch.manual_seed(42)
     state_not_inplace, _ = transform.update(init_state, batch)
 
+    assert state_not_inplace.step == 1
+
     # One step in place = same as not inplace
     torch.manual_seed(42)
     state_inplace, _ = transform.update(init_state, batch, inplace=True)
+
+    assert state_inplace.step == 1
+    assert init_state.step == 1
 
     # Iterate through leaves of params and check they are the same
     for init_leaf, not_inplace_leaf, inplace_leaf in zip(

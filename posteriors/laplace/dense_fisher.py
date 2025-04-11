@@ -5,7 +5,7 @@ from optree import tree_map
 from optree.integration.torch import tree_ravel
 from tensordict import TensorClass
 from posteriors.types import TensorTree, Transform, LogProbFn
-from posteriors.tree_utils import tree_size
+from posteriors.tree_utils import tree_size, tree_insert_
 from posteriors.utils import (
     per_samplify,
     empirical_fisher,
@@ -61,10 +61,12 @@ class DenseLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
+        step: Current step count.
     """
 
     params: TensorTree
     prec: torch.Tensor
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -127,9 +129,10 @@ def update(
 
     if inplace:
         state.prec.data += fisher
+        tree_insert_(state.step, state.step + 1)
         return state, aux
     else:
-        return DenseLaplaceState(state.params, state.prec + fisher), aux
+        return DenseLaplaceState(state.params, state.prec + fisher, state.step + 1), aux
 
 
 def sample(

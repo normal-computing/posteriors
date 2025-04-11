@@ -24,7 +24,11 @@ def test_ekf_diag_inplace():
         for i, x in enumerate(target_mean)
     }
     batch = torch.arange(3).reshape(-1, 1)
-    transform = ekf.diag_fisher.build(log_prob, lr=1e-1)
+
+    def lr(step):
+        return 1e-1 * (step + 1) ** -0.33
+
+    transform = ekf.diag_fisher.build(log_prob, lr=lr)
 
     verify_inplace_update(transform, init_mean, batch)
 

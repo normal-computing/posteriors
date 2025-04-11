@@ -11,8 +11,8 @@ from posteriors.types import (
     ForwardFn,
     OuterLogProbFn,
 )
+from posteriors.tree_utils import tree_insert_, tree_size
 from posteriors.utils import (
-    tree_size,
     ggn,
     is_scalar,
     CatchAuxError,
@@ -73,10 +73,12 @@ class DenseLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec: Precision matrix of the Normal distribution.
+        step: Current step count.
     """
 
     params: TensorTree
     prec: torch.Tensor
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -142,9 +144,12 @@ def update(
 
     if inplace:
         state.prec.data += ggn_batch
+        tree_insert_(state.step, state.step + 1)
         return state, aux
     else:
-        return DenseLaplaceState(state.params, state.prec + ggn_batch), aux
+        return DenseLaplaceState(
+            state.params, state.prec + ggn_batch, state.step + 1
+        ), aux
 
 
 def sample(

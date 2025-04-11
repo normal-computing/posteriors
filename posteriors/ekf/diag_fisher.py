@@ -5,7 +5,7 @@ from torch.func import jacrev
 from optree import tree_map
 from tensordict import TensorClass
 
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import (
     diag_normal_sample,
@@ -17,7 +17,7 @@ from posteriors.utils import (
 
 def build(
     log_likelihood: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     transition_sd: float = 0.0,
     per_sample: bool = False,
     init_sds: TensorTree | float = 1.0,
@@ -44,6 +44,7 @@ def build(
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
@@ -76,11 +77,13 @@ class EKFDiagState(TensorClass["frozen"]):
         sd_diag: Square-root diagonal of the covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
+        step: Current step count.
     """
 
     params: TensorTree
     sd_diag: TensorTree
     log_likelihood: torch.Tensor = torch.tensor([])
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -110,7 +113,7 @@ def update(
     state: EKFDiagState,
     batch: Any,
     log_likelihood: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     transition_sd: float = 0.0,
     per_sample: bool = False,
     inplace: bool = False,
@@ -126,6 +129,7 @@ def update(
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         transition_sd: Standard deviation of the transition noise, to additively
             inflate the diagonal covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
@@ -141,6 +145,8 @@ def update(
 
     if not per_sample:
         log_likelihood = per_samplify(log_likelihood)
+
+    lr = lr(state.step) if callable(lr) else lr
 
     predict_sd_diag = flexi_tree_map(
         lambda x: (x**2 + transition_sd**2) ** 0.5, state.sd_diag, inplace=inplace
@@ -167,9 +173,12 @@ def update(
 
     if inplace:
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
 
-    return EKFDiagState(update_mean, update_sd_diag, log_liks.mean().detach()), aux
+    return EKFDiagState(
+        update_mean, update_sd_diag, log_liks.mean().detach(), state.step + 1
+    ), aux
 
 
 def sample(

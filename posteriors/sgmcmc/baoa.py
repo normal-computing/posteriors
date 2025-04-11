@@ -5,17 +5,17 @@ from torch.func import grad_and_value
 from optree import tree_map
 from tensordict import TensorClass
 
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
 
 
 def build(
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     momenta: TensorTree | float | None = None,
 ) -> Transform:
     """Builds BAOA transform.
@@ -49,9 +49,11 @@ def build(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
 
@@ -77,11 +79,13 @@ class BAOAState(TensorClass["frozen"]):
         params: Parameters.
         momenta: Momenta for each parameter.
         log_posterior: Log posterior evaluation.
+        step: Current step count.
     """
 
     params: TensorTree
     momenta: TensorTree
     log_posterior: torch.Tensor = torch.tensor(torch.nan)
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(params: TensorTree, momenta: TensorTree | float | None = None) -> BAOAState:
@@ -113,10 +117,10 @@ def update(
     state: BAOAState,
     batch: Any,
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     inplace: bool = False,
 ) -> tuple[BAOAState, TensorTree]:
     """Updates parameters and momenta for BAOA.
@@ -132,9 +136,11 @@ def update(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -147,6 +153,8 @@ def update(
             state.params, batch
         )
 
+    lr = lr(state.step) if callable(lr) else lr
+    temperature = temperature(state.step) if callable(temperature) else temperature
     prec = sigma**-2
     gamma = torch.tensor(alpha * prec)
     zeta2 = (temperature * (1 - torch.exp(-2 * gamma * lr))) ** 0.5
@@ -167,5 +175,6 @@ def update(
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
-    return BAOAState(params, momenta, log_post.detach()), aux
+    return BAOAState(params, momenta, log_post.detach(), state.step + 1), aux

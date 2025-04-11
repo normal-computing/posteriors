@@ -6,7 +6,7 @@ from optree import tree_map
 from tensordict import TensorClass
 
 from posteriors.types import TensorTree, Transform, LogProbFn
-from posteriors.tree_utils import flexi_tree_map
+from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import (
     diag_normal_sample,
     per_samplify,
@@ -60,10 +60,12 @@ class DiagLaplaceState(TensorClass["frozen"]):
     Attributes:
         params: Mean of the Normal distribution.
         prec_diag: Diagonal of the precision matrix of the Normal distribution.
+        step: Current step count.
     """
 
     params: TensorTree
     prec_diag: TensorTree
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -131,8 +133,9 @@ def update(
     )
 
     if inplace:
+        tree_insert_(state.step, state.step + 1)
         return state, aux
-    return DiagLaplaceState(state.params, prec_diag), aux
+    return DiagLaplaceState(state.params, prec_diag, state.step + 1), aux
 
 
 def sample(

@@ -5,18 +5,18 @@ from torch.func import grad_and_value
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 from tensordict import TensorClass
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
 
 
 def build(
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     momenta: TensorTree | float | None = None,
     xi: float = None,
 ) -> Transform:
@@ -43,10 +43,12 @@ def build(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
         xi: Initial value for scalar thermostat ξ. Defaults to `alpha`.
@@ -75,12 +77,14 @@ class SGNHTState(TensorClass["frozen"]):
         momenta: Momenta for each parameter.
         xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
+        step: Current step count.
     """
 
     params: TensorTree
     momenta: TensorTree
     xi: torch.Tensor
     log_posterior: torch.Tensor = torch.tensor(torch.nan)
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -117,11 +121,11 @@ def update(
     state: SGNHTState,
     batch: Any,
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     inplace: bool = False,
 ) -> tuple[SGNHTState, TensorTree]:
     """Updates parameters, momenta and xi for SGNHT.
@@ -136,10 +140,12 @@ def update(
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
         lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -151,6 +157,8 @@ def update(
             state.params, batch
         )
 
+    lr = lr(state.step) if callable(lr) else lr
+    temperature = temperature(state.step) if callable(temperature) else temperature
     prec = sigma**-2
 
     def transform_params(p, m):
@@ -176,5 +184,6 @@ def update(
     if inplace:
         tree_insert_(state.xi, xi_new)
         tree_insert_(state.log_posterior, log_post.detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
-    return SGNHTState(params, momenta, xi_new, log_post.detach()), aux
+    return SGNHTState(params, momenta, xi_new, log_post.detach(), state.step + 1), aux

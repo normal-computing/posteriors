@@ -1,19 +1,20 @@
 from typing import Any
 from functools import partial
 import torch
+from torch import Tensor
 from torch.func import grad_and_value
 from tensordict import TensorClass
 
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import CatchAuxError
 
 
 def build(
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     beta: float = 0.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
 ) -> Transform:
     """Builds SGLD transform.
 
@@ -32,9 +33,11 @@ def build(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
+        lr: Learning rate,
+            scalar or schedule (callable taking step index, returning scalar).
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the sampling distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
 
     Returns:
         SGLD transform (posteriors.types.Transform instance).
@@ -55,10 +58,12 @@ class SGLDState(TensorClass["frozen"]):
     Attributes:
         params: Parameters.
         log_posterior: Log posterior evaluation.
+        step: Current step count.
     """
 
     params: TensorTree
-    log_posterior: torch.Tensor = torch.tensor(torch.nan)
+    log_posterior: Tensor = torch.tensor(torch.nan)
+    step: Tensor = torch.tensor(0)
 
 
 def init(params: TensorTree) -> SGLDState:
@@ -78,9 +83,9 @@ def update(
     state: SGLDState,
     batch: Any,
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     beta: float = 0.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     inplace: bool = False,
 ) -> tuple[SGLDState, TensorTree]:
     """Updates parameters for SGLD.
@@ -94,9 +99,11 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
+        lr: Learning rate,
+            scalar or schedule (callable taking step index, returning scalar).
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the sampling distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -107,6 +114,9 @@ def update(
         grads, (log_post, aux) = grad_and_value(log_posterior, has_aux=True)(
             state.params, batch
         )
+
+    lr = lr(state.step) if callable(lr) else lr
+    temperature = temperature(state.step) if callable(temperature) else temperature
 
     def transform_params(p, g):
         return (
@@ -120,5 +130,6 @@ def update(
 
     if inplace:
         tree_insert_(state.log_posterior, log_post.detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
-    return SGLDState(params, log_post.detach()), aux
+    return SGLDState(params, log_post.detach(), state.step + 1), aux

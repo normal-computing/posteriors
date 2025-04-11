@@ -6,7 +6,7 @@ from optree.integration.torch import tree_ravel
 from tensordict import TensorClass
 
 from posteriors.tree_utils import tree_size, tree_insert_
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.utils import (
     per_samplify,
     empirical_fisher,
@@ -17,7 +17,7 @@ from posteriors.utils import (
 
 def build(
     log_likelihood: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     transition_cov: torch.Tensor | float = 0.0,
     per_sample: bool = False,
     init_cov: torch.Tensor | float = 1.0,
@@ -43,6 +43,7 @@ def build(
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         transition_cov: Covariance of the transition noise, to additively
             inflate the covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
@@ -74,11 +75,13 @@ class EKFDenseState(TensorClass["frozen"]):
         cov: Covariance matrix of the
             Normal distribution.
         log_likelihood: Log likelihood of the data given the parameters.
+        step: Current step count.
     """
 
     params: TensorTree
     cov: torch.Tensor
     log_likelihood: torch.Tensor = torch.tensor([])
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -122,6 +125,7 @@ def update(
             returns the log-likelihood value as well as auxiliary information,
             e.g. from the model call.
         lr: Inverse temperature of the update, which behaves like a learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         transition_cov: Covariance of the transition noise, to additively
             inflate the covariance before the update.
         per_sample: If True, then log_likelihood is assumed to return a vector of
@@ -136,6 +140,8 @@ def update(
     """
     if not per_sample:
         log_likelihood = per_samplify(log_likelihood)
+
+    lr = lr(state.step) if callable(lr) else lr
 
     with torch.no_grad(), CatchAuxError():
 
@@ -163,9 +169,12 @@ def update(
         tree_insert_(state.params, update_mean)
         tree_insert_(state.cov, update_cov)
         tree_insert_(state.log_likelihood, log_liks.mean().detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
 
-    return EKFDenseState(update_mean, update_cov, log_liks.mean().detach()), aux
+    return EKFDenseState(
+        update_mean, update_cov, log_liks.mean().detach(), state.step + 1
+    ), aux
 
 
 def sample(

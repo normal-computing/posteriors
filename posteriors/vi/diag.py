@@ -6,7 +6,7 @@ from optree import tree_map
 import torchopt
 from tensordict import TensorClass
 
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import tree_insert_
 from posteriors.utils import (
     diag_normal_log_prob,
@@ -19,7 +19,7 @@ from posteriors.utils import (
 def build(
     log_posterior: Callable[[TensorTree, Any], float],
     optimizer: torchopt.base.GradientTransformation,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     n_samples: int = 1,
     stl: bool = True,
     init_log_sds: TensorTree | float = 0.0,
@@ -41,6 +41,7 @@ def build(
         optimizer: TorchOpt functional optimizer for updating the variational
             parameters. Make sure to use lower case like torchopt.adam()
         temperature: Temperature to rescale (divide) log_posterior.
+            Scalar or schedule (callable taking step index, returning scalar).
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
             from [Roeder et al](https://arxiv.org/abs/1703.09194).
@@ -72,12 +73,14 @@ class VIDiagState(TensorClass["frozen"]):
         opt_state: TorchOpt state storing optimizer data for updating the
             variational parameters.
         nelbo: Negative evidence lower bound (lower is better).
+        step: Current step count.
     """
 
     params: TensorTree
     log_sd_diag: TensorTree
     opt_state: torchopt.typing.OptState
     nelbo: torch.Tensor = torch.tensor([])
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -139,6 +142,7 @@ def update(
         optimizer: TorchOpt functional optimizer for updating the variational
             parameters. Make sure to use lower case like torchopt.adam()
         temperature: Temperature to rescale (divide) log_posterior.
+            Scalar or schedule (callable taking step index, returning scalar).
         n_samples: Number of samples to use for Monte Carlo estimate.
         stl: Whether to use the stick-the-landing estimator
             from (Roeder et al](https://arxiv.org/abs/1703.09194).
@@ -147,6 +151,7 @@ def update(
     Returns:
         Updated DiagVIState and auxiliary information.
     """
+    temperature = temperature(state.step) if callable(temperature) else temperature
 
     def nelbo_log_sd(m, lsd):
         sd_diag = tree_map(torch.exp, lsd)
@@ -169,9 +174,12 @@ def update(
 
     if inplace:
         tree_insert_(state.nelbo, nelbo_val.detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
 
-    return VIDiagState(mean, log_sd_diag, opt_state, nelbo_val.detach()), aux
+    return VIDiagState(
+        mean, log_sd_diag, opt_state, nelbo_val.detach(), state.step + 1
+    ), aux
 
 
 def nelbo(

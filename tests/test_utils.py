@@ -110,7 +110,8 @@ def test_model_to_function():
 
     func_output2 = func_lm(dict(lm.named_parameters()), input_ids, attention_mask)
 
-    assert type(output) == type(func_output1) == type(func_output2)
+    assert type(output) is type(func_output1)
+    assert type(output) is type(func_output2)
     assert torch.allclose(output["logits"], func_output1["logits"])
     assert torch.allclose(output["logits"], func_output2["logits"])
 

@@ -43,9 +43,9 @@ class EvaluationEngine:
                 config["pretrained_model_name_or_path"]
             )
         else:
-            assert os.path.isdir(
-                config["checkpoints_folder"]
-            ), "Provided checkpoints is not a path to a folder"
+            assert os.path.isdir(config["checkpoints_folder"]), (
+                "Provided checkpoints is not a path to a folder"
+            )
             checkpoints = [
                 os.path.join(config["checkpoints_folder"], path)
                 for path in os.listdir(config["checkpoints_folder"])

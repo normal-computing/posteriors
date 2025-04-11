@@ -10,7 +10,9 @@ def test_sgld():
     torch.manual_seed(42)
 
     # Set inference parameters
-    lr = 1e-3
+    def lr(step):
+        return 1e-2 * (step + 1) ** -0.33
+
     beta = 0.0
 
     # Run MCMC test on Gaussian

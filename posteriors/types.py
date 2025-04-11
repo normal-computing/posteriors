@@ -17,10 +17,15 @@ LogProbFn = Callable[[TensorTree, TensorTree], Tuple[float, TensorTree]]
 ForwardFn = Callable[[TensorTree, TensorTree], Tuple[Tensor, TensorTree]]
 OuterLogProbFn = Callable[[TensorTree, TensorTree], float]
 
+TensorLike = float | int | bool | Tensor
+Schedule = Callable[
+    [TensorLike], TensorLike
+]  # Learning rate schedule (input is step index, output is scalar learning rate)
+
 
 class InitFn(Protocol):
-    @staticmethod
     def __call__(
+        self,
         params: TensorTree,
     ) -> TensorClass:
         """Initiate a posteriors state with unified API:
@@ -48,8 +53,8 @@ class InitFn(Protocol):
 
 
 class UpdateFn(Protocol):
-    @staticmethod
     def __call__(
+        self,
         state: TensorClass,
         batch: Any,
         inplace: bool = False,

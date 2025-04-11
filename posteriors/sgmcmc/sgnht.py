@@ -16,7 +16,7 @@ def build(
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     momenta: TensorTree | float | None = None,
     xi: float = None,
 ) -> Transform:
@@ -42,12 +42,13 @@ def build(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate,
-            scalar or schedule (callable taking step index, returning scalar).
+        lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
         xi: Initial value for scalar thermostat ξ. Defaults to `alpha`.
@@ -124,7 +125,7 @@ def update(
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     inplace: bool = False,
 ) -> tuple[SGNHTState, TensorTree]:
     """Updates parameters, momenta and xi for SGNHT.
@@ -138,11 +139,13 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate, scalar or schedule (callable taking step index, returning scalar).
+        lr: Learning rate.
+            Scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -155,6 +158,7 @@ def update(
         )
 
     lr = lr(state.step) if callable(lr) else lr
+    temperature = temperature(state.step) if callable(temperature) else temperature
     prec = sigma**-2
 
     def transform_params(p, m):

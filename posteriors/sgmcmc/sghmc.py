@@ -16,7 +16,7 @@ def build(
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     momenta: TensorTree | float | None = None,
 ) -> Transform:
     """Builds SGHMC transform.
@@ -47,6 +47,7 @@ def build(
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         momenta: Initial momenta. Can be tree like params or scalar.
             Defaults to random iid samples from N(0, 1).
 
@@ -115,7 +116,7 @@ def update(
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
-    temperature: float = 1.0,
+    temperature: float | Schedule = 1.0,
     inplace: bool = False,
 ) -> tuple[SGHMCState, TensorTree]:
     """Updates parameters and momenta for SGHMC.
@@ -135,6 +136,7 @@ def update(
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
         temperature: Temperature of the joint parameter + momenta distribution.
+            Scalar or schedule (callable taking step index, returning scalar).
         inplace: Whether to modify state in place.
 
     Returns:
@@ -147,6 +149,7 @@ def update(
         )
 
     lr = lr(state.step) if callable(lr) else lr
+    temperature = temperature(state.step) if callable(temperature) else temperature
     prec = sigma**-2
 
     def transform_params(p, m):

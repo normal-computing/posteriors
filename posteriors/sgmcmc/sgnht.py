@@ -5,14 +5,14 @@ from torch.func import grad_and_value
 from optree import tree_map
 from optree.integration.torch import tree_ravel
 from tensordict import TensorClass
-from posteriors.types import TensorTree, Transform, LogProbFn
+from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_
 from posteriors.utils import is_scalar, CatchAuxError
 
 
 def build(
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
@@ -42,7 +42,8 @@ def build(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
+        lr: Learning rate,
+            scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
@@ -75,12 +76,14 @@ class SGNHTState(TensorClass["frozen"]):
         momenta: Momenta for each parameter.
         xi: Scalar thermostat.
         log_posterior: Log posterior evaluation.
+        step: Current step count.
     """
 
     params: TensorTree
     momenta: TensorTree
     xi: torch.Tensor
     log_posterior: torch.Tensor = torch.tensor(torch.nan)
+    step: torch.Tensor = torch.tensor(0)
 
 
 def init(
@@ -117,7 +120,7 @@ def update(
     state: SGNHTState,
     batch: Any,
     log_posterior: LogProbFn,
-    lr: float,
+    lr: float | Schedule,
     alpha: float = 0.01,
     beta: float = 0.0,
     sigma: float = 1.0,
@@ -135,7 +138,7 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate.
+        lr: Learning rate, scalar or schedule (callable taking step index, returning scalar).
         alpha: Friction coefficient.
         beta: Gradient noise coefficient (estimated variance).
         sigma: Standard deviation of momenta target distribution.
@@ -151,6 +154,7 @@ def update(
             state.params, batch
         )
 
+    lr = lr(state.step) if callable(lr) else lr
     prec = sigma**-2
 
     def transform_params(p, m):
@@ -176,5 +180,6 @@ def update(
     if inplace:
         tree_insert_(state.xi, xi_new)
         tree_insert_(state.log_posterior, log_post.detach())
+        tree_insert_(state.step, state.step + 1)
         return state, aux
-    return SGNHTState(params, momenta, xi_new, log_post.detach()), aux
+    return SGNHTState(params, momenta, xi_new, log_post.detach(), state.step + 1), aux

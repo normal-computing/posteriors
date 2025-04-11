@@ -111,13 +111,13 @@ def update(
             state.params, batch
         )
 
-    current_lr = lr(state.step) if callable(lr) else lr
+    lr = lr(state.step) if callable(lr) else lr
 
     def transform_params(p, g):
         return (
             p
-            + current_lr * g
-            + (temperature * current_lr * (2 - temperature * current_lr * beta)) ** 0.5
+            + lr * g
+            + (temperature * lr * (2 - temperature * lr * beta)) ** 0.5
             * torch.randn_like(p)
         )
 

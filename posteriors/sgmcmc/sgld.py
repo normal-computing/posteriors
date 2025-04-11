@@ -98,7 +98,8 @@ def update(
         log_posterior: Function that takes parameters and input batch and
             returns the log posterior value (which can be unnormalised)
             as well as auxiliary information, e.g. from the model call.
-        lr: Learning rate, either a float or a schedule (callable taking step index, returning scalar).
+        lr: Learning rate,
+            scalar or schedule (callable taking step index, returning scalar).
         beta: Gradient noise coefficient (estimated variance).
         temperature: Temperature of the sampling distribution.
         inplace: Whether to modify state in place.

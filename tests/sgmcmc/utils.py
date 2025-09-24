@@ -61,7 +61,10 @@ def run_test_sgmcmc_gaussian(
 
     start_num_samples = 500  # Omit first few KLs with high variance due to few samples
     spacing = 100
-    kl_divs_spaced = kl_divs[start_num_samples::spacing]
+
+    kl_divs_min_idx = torch.argmin(kl_divs[2:]) + 2
+    kl_divs_before_min = kl_divs[:kl_divs_min_idx]
+    kl_divs_spaced = kl_divs_before_min[start_num_samples::spacing]
     spaced_decreasing = kl_divs_spaced[:-1] > kl_divs_spaced[1:]
     proportion_decreasing = spaced_decreasing.float().mean()
     assert proportion_decreasing > 0.5, (

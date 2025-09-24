@@ -10,7 +10,7 @@ def test_baoa():
     torch.manual_seed(42)
 
     # Set inference parameters (with torch.optim.SGD parameterization)
-    lr = 1e-3
+    lr = 1e-2
     mu = 0.9
     tau = 0.9
 

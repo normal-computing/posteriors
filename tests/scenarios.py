@@ -41,7 +41,7 @@ def get_multivariate_normal_log_prob(
 ) -> tuple[LogProbFn, tuple[torch.Tensor, torch.Tensor]]:
     mean = torch.randn(dim)
     sqrt_cov = torch.randn(dim, dim)
-    cov = sqrt_cov @ sqrt_cov.T
+    cov = sqrt_cov @ sqrt_cov.T * 0.3 + torch.eye(dim) * 0.7
     chol_cov = torch.linalg.cholesky(cov)  # Lower triangular with positive diagonal
 
     def log_prob(p, batch):

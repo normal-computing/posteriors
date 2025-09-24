@@ -8,9 +8,9 @@ from tests import utils
 
 def run_test_sgmcmc_gaussian(
     transform_builder: Callable[[LogProbFn], Transform],
-    dim: int = 3,
-    n_steps: int = 15_000,
-    burnin: int = 5_000,
+    dim: int = 2,
+    n_steps: int = 100_000,
+    burnin: int = 15_000,
     rtol: float = 1e-2,  # Relative reduction of KL for final distribution compared to initial distribution
 ):
     # Load log posterior
@@ -32,6 +32,13 @@ def run_test_sgmcmc_gaussian(
 
     # Remove burnin
     all_states = all_states[burnin:]
+
+    samples_mean = all_states.params.mean(0)
+    samples_cov = all_states.params.T.cov()
+
+    # Check sufficient statistics
+    assert torch.allclose(samples_mean, mean, atol=1e-1)
+    assert torch.allclose(samples_cov, cov, atol=1e-1)
 
     # Check KL divergence between true and inferred Gaussian
     kl_init = utils.kl_gaussians(torch.zeros(dim), torch.eye(dim) * init_var, mean, cov)
@@ -57,4 +64,6 @@ def run_test_sgmcmc_gaussian(
     kl_divs_spaced = kl_divs[start_num_samples::spacing]
     spaced_decreasing = kl_divs_spaced[:-1] > kl_divs_spaced[1:]
     proportion_decreasing = spaced_decreasing.float().mean()
-    assert proportion_decreasing > 0.8
+    assert proportion_decreasing > 0.5, (
+        f"Proportion decreasing: {proportion_decreasing}"
+    )

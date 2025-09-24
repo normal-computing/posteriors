@@ -1,6 +1,6 @@
 from typing import Callable
 import torch
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 from tests.scenarios import get_multivariate_normal_log_prob
 from posteriors.types import LogProbFn, Transform
 

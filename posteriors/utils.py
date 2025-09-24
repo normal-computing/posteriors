@@ -6,7 +6,7 @@ import torch
 from torch.func import grad, jvp, vjp, functional_call, jacrev, jacfwd
 from torch.distributions import Normal
 from optree import tree_map, tree_reduce, tree_flatten, tree_leaves
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 
 from posteriors.types import TensorTree, ForwardFn, Tensor
 from posteriors.tree_utils import tree_size

@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from torch.func import grad_and_value
 from optree import tree_map
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 from tensordict import TensorClass
 from posteriors.types import TensorTree, Transform, LogProbFn, Schedule
 from posteriors.tree_utils import flexi_tree_map, tree_insert_

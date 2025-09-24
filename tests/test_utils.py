@@ -2,7 +2,7 @@ import pytest
 from functools import partial
 import torch
 from optree import tree_map, tree_flatten, tree_reduce
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 
 from posteriors import (
     CatchAuxError,

@@ -2,7 +2,7 @@ from functools import partial
 from typing import Any
 import torch
 from optree import tree_map
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 from tensordict import TensorClass
 
 from posteriors.types import (

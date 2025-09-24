@@ -2,7 +2,7 @@ import torch
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call, hessian
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 
 from posteriors import tree_size, diag_normal_log_prob
 from posteriors.laplace import dense_hessian

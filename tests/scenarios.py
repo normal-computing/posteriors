@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 from posteriors.types import LogProbFn
 
 

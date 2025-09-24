@@ -3,7 +3,7 @@ import torch
 from torch.distributions import Normal
 from torch.utils.data import DataLoader, TensorDataset
 from torch.func import functional_call
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 
 from posteriors.laplace import dense_ggn
 from tests.utils import verify_inplace_update

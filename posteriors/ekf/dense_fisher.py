@@ -2,7 +2,7 @@ from typing import Any
 from functools import partial
 import torch
 from torch.func import grad_and_value
-from optree.integration.torch import tree_ravel
+from optree.integrations.torch import tree_ravel
 from tensordict import TensorClass
 
 from posteriors.tree_utils import tree_size, tree_insert_

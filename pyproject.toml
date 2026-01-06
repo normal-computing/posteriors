@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python =">=3.9"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Sam Duffield", email = "sam@normalcomputing.ai"},
+    {name = "Sam Duffield", email = "sam@normalcomputing.com"},
 ]
 keywords = ["pytorch", "uncertainty"]
 classifiers = [

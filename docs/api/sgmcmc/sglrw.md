@@ -1,0 +1,3 @@
+# SGLRW
+
+::: posteriors.sgmcmc.sglrw

@@ -36,6 +36,8 @@ thermostat (SGNHT) algorithm from [Ding et al, 2014](https://proceedings.neurips
 (SGHMC with adaptive friction coefficient).
 - [`sgmcmc.baoa`](sgmcmc/baoa.md) implements the BAOA integrator for SGHMC
 from [Leimkuhler and Matthews, 2015 - p271](https://link.springer.com/book/10.1007/978-3-319-16375-8).
+- [`sgmcmc.sglrw`](sgmcmc/sglrw.md) implements the stochastic gradient lattice random
+walk (SGLRW) algorithm from [Mensch et al, 2026](https://arxiv.org/abs/2602.15925).
 
 For an overview and unifying framework for SGMCMC methods, see [Ma et al, 2015](https://arxiv.org/abs/1506.04696).
 

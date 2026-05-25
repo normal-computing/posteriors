@@ -40,8 +40,8 @@ def test_baoa_inplace_step():
     # Build transform
     transform = baoa.build(log_prob, lr)
 
-    # Initialise
-    params = torch.randn(dim)
+    # Initialise 
+    params = {"w": torch.randn(2, 2), "b": torch.randn(1)}
 
     # Verify inplace update
     verify_inplace_update(transform, params, None)

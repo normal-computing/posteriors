@@ -33,7 +33,7 @@ def test_sgld_inplace_step():
     # Build transform
     transform = sgld.build(log_prob, lr)
 
-    # Initialise 
+    # Initialise
     params = {"w": torch.randn(2, 2), "b": torch.randn(1)}
 
     # Verify inplace update

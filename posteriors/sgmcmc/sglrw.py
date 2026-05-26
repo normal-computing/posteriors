@@ -93,7 +93,7 @@ def update(
     T_val = temperature(state.step) if callable(temperature) else temperature
     # Spatial stepsize to make update binary
     diffusion_val = (2.0 * T_val) ** 0.5
-    delta_x = lr_val ** 0.5 * diffusion_val
+    delta_x = lr_val**0.5 * diffusion_val
 
     # Per-parameter binary LRW transform
     def transform_params(p, g):
@@ -134,7 +134,9 @@ def ternary_probs(
     Returns:
         Update probabilities as a tensor, with last axis being [p_minus, p_zero, p_plus].
     """
-    diffusion_val = torch.as_tensor(diffusion_val, dtype=drift_val.dtype, device=drift_val.device)
+    diffusion_val = torch.as_tensor(
+        diffusion_val, dtype=drift_val.dtype, device=drift_val.device
+    )
     stepsize = torch.as_tensor(stepsize, dtype=drift_val.dtype, device=drift_val.device)
     delta_x = torch.as_tensor(delta_x, dtype=drift_val.dtype, device=drift_val.device)
     desired_mean = stepsize * drift_val

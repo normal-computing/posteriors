@@ -130,10 +130,11 @@ If you want to contribute code, please check the [contributing guide](https://no
 If you use `posteriors` in your research, please cite the library using the following BibTeX entry:
 
 ```bibtex
-@article{duffield2024scalable,
-  title={Scalable Bayesian Learning with posteriors},
-  author={Duffield, Samuel and Donatella, Kaelan and Chiu, Johnathan and Klett, Phoebe and Simpson, Daniel},
-  journal={arXiv preprint arXiv:2406.00104},
-  year={2024}
+@inproceedings{duffield2025scalable,
+    title={Scalable Bayesian Learning with posteriors},
+    author={Samuel Duffield and Kaelan Donatella and Johnathan Chiu and Phoebe Klett and Daniel Simpson},
+    booktitle={The Thirteenth International Conference on Learning Representations},
+    year={2025},
+    url={https://openreview.net/forum?id=fifXzmzeGy}
 }
 ```

@@ -91,18 +91,13 @@ def update(
     # Resolve schedules
     lr_val = lr(state.step) if callable(lr) else lr
     T_val = temperature(state.step) if callable(temperature) else temperature
-    lr_val = torch.as_tensor(
-        lr_val, dtype=state.params.dtype, device=state.params.device
-    )
-    T_val = torch.as_tensor(T_val, dtype=state.params.dtype, device=state.params.device)
-
     # Spatial stepsize to make update binary
-    diffusion_val = torch.sqrt(2.0 * T_val)
-    delta_x = torch.sqrt(lr_val) * diffusion_val
+    diffusion_val = (2.0 * T_val) ** 0.5
+    delta_x = lr_val**0.5 * diffusion_val
 
     # Per-parameter binary LRW transform
     def transform_params(p, g):
-        p_plus = ternary_probs(g, diffusion_val, lr_val, delta_x)[:, 2]
+        p_plus = ternary_probs(g, diffusion_val, lr_val, delta_x)[..., 2]
 
         u = torch.rand_like(p_plus)
         step_sign = torch.where(
@@ -139,6 +134,11 @@ def ternary_probs(
     Returns:
         Update probabilities as a tensor, with last axis being [p_minus, p_zero, p_plus].
     """
+    diffusion_val = torch.as_tensor(
+        diffusion_val, dtype=drift_val.dtype, device=drift_val.device
+    )
+    stepsize = torch.as_tensor(stepsize, dtype=drift_val.dtype, device=drift_val.device)
+    delta_x = torch.as_tensor(delta_x, dtype=drift_val.dtype, device=drift_val.device)
     desired_mean = stepsize * drift_val
     desired_var = stepsize * diffusion_val**2
     scaled_mean = desired_mean / delta_x
